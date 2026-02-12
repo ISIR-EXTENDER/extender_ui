@@ -5,7 +5,10 @@ export type WsStatus = "disconnected" | "connecting" | "connected";
 interface TeleopState {
   joyX: number;
   joyY: number;
+  rotX: number;
+  rotY: number;
   z: number;
+  rz: number;
   mode: number;
   wsStatus: WsStatus;
   seq: number;
@@ -16,7 +19,9 @@ interface TeleopState {
   invertY: boolean;
   invertZ: boolean;
   setJoy: (x: number, y: number) => void;
+  setRot: (x: number, y: number) => void;
   setZ: (z: number) => void;
+  setRz: (z: number) => void;
   setMode: (mode: number) => void;
   cycleMode: () => void;
   setWsStatus: (status: WsStatus) => void;
@@ -32,7 +37,10 @@ interface TeleopState {
 export const useTeleopStore = create<TeleopState>((set, get) => ({
   joyX: 0,
   joyY: 0,
+  rotX: 0,
+  rotY: 0,
   z: 0,
+  rz: 0,
   mode: 0,
   wsStatus: "disconnected",
   seq: 0,
@@ -43,7 +51,9 @@ export const useTeleopStore = create<TeleopState>((set, get) => ({
   invertY: false,
   invertZ: false,
   setJoy: (x, y) => set({ joyX: x, joyY: y }),
+  setRot: (x, y) => set({ rotX: x, rotY: y }),
   setZ: (z) => set({ z }),
+  setRz: (z) => set({ rz: z }),
   setMode: (mode) => set({ mode }),
   cycleMode: () => set((state) => ({ mode: (state.mode + 1) % 4 })),
   setWsStatus: (status) => set({ wsStatus: status }),

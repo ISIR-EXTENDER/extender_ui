@@ -1,73 +1,83 @@
-# React + TypeScript + Vite
+# Extender UI — Tablet Teleoperation Console
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This is a touch-first teleoperation UI for the Extender robot system. It is designed for a tablet, supports focus mode, and separates tasks across tabs so each answers a single operator question.
 
-Currently, two official plugins are available:
+## Architecture Overview
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- Frontend: React + TypeScript (Vite) for fast UI iteration.
+- State: Zustand store for teleop input state.
+- Transport: WebSocket served by the ROS2 tablet_interface node (rclpy) that publishes teleop_cmd and state updates.
+- Rendering: Lightweight cards, two joysticks, and responsive layouts for large touch targets.
 
-## React Compiler
+### Data Flow
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+1. User gestures update joystick and buttons (Z/RZ, mode).
+2. UI sends teleop_cmd messages over WebSocket at a fixed rate + on changes.
+3. The tablet_interface node validates + scales commands, then publishes `/teleop_cmd` (ROS2).
+4. UI listens for state messages and renders live telemetry (watchdog, speed, pose, etc.).
 
-## Expanding the ESLint configuration
+## Tabs (What each tab answers)
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+1. Controls — How do I move?
+  - Motion controls (translation + rotation joysticks) and live teleop dashboard.
+  - RViz live preview on the right.
+2. Articular — How do I position joints?
+  - Joint sliders with limits, torque display, and send/sync actions.
+  - RViz live + joint mini plots on the right.
+3. Poses & Trajectories — How do I replay motion?
+  - Saved poses list, trajectory builder, and preview panels (graphs, interpolation, Cartesian preview).
+4. Pétanque — Use-case optimized interface.
+  - Game status, actions, and vision/trajectory cards.
+5. Camera — What do I see?
+  - Central feed, camera settings side panel, and recording controls.
+6. Visual Servoing — How do I servo to a target?
+  - Target selection, enable toggle, PID, and live visual overlays.
+7. Curves — What do the signals look like?
+  - Live plots for linear/angular velocity, joint velocities, error norms, and gains.
+8. Logs / Rosbags — What did I record?
+  - Start/stop capture, bag naming, and session metrics.
+9. Configuration — How do I configure?
+  - Advanced settings (gains, filters, frames, inversion, robot type, deadman).
+10. Debug — What is happening internally?
+   - Raw streams, controller state, latency, and watchdog diagnostics.
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## Libraries Used (and why)
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+- React + TypeScript: Strong typing for complex UI state and predictable component behavior.
+- Vite: Fast development server and modern build pipeline for quick iteration.
+- Zustand: Minimal, fast global state management for teleop inputs.
+- Radix Slider: Accessible, touch-friendly sliders for gains and joint controls.
+- NippleJS: Mature, reliable joystick behavior for touch screens.
+- Recharts: Lightweight charting for live plots; good tradeoff of features vs. bundle size.
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+## Backend (tablet_interface) Notes
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+- **ROS2 rclpy Node**: The tablet_interface package hosts the WebSocket server and publishes `/teleop_cmd`.
+- **FastAPI + Uvicorn**: Lightweight async WebSocket server embedded in the node.
+- **Pydantic**: Validates incoming WS payloads.
+- **SafetyGate**: Enforces watchdog and max velocity limits before publishing.
+- **Default WS endpoint**: ws://<bind_host>:8765/ws/control (configurable in tablet_interface parameters).
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## TODOs (Backend Wiring)
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+- Wire all buttons/sliders to ROS2 services/actions/topics:
+  - Gripper actions and parameters
+  - Pose management (add/rename/delete/move)
+  - Trajectory builder + execution
+  - Joint control publish/feedback
+  - Camera controls + overlay toggle
+  - Rosbag start/stop + list + download
+  - Visual servoing target selection + PID
+
+## Notes
+
+- The UI is touch-optimized and should not require scrolling on the target tablet resolution.
+- Focus mode displays only the motion panel for low-distraction teleop.
+
+## Development
+
+- npm install
+- npm run dev
+
+
+

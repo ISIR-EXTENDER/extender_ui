@@ -1,14 +1,34 @@
 import { useEffect, useRef } from "react";
 import type { JoystickManager } from "nipplejs";
 
-import { useTeleopStore } from "../store";
-
 const clamp = (v: number, min = -1, max = 1) => Math.max(min, Math.min(max, v));
 
-export function Joystick() {
+type JoystickProps = {
+  onMove: (x: number, y: number) => void;
+  onEnd?: () => void;
+  color?: string;
+  size?: number;
+  deadzone?: number;
+  className?: string;
+};
+
+export function Joystick({
+  onMove,
+  onEnd,
+  color = "#4a9eff",
+  size = 160,
+  deadzone = 0.1,
+  className,
+}: JoystickProps) {
   const zoneRef = useRef<HTMLDivElement | null>(null);
   const managerRef = useRef<JoystickManager | null>(null);
-  const setJoy = useTeleopStore((s) => s.setJoy);
+  const onMoveRef = useRef(onMove);
+  const onEndRef = useRef(onEnd);
+
+  useEffect(() => {
+    onMoveRef.current = onMove;
+    onEndRef.current = onEnd;
+  }, [onMove, onEnd]);
 
   useEffect(() => {
     if (!zoneRef.current) return;
@@ -28,8 +48,8 @@ export function Joystick() {
           zone: zoneRef.current,
           mode: "static",
           position: { left: "50%", top: "50%" },
-          color: "#4f46e5",
-          size: 160,
+          color,
+          size,
           restOpacity: 0.8,
           lockX: false,
           lockY: false,
@@ -38,15 +58,19 @@ export function Joystick() {
         managerRef.current.on("move", (_, data) => {
           const x = clamp(data.vector.x);
           const y = clamp(data.vector.y);
-          setJoy(x, y);
+          onMoveRef.current(x, y);
         });
 
         managerRef.current.on("end", () => {
-          setJoy(0, 0);
+          if (onEndRef.current) {
+            onEndRef.current();
+          } else {
+            onMoveRef.current(0, 0);
+          }
         });
       })
       .catch(() => {
-        setJoy(0, 0);
+        onMoveRef.current(0, 0);
       });
 
     return () => {
@@ -54,7 +78,18 @@ export function Joystick() {
       managerRef.current?.destroy();
       managerRef.current = null;
     };
-  }, [setJoy]);
+  }, [color, size]);
 
-  return <div className="joystick-zone" ref={zoneRef} />;
+  return (
+    <div
+      className={`joystick-shell ${className ?? ""}`.trim()}
+      style={{
+        ["--joy-size" as string]: `${size}px`,
+        ["--joy-deadzone" as string]: `${deadzone}`,
+      }}
+    >
+      <div className="joystick-deadzone" />
+      <div className="joystick-zone" ref={zoneRef} />
+    </div>
+  );
 }
