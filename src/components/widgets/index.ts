@@ -1,6 +1,17 @@
 export { JoystickWidget } from "./JoystickWidget";
 export { SliderWidget } from "./SliderWidget";
 export {
+  ActionButtonWidget,
+  GripperControlWidget,
+  MaxVelocityWidget,
+  NavigationBarWidget,
+  NavigationButtonWidget,
+  RosbagControlWidget,
+  StreamDisplayWidget,
+  TextareaWidget,
+  TextWidget,
+} from "./AuxWidgets";
+export {
   SavePoseButtonWidget,
   LoadPoseButtonWidget,
 } from "./PoseButtonsWidget";
@@ -12,6 +23,19 @@ export {
   type SliderWidget as SliderWidgetModel,
   type SavePoseButtonWidget as SavePoseButtonWidgetModel,
   type LoadPoseButtonWidget as LoadPoseButtonWidgetModel,
+  type NavigationButtonWidget as NavigationButtonWidgetModel,
+  type NavigationBarWidget as NavigationBarWidgetModel,
+  type TextWidget as TextWidgetModel,
+  type TextareaWidget as TextareaWidgetModel,
+  type ButtonWidget as ButtonWidgetModel,
+  type RosbagControlWidget as RosbagControlWidgetModel,
+  type MaxVelocityWidget as MaxVelocityWidgetModel,
+  type GripperControlWidget as GripperControlWidgetModel,
+  type StreamDisplayWidget as StreamDisplayWidgetModel,
+  type NavigationOrientation,
+  type StreamSource,
+  type TextAlign,
+  type WidgetKind,
   type SliderDirection,
   type SliderBinding,
   type JoystickBinding,

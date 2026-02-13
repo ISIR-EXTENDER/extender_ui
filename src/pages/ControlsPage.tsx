@@ -8,40 +8,57 @@ import {
 import { createPortal } from "react-dom";
 
 import type { CanvasRect } from "../components/layout/CanvasItem";
-import { ModeSelector } from "../components/teleop/ModeSelector";
-import { JoystickWidget } from "../components/widgets/JoystickWidget";
+import { wsClient } from "../services/wsClient";
 import {
+  ActionButtonWidget,
+  GripperControlWidget,
+  JoystickWidget,
   LoadPoseButtonWidget,
+  MaxVelocityWidget,
+  NavigationBarWidget,
+  NavigationButtonWidget,
+  RosbagControlWidget,
   SavePoseButtonWidget,
-} from "../components/widgets/PoseButtonsWidget";
-import { SliderWidget } from "../components/widgets/SliderWidget";
-import {
+  SliderWidget,
+  StreamDisplayWidget,
+  TextareaWidget,
+  TextWidget,
   WIDGET_CATALOG,
   cloneWidgets,
   createWidgetFromCatalogType,
   DEFAULT_WIDGETS,
-  instantiateTsPreset,
   loadConfigurationsFromLocalStorage,
   persistConfigurationsToLocalStorage,
   removeConfiguration,
   syncConfigurationsFromFolder,
   syncConfigurationsToFolder,
-  TS_WIDGET_PRESETS,
+  type ButtonWidgetModel,
   type CanvasWidget,
-  type JoystickWidget as JoystickWidgetModel,
-  type LoadPoseButtonWidget as LoadPoseButtonWidgetModel,
+  type GripperControlWidgetModel,
+  type JoystickWidgetModel,
+  type LoadPoseButtonWidgetModel,
+  type MaxVelocityWidgetModel,
+  type NavigationBarWidgetModel,
+  type NavigationButtonWidgetModel,
   type PoseSnapshot,
   type PoseTopicValue,
-  type SliderWidget as SliderWidgetModel,
+  type RosbagControlWidgetModel,
+  type SliderWidgetModel,
+  type StreamDisplayWidgetModel,
+  type TextAlign,
+  type TextareaWidgetModel,
+  type TextWidgetModel,
   type WidgetIcon,
   type WidgetCatalogType,
   type WidgetConfiguration,
   upsertConfiguration,
 } from "../components/widgets";
 import { useTeleopStore } from "../store/teleopStore";
+import { useUiStore } from "../store/uiStore";
 
 type ControlsPageProps = {
   focusOnly?: boolean;
+  onDirtyChange?: (isDirty: boolean) => void;
 };
 
 type ContextMenuState = {
@@ -54,7 +71,6 @@ type ContextMenuState = {
 const ENABLED_WIDGETS = WIDGET_CATALOG.filter((entry) => entry.enabled);
 const DEFAULT_ADD_WIDGET_TYPE: WidgetCatalogType =
   (ENABLED_WIDGETS[0]?.type as WidgetCatalogType | undefined) ?? "joystick";
-const DEFAULT_TS_PRESET_ID = TS_WIDGET_PRESETS[0]?.id ?? "";
 const TOPIC_FRESHNESS_MS = 200;
 const TOPIC_FRESHNESS_TICK_MS = 100;
 
@@ -68,8 +84,10 @@ const HEX_COLOR_PATTERN = /^#(?:[0-9a-fA-F]{3}){1,2}$/;
 const toColorInputValue = (value: string, fallback = "#4a9eff") =>
   HEX_COLOR_PATTERN.test(value.trim()) ? value : fallback;
 const clampSignedUnit = (value: number) => Math.max(-1, Math.min(1, value));
+const nextNavigationItemId = () =>
+  `nav-item-${Date.now()}-${Math.random().toString(16).slice(2, 7)}`;
 
-export function ControlsPage({ focusOnly = false }: ControlsPageProps) {
+export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageProps) {
   const joyX = useTeleopStore((s) => s.joyX);
   const joyY = useTeleopStore((s) => s.joyY);
   const rotX = useTeleopStore((s) => s.rotX);
@@ -80,6 +98,16 @@ export function ControlsPage({ focusOnly = false }: ControlsPageProps) {
   const setRot = useTeleopStore((s) => s.setRot);
   const setZ = useTeleopStore((s) => s.setZ);
   const setRz = useTeleopStore((s) => s.setRz);
+  const maxVelocity = useTeleopStore((s) => s.maxVelocity);
+  const setMaxVelocity = useTeleopStore((s) => s.setMaxVelocity);
+  const gripperSpeed = useUiStore((s) => s.gripperSpeed);
+  const gripperForce = useUiStore((s) => s.gripperForce);
+  const setGripperSpeed = useUiStore((s) => s.setGripperSpeed);
+  const setGripperForce = useUiStore((s) => s.setGripperForce);
+  const cameraStreamUrl = useUiStore((s) => s.cameraStreamUrl);
+  const rvizStreamUrl = useUiStore((s) => s.rvizStreamUrl);
+  const setCameraStreamUrl = useUiStore((s) => s.setCameraStreamUrl);
+  const setRvizStreamUrl = useUiStore((s) => s.setRvizStreamUrl);
 
   const canvasSurfaceRef = useRef<HTMLDivElement | null>(null);
   const [topBarSlotElement, setTopBarSlotElement] = useState<HTMLElement | null>(null);
@@ -88,7 +116,7 @@ export function ControlsPage({ focusOnly = false }: ControlsPageProps) {
   const [selectedWidgetId, setSelectedWidgetId] = useState<string | null>(null);
   const [quickAddType, setQuickAddType] = useState<WidgetCatalogType>(DEFAULT_ADD_WIDGET_TYPE);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
-  const [selectedTsPresetId, setSelectedTsPresetId] = useState<string>(DEFAULT_TS_PRESET_ID);
+  const [pendingNavBarScreenId, setPendingNavBarScreenId] = useState<string>("");
 
   const [configurations, setConfigurations] = useState<WidgetConfiguration[]>(() =>
     loadConfigurationsFromLocalStorage()
@@ -98,6 +126,12 @@ export function ControlsPage({ focusOnly = false }: ControlsPageProps) {
   const [statusMessage, setStatusMessage] = useState<string>("");
   const [widgetPulseMap, setWidgetPulseMap] = useState<Record<string, number>>({});
   const [freshnessClock, setFreshnessClock] = useState<number>(() => Date.now());
+  const [rosbagRecording, setRosbagRecording] = useState(false);
+  const [rosbagStatus, setRosbagStatus] = useState("idle");
+  const [savedBaseline, setSavedBaseline] = useState<{ name: string; widgetSignature: string }>({
+    name: "",
+    widgetSignature: JSON.stringify([]),
+  });
 
   const magnitude = useMemo(() => Math.min(1, Math.hypot(joyX, joyY)), [joyX, joyY]);
 
@@ -184,6 +218,15 @@ export function ControlsPage({ focusOnly = false }: ControlsPageProps) {
     () => configurations.find((configuration) => configuration.name === selectedConfigName) ?? null,
     [configurations, selectedConfigName]
   );
+  const availableScreenIds = useMemo(
+    () => configurations.map((configuration) => configuration.name),
+    [configurations]
+  );
+  const widgetSignature = useMemo(() => JSON.stringify(widgets), [widgets]);
+  const trimmedNameInput = configNameInput.trim();
+  const hasWidgetDiff = widgetSignature !== savedBaseline.widgetSignature;
+  const hasNameDiff = trimmedNameInput.length > 0 && trimmedNameInput !== savedBaseline.name;
+  const isCanvasDirty = hasWidgetDiff || hasNameDiff;
 
   const canvasSize = useMemo(() => {
     const maxRight = widgets.reduce((acc, widget) => Math.max(acc, widget.rect.x + widget.rect.w), 220);
@@ -193,6 +236,44 @@ export function ControlsPage({ focusOnly = false }: ControlsPageProps) {
       height: maxBottom + 24,
     };
   }, [widgets]);
+
+  useEffect(() => {
+    onDirtyChange?.(isCanvasDirty);
+  }, [isCanvasDirty, onDirtyChange]);
+
+  useEffect(() => {
+    if (!isCanvasDirty) return;
+
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [isCanvasDirty]);
+
+  useEffect(() => {
+    if (!selectedWidget || selectedWidget.kind !== "navigation-bar") {
+      setPendingNavBarScreenId("");
+      return;
+    }
+
+    const available = availableScreenIds.filter(
+      (screenId) =>
+        !selectedWidget.items.some((item) => item.targetScreenId === screenId)
+    );
+    if (!available.length) {
+      if (pendingNavBarScreenId) {
+        setPendingNavBarScreenId("");
+      }
+      return;
+    }
+
+    if (!available.includes(pendingNavBarScreenId)) {
+      setPendingNavBarScreenId(available[0]);
+    }
+  }, [availableScreenIds, pendingNavBarScreenId, selectedWidget]);
 
   const updateWidget = (id: string, updater: (widget: CanvasWidget) => CanvasWidget) => {
     setWidgets((prev) => prev.map((widget) => (widget.id === id ? updater(widget) : widget)));
@@ -241,6 +322,45 @@ export function ControlsPage({ focusOnly = false }: ControlsPageProps) {
   ) => {
     updateSelectedWidget((widget) => (widget.kind === "load-pose-button" ? updater(widget) : widget));
   };
+  const updateSelectedNavigationButton = (
+    updater: (widget: NavigationButtonWidgetModel) => NavigationButtonWidgetModel
+  ) => {
+    updateSelectedWidget((widget) => (widget.kind === "navigation-button" ? updater(widget) : widget));
+  };
+  const updateSelectedNavigationBar = (
+    updater: (widget: NavigationBarWidgetModel) => NavigationBarWidgetModel
+  ) => {
+    updateSelectedWidget((widget) => (widget.kind === "navigation-bar" ? updater(widget) : widget));
+  };
+  const updateSelectedText = (updater: (widget: TextWidgetModel) => TextWidgetModel) => {
+    updateSelectedWidget((widget) => (widget.kind === "text" ? updater(widget) : widget));
+  };
+  const updateSelectedTextarea = (updater: (widget: TextareaWidgetModel) => TextareaWidgetModel) => {
+    updateSelectedWidget((widget) => (widget.kind === "textarea" ? updater(widget) : widget));
+  };
+  const updateSelectedButton = (updater: (widget: ButtonWidgetModel) => ButtonWidgetModel) => {
+    updateSelectedWidget((widget) => (widget.kind === "button" ? updater(widget) : widget));
+  };
+  const updateSelectedRosbagControl = (
+    updater: (widget: RosbagControlWidgetModel) => RosbagControlWidgetModel
+  ) => {
+    updateSelectedWidget((widget) => (widget.kind === "rosbag-control" ? updater(widget) : widget));
+  };
+  const updateSelectedMaxVelocity = (
+    updater: (widget: MaxVelocityWidgetModel) => MaxVelocityWidgetModel
+  ) => {
+    updateSelectedWidget((widget) => (widget.kind === "max-velocity" ? updater(widget) : widget));
+  };
+  const updateSelectedGripperControl = (
+    updater: (widget: GripperControlWidgetModel) => GripperControlWidgetModel
+  ) => {
+    updateSelectedWidget((widget) => (widget.kind === "gripper-control" ? updater(widget) : widget));
+  };
+  const updateSelectedStreamDisplay = (
+    updater: (widget: StreamDisplayWidgetModel) => StreamDisplayWidgetModel
+  ) => {
+    updateSelectedWidget((widget) => (widget.kind === "stream-display" ? updater(widget) : widget));
+  };
 
   const markWidgetPulse = (widgetId: string) => {
     const now = Date.now();
@@ -269,6 +389,13 @@ export function ControlsPage({ focusOnly = false }: ControlsPageProps) {
     setStatusMessage("");
   };
 
+  const confirmDiscardUnsavedChanges = (nextAction: string) => {
+    if (!isCanvasDirty) return true;
+    return window.confirm(
+      `You have unsaved changes on this screen. ${nextAction} anyway?`
+    );
+  };
+
   const removeSelectedWidget = () => {
     if (!selectedWidgetId) return;
     setWidgets((prev) => prev.filter((widget) => widget.id !== selectedWidgetId));
@@ -276,72 +403,73 @@ export function ControlsPage({ focusOnly = false }: ControlsPageProps) {
   };
 
   const clearCanvas = () => {
+    if (!confirmDiscardUnsavedChanges("Clear the canvas")) return;
     setWidgets([]);
     setSelectedWidgetId(null);
+    setStatusMessage("Canvas cleared.");
   };
 
   const loadConfigurationByName = (name: string) => {
     const configuration = configurations.find((item) => item.name === name);
     if (!configuration) {
-      setStatusMessage("Configuration not found.");
+      setStatusMessage("Screen not found.");
       return;
     }
-    setWidgets(cloneWidgets(configuration.widgets));
+    if (!confirmDiscardUnsavedChanges(`Load screen "${name}"`)) {
+      return;
+    }
+    const loadedWidgets = cloneWidgets(configuration.widgets);
+    setWidgets(loadedWidgets);
     setSelectedWidgetId(null);
     setSelectedConfigName(name);
     setConfigNameInput(name);
+    setSavedBaseline({
+      name,
+      widgetSignature: JSON.stringify(loadedWidgets),
+    });
     setStatusMessage(`Loaded \"${name}\".`);
   };
 
   const saveCurrentConfiguration = () => {
     const name = (configNameInput || selectedConfigName).trim();
     if (!name) {
-      setStatusMessage("Provide a configuration name before saving.");
+      setStatusMessage("Provide a screen name before saving.");
       return;
     }
 
     setConfigurations((prev) => upsertConfiguration(prev, name, widgets));
     setSelectedConfigName(name);
     setConfigNameInput(name);
+    setSavedBaseline({
+      name,
+      widgetSignature,
+    });
     setStatusMessage(`Saved \"${name}\".`);
   };
 
   const deleteSelectedConfiguration = () => {
     if (!selectedConfigName) {
-      setStatusMessage("Select a configuration to delete.");
+      setStatusMessage("Select a screen to delete.");
       return;
     }
 
     setConfigurations((prev) => removeConfiguration(prev, selectedConfigName));
     setStatusMessage(`Deleted \"${selectedConfigName}\".`);
+    if (savedBaseline.name === selectedConfigName) {
+      setSavedBaseline({
+        name: "",
+        widgetSignature: JSON.stringify([]),
+      });
+    }
     setSelectedConfigName("");
     setConfigNameInput("");
   };
 
   const loadDemoConfiguration = () => {
+    if (!confirmDiscardUnsavedChanges("Load demo widgets")) return;
     setWidgets(cloneWidgets(DEFAULT_WIDGETS));
     setSelectedWidgetId(null);
     setStatusMessage("Loaded default demo widgets.");
-  };
-
-  const loadTsPreset = () => {
-    if (!selectedTsPresetId) {
-      setStatusMessage("Select a TS preset first.");
-      return;
-    }
-
-    const widgetsFromPreset = instantiateTsPreset(selectedTsPresetId);
-    if (!widgetsFromPreset) {
-      setStatusMessage("TS preset not found.");
-      return;
-    }
-
-    const presetName =
-      TS_WIDGET_PRESETS.find((preset) => preset.id === selectedTsPresetId)?.label ??
-      selectedTsPresetId;
-    setWidgets(widgetsFromPreset);
-    setSelectedWidgetId(null);
-    setStatusMessage(`Loaded TS preset \"${presetName}\".`);
   };
 
   const upsertPose = (poses: PoseSnapshot[], pose: PoseSnapshot) => {
@@ -373,7 +501,7 @@ export function ControlsPage({ focusOnly = false }: ControlsPageProps) {
 
   const saveCurrentPose = () => {
     if (!selectedConfigName) {
-      setStatusMessage("Select a configuration before saving a pose.");
+      setStatusMessage("Select a screen before saving a pose.");
       return;
     }
 
@@ -404,17 +532,17 @@ export function ControlsPage({ focusOnly = false }: ControlsPageProps) {
             }
       )
     );
-    setStatusMessage(`Pose \"${poseName}\" saved for configuration \"${selectedConfigName}\".`);
+    setStatusMessage(`Pose \"${poseName}\" saved for screen \"${selectedConfigName}\".`);
   };
 
   const loadPoseByName = (poseName: string) => {
     if (!selectedConfigName) {
-      setStatusMessage("Select a configuration before loading a pose.");
+      setStatusMessage("Select a screen before loading a pose.");
       return;
     }
     const configuration = configurations.find((item) => item.name === selectedConfigName);
     if (!configuration) {
-      setStatusMessage("Configuration not found.");
+      setStatusMessage("Screen not found.");
       return;
     }
 
@@ -467,10 +595,45 @@ export function ControlsPage({ focusOnly = false }: ControlsPageProps) {
     setStatusMessage(`Pose \"${pose.name}\" loaded.`);
   };
 
+  const addSelectedScreenToNavigationBar = () => {
+    const targetScreenId = pendingNavBarScreenId.trim();
+    if (!targetScreenId) return;
+
+    updateSelectedNavigationBar((widget) => {
+      if (widget.items.some((item) => item.targetScreenId === targetScreenId)) {
+        return widget;
+      }
+
+      return {
+        ...widget,
+        items: [
+          ...widget.items,
+          {
+            id: nextNavigationItemId(),
+            targetScreenId,
+            label: targetScreenId,
+          },
+        ],
+      };
+    });
+  };
+
+  const toggleRosbagRecording = (widget: RosbagControlWidgetModel) => {
+    const nextRecording = !rosbagRecording;
+    setRosbagRecording(nextRecording);
+    setRosbagStatus(nextRecording ? "recording" : "stopped");
+    wsClient.send({
+      type: "rosbag_cmd",
+      action: nextRecording ? "start" : "stop",
+      name: widget.bagName,
+      auto_timestamp: widget.autoTimestamp,
+    });
+  };
+
   const handleSyncToFolder = async () => {
     try {
       const count = await syncConfigurationsToFolder(configurations);
-      setStatusMessage(`Synced ${count} configuration(s) to folder.`);
+      setStatusMessage(`Synced ${count} screen(s) to folder.`);
     } catch (error) {
       setStatusMessage(error instanceof Error ? error.message : "Sync to folder failed.");
     }
@@ -480,7 +643,7 @@ export function ControlsPage({ focusOnly = false }: ControlsPageProps) {
     try {
       const merged = await syncConfigurationsFromFolder(configurations);
       setConfigurations(merged);
-      setStatusMessage(`Synced ${merged.length} configuration(s) from folder.`);
+      setStatusMessage(`Synced ${merged.length} screen(s) from folder.`);
     } catch (error) {
       setStatusMessage(error instanceof Error ? error.message : "Sync from folder failed.");
     }
@@ -530,6 +693,146 @@ export function ControlsPage({ focusOnly = false }: ControlsPageProps) {
           onRectChange={(next) => updateWidget(widget.id, (current) => ({ ...current, rect: next }))}
           onTrigger={() => loadPoseByName(widget.poseName)}
           poseAvailable={poseAvailable}
+        />
+      );
+    }
+
+    if (widget.kind === "navigation-button") {
+      const canNavigate = availableScreenIds.includes(widget.targetScreenId);
+      return (
+        <NavigationButtonWidget
+          key={widget.id}
+          widget={widget}
+          selected={selected}
+          onSelect={() => setSelectedWidgetId(widget.id)}
+          onRectChange={(next) => updateWidget(widget.id, (current) => ({ ...current, rect: next }))}
+          onNavigate={(screenId) => setStatusMessage(`Navigation target selected: ${screenId}`)}
+          canNavigate={canNavigate}
+        />
+      );
+    }
+
+    if (widget.kind === "navigation-bar") {
+      return (
+        <NavigationBarWidget
+          key={widget.id}
+          widget={widget}
+          selected={selected}
+          onSelect={() => setSelectedWidgetId(widget.id)}
+          onRectChange={(next) => updateWidget(widget.id, (current) => ({ ...current, rect: next }))}
+          onNavigate={(screenId) => setStatusMessage(`Navigation target selected: ${screenId}`)}
+        />
+      );
+    }
+
+    if (widget.kind === "text") {
+      return (
+        <TextWidget
+          key={widget.id}
+          widget={widget}
+          selected={selected}
+          onSelect={() => setSelectedWidgetId(widget.id)}
+          onRectChange={(next) => updateWidget(widget.id, (current) => ({ ...current, rect: next }))}
+        />
+      );
+    }
+
+    if (widget.kind === "textarea") {
+      return (
+        <TextareaWidget
+          key={widget.id}
+          widget={widget}
+          selected={selected}
+          onSelect={() => setSelectedWidgetId(widget.id)}
+          onRectChange={(next) => updateWidget(widget.id, (current) => ({ ...current, rect: next }))}
+        />
+      );
+    }
+
+    if (widget.kind === "button") {
+      return (
+        <ActionButtonWidget
+          key={widget.id}
+          widget={widget}
+          selected={selected}
+          onSelect={() => setSelectedWidgetId(widget.id)}
+          onRectChange={(next) => updateWidget(widget.id, (current) => ({ ...current, rect: next }))}
+          onTrigger={() => {
+            wsClient.send({
+              type: "ui_button",
+              topic: widget.topic,
+              payload: widget.payload,
+              widget_id: widget.id,
+            });
+            setStatusMessage(`Button "${widget.label}" emitted payload.`);
+          }}
+        />
+      );
+    }
+
+    if (widget.kind === "rosbag-control") {
+      return (
+        <RosbagControlWidget
+          key={widget.id}
+          widget={widget}
+          selected={selected}
+          onSelect={() => setSelectedWidgetId(widget.id)}
+          onRectChange={(next) => updateWidget(widget.id, (current) => ({ ...current, rect: next }))}
+          isRecording={rosbagRecording}
+          statusText={rosbagStatus}
+          onToggleRecording={() => toggleRosbagRecording(widget)}
+        />
+      );
+    }
+
+    if (widget.kind === "max-velocity") {
+      return (
+        <MaxVelocityWidget
+          key={widget.id}
+          widget={widget}
+          selected={selected}
+          onSelect={() => setSelectedWidgetId(widget.id)}
+          onRectChange={(next) => updateWidget(widget.id, (current) => ({ ...current, rect: next }))}
+          value={maxVelocity}
+          onValueChange={setMaxVelocity}
+        />
+      );
+    }
+
+    if (widget.kind === "gripper-control") {
+      return (
+        <GripperControlWidget
+          key={widget.id}
+          widget={widget}
+          selected={selected}
+          onSelect={() => setSelectedWidgetId(widget.id)}
+          onRectChange={(next) => updateWidget(widget.id, (current) => ({ ...current, rect: next }))}
+          speed={gripperSpeed}
+          force={gripperForce}
+          onSpeedChange={setGripperSpeed}
+          onForceChange={setGripperForce}
+          onOpen={() => {
+            wsClient.send({ type: "gripper_cmd", action: "open", speed: gripperSpeed, force: gripperForce });
+            setStatusMessage("Gripper open command sent.");
+          }}
+          onClose={() => {
+            wsClient.send({ type: "gripper_cmd", action: "close", speed: gripperSpeed, force: gripperForce });
+            setStatusMessage("Gripper close command sent.");
+          }}
+        />
+      );
+    }
+
+    if (widget.kind === "stream-display") {
+      const url = widget.source === "rviz" ? rvizStreamUrl : cameraStreamUrl;
+      return (
+        <StreamDisplayWidget
+          key={widget.id}
+          widget={{ ...widget, streamUrl: url || widget.streamUrl }}
+          selected={selected}
+          onSelect={() => setSelectedWidgetId(widget.id)}
+          onRectChange={(next) => updateWidget(widget.id, (current) => ({ ...current, rect: next }))}
+          statusText={widget.source === "rviz" ? "RViz stream" : "Camera stream"}
         />
       );
     }
@@ -588,14 +891,13 @@ export function ControlsPage({ focusOnly = false }: ControlsPageProps) {
     <div className="controls-header-inline">
       <div className="controls-config-row">
         <label className="controls-field controls-config-field">
-          <span>Configuration</span>
+          <span>Screen</span>
           <select
             className="editor-input"
             value={selectedConfigName}
             onChange={(event) => {
               const name = event.target.value;
               setSelectedConfigName(name);
-              setConfigNameInput(name);
             }}
           >
             <option value="">-- select --</option>
@@ -613,33 +915,19 @@ export function ControlsPage({ focusOnly = false }: ControlsPageProps) {
             className="editor-input"
             value={configNameInput}
             onChange={(event) => setConfigNameInput(event.target.value)}
-            placeholder="new configuration"
+            placeholder="new screen"
           />
-        </label>
-
-        <label className="controls-field controls-config-field">
-          <span>TS Preset</span>
-          <select
-            className="editor-input"
-            value={selectedTsPresetId}
-            onChange={(event) => setSelectedTsPresetId(event.target.value)}
-          >
-            {TS_WIDGET_PRESETS.map((preset) => (
-              <option key={preset.id} value={preset.id}>
-                {preset.label}
-              </option>
-            ))}
-          </select>
         </label>
 
         <button type="button" className="tab-button" onClick={() => selectedConfigName && loadConfigurationByName(selectedConfigName)}>
           Load
         </button>
-        <button type="button" className="tab-button" onClick={loadTsPreset} disabled={!selectedTsPresetId}>
-          Load Preset
-        </button>
-        <button type="button" className="tab-button" onClick={saveCurrentConfiguration}>
-          Save
+        <button
+          type="button"
+          className={`tab-button ${isCanvasDirty ? "is-dirty-save" : ""}`}
+          onClick={saveCurrentConfiguration}
+        >
+          {isCanvasDirty ? "Save*" : "Save"}
         </button>
         <button type="button" className="tab-button" onClick={deleteSelectedConfiguration} disabled={!selectedConfigName}>
           Delete
@@ -1105,15 +1393,410 @@ export function ControlsPage({ focusOnly = false }: ControlsPageProps) {
                           >
                             <option value="home">home</option>
                             <option value="save">save</option>
+                            <option value="arrow-right">arrow-right</option>
                           </select>
                         </label>
                       </div>
+                    </>
+                  ) : selectedWidget.kind === "navigation-button" ? (
+                    <>
+                      <div className="controls-property-title">Navigation Button</div>
+                      <div className="controls-field-row">
+                        <label className="controls-field">
+                          <span>Target Screen</span>
+                          <select
+                            className="editor-input"
+                            value={selectedWidget.targetScreenId}
+                            onChange={(event) =>
+                              updateSelectedNavigationButton((widget) => ({
+                                ...widget,
+                                targetScreenId: event.target.value,
+                              }))
+                            }
+                          >
+                            <option value="">-- select screen --</option>
+                            {availableScreenIds.map((screenId) => (
+                              <option key={screenId} value={screenId}>
+                                {screenId}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="controls-field">
+                          <span>Icon</span>
+                          <select
+                            className="editor-input"
+                            value={selectedWidget.icon}
+                            onChange={(event) =>
+                              updateSelectedNavigationButton((widget) => ({
+                                ...widget,
+                                icon: (event.target.value as WidgetIcon) || "arrow-right",
+                              }))
+                            }
+                          >
+                            <option value="arrow-right">arrow-right</option>
+                            <option value="home">home</option>
+                            <option value="save">save</option>
+                          </select>
+                        </label>
+                      </div>
+                    </>
+                  ) : selectedWidget.kind === "navigation-bar" ? (
+                    <>
+                      <div className="controls-property-title">Navigation Bar</div>
+                      <div className="controls-field-row">
+                        <label className="controls-field">
+                          <span>Orientation</span>
+                          <select
+                            className="editor-input"
+                            value={selectedWidget.orientation}
+                            onChange={(event) =>
+                              updateSelectedNavigationBar((widget) => ({
+                                ...widget,
+                                orientation:
+                                  event.target.value === "horizontal" ? "horizontal" : "vertical",
+                              }))
+                            }
+                          >
+                            <option value="vertical">vertical</option>
+                            <option value="horizontal">horizontal</option>
+                          </select>
+                        </label>
+                        <label className="controls-field">
+                          <span>Add Screen</span>
+                          <select
+                            className="editor-input"
+                            value={pendingNavBarScreenId}
+                            onChange={(event) => setPendingNavBarScreenId(event.target.value)}
+                          >
+                            <option value="">-- select screen --</option>
+                            {availableScreenIds
+                              .filter(
+                                (screenId) =>
+                                  !selectedWidget.items.some(
+                                    (item) => item.targetScreenId === screenId
+                                  )
+                              )
+                              .map((screenId) => (
+                                <option key={screenId} value={screenId}>
+                                  {screenId}
+                                </option>
+                              ))}
+                          </select>
+                        </label>
+                        <button
+                          type="button"
+                          className="tab-button controls-inline-button"
+                          onClick={addSelectedScreenToNavigationBar}
+                          disabled={!pendingNavBarScreenId}
+                        >
+                          Add Link
+                        </button>
+                      </div>
+                      <div className="controls-navigation-editor">
+                        {selectedWidget.items.length === 0 ? (
+                          <div className="controls-hint">No navigation links yet.</div>
+                        ) : (
+                          selectedWidget.items.map((item) => (
+                            <div key={item.id} className="controls-navigation-editor-row">
+                              <label className="controls-field">
+                                <span>Screen</span>
+                                <select
+                                  className="editor-input"
+                                  value={item.targetScreenId}
+                                  onChange={(event) =>
+                                    updateSelectedNavigationBar((widget) => ({
+                                      ...widget,
+                                      items: widget.items.map((entry) =>
+                                        entry.id !== item.id
+                                          ? entry
+                                          : {
+                                              ...entry,
+                                              targetScreenId: event.target.value,
+                                              label:
+                                                entry.label.trim() && entry.label !== item.targetScreenId
+                                                  ? entry.label
+                                                  : event.target.value,
+                                            }
+                                      ),
+                                    }))
+                                  }
+                                >
+                                  <option value="">-- select screen --</option>
+                                  {availableScreenIds.map((screenId) => (
+                                    <option key={screenId} value={screenId}>
+                                      {screenId}
+                                    </option>
+                                  ))}
+                                </select>
+                              </label>
+                              <label className="controls-field">
+                                <span>Label</span>
+                                <input
+                                  className="editor-input"
+                                  value={item.label}
+                                  onChange={(event) =>
+                                    updateSelectedNavigationBar((widget) => ({
+                                      ...widget,
+                                      items: widget.items.map((entry) =>
+                                        entry.id === item.id
+                                          ? { ...entry, label: event.target.value }
+                                          : entry
+                                      ),
+                                    }))
+                                  }
+                                />
+                              </label>
+                              <button
+                                type="button"
+                                className="tab-button controls-inline-button"
+                                onClick={() =>
+                                  updateSelectedNavigationBar((widget) => ({
+                                    ...widget,
+                                    items: widget.items.filter((entry) => entry.id !== item.id),
+                                  }))
+                                }
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </>
+                  ) : selectedWidget.kind === "text" ? (
+                    <>
+                      <div className="controls-property-title">Text</div>
+                      <label className="controls-field">
+                        <span>Text</span>
+                        <textarea
+                          className="editor-input"
+                          rows={4}
+                          value={selectedWidget.text}
+                          onChange={(event) =>
+                            updateSelectedText((widget) => ({
+                              ...widget,
+                              text: event.target.value,
+                            }))
+                          }
+                        />
+                      </label>
+                      <div className="controls-field-row">
+                        <label className="controls-field">
+                          <span>Font Size</span>
+                          <input
+                            type="number"
+                            className="editor-input"
+                            min={10}
+                            max={80}
+                            value={selectedWidget.fontSize}
+                            onChange={(event) =>
+                              updateSelectedText((widget) => ({
+                                ...widget,
+                                fontSize: Math.max(10, Math.round(readNumber(event.target.value, widget.fontSize))),
+                              }))
+                            }
+                          />
+                        </label>
+                        <label className="controls-field">
+                          <span>Align</span>
+                          <select
+                            className="editor-input"
+                            value={selectedWidget.align}
+                            onChange={(event) =>
+                              updateSelectedText((widget) => ({
+                                ...widget,
+                                align: (event.target.value as TextAlign) || "left",
+                              }))
+                            }
+                          >
+                            <option value="left">left</option>
+                            <option value="center">center</option>
+                            <option value="right">right</option>
+                          </select>
+                        </label>
+                      </div>
+                    </>
+                  ) : selectedWidget.kind === "textarea" ? (
+                    <>
+                      <div className="controls-property-title">Textarea</div>
+                      <label className="controls-field">
+                        <span>Text</span>
+                        <textarea
+                          className="editor-input"
+                          rows={8}
+                          value={selectedWidget.text}
+                          onChange={(event) =>
+                            updateSelectedTextarea((widget) => ({
+                              ...widget,
+                              text: event.target.value,
+                            }))
+                          }
+                        />
+                      </label>
+                      <label className="controls-field">
+                        <span>Font Size</span>
+                        <input
+                          type="number"
+                          className="editor-input"
+                          min={10}
+                          max={40}
+                          value={selectedWidget.fontSize}
+                          onChange={(event) =>
+                            updateSelectedTextarea((widget) => ({
+                              ...widget,
+                              fontSize: Math.max(10, Math.round(readNumber(event.target.value, widget.fontSize))),
+                            }))
+                          }
+                        />
+                      </label>
+                    </>
+                  ) : selectedWidget.kind === "button" ? (
+                    <>
+                      <div className="controls-property-title">Action Button</div>
+                      <label className="controls-field">
+                        <span>Payload</span>
+                        <input
+                          className="editor-input"
+                          value={selectedWidget.payload}
+                          onChange={(event) =>
+                            updateSelectedButton((widget) => ({
+                              ...widget,
+                              payload: event.target.value,
+                            }))
+                          }
+                        />
+                      </label>
+                    </>
+                  ) : selectedWidget.kind === "rosbag-control" ? (
+                    <>
+                      <div className="controls-property-title">Rosbag Control</div>
+                      <label className="controls-field">
+                        <span>Bag Name</span>
+                        <input
+                          className="editor-input"
+                          value={selectedWidget.bagName}
+                          onChange={(event) =>
+                            updateSelectedRosbagControl((widget) => ({
+                              ...widget,
+                              bagName: event.target.value,
+                            }))
+                          }
+                        />
+                      </label>
+                      <label className="controls-field">
+                        <span>Auto Timestamp</span>
+                        <select
+                          className="editor-input"
+                          value={selectedWidget.autoTimestamp ? "on" : "off"}
+                          onChange={(event) =>
+                            updateSelectedRosbagControl((widget) => ({
+                              ...widget,
+                              autoTimestamp: event.target.value === "on",
+                            }))
+                          }
+                        >
+                          <option value="on">on</option>
+                          <option value="off">off</option>
+                        </select>
+                      </label>
+                    </>
+                  ) : selectedWidget.kind === "max-velocity" ? (
+                    <>
+                      <div className="controls-property-title">Max Velocity</div>
+                      <div className="controls-field-row">
+                        <label className="controls-field">
+                          <span>Min</span>
+                          <input
+                            type="number"
+                            step={0.01}
+                            className="editor-input"
+                            value={selectedWidget.min}
+                            onChange={(event) =>
+                              updateSelectedMaxVelocity((widget) => ({
+                                ...widget,
+                                min: readNumber(event.target.value, widget.min),
+                              }))
+                            }
+                          />
+                        </label>
+                        <label className="controls-field">
+                          <span>Max</span>
+                          <input
+                            type="number"
+                            step={0.01}
+                            className="editor-input"
+                            value={selectedWidget.max}
+                            onChange={(event) =>
+                              updateSelectedMaxVelocity((widget) => ({
+                                ...widget,
+                                max: readNumber(event.target.value, widget.max),
+                              }))
+                            }
+                          />
+                        </label>
+                        <label className="controls-field">
+                          <span>Step</span>
+                          <input
+                            type="number"
+                            step={0.01}
+                            className="editor-input"
+                            value={selectedWidget.step}
+                            onChange={(event) =>
+                              updateSelectedMaxVelocity((widget) => ({
+                                ...widget,
+                                step: Math.max(0.001, readNumber(event.target.value, widget.step)),
+                              }))
+                            }
+                          />
+                        </label>
+                      </div>
+                    </>
+                  ) : selectedWidget.kind === "gripper-control" ? (
+                    <>
+                      <div className="controls-property-title">Gripper Control</div>
+                      <div className="controls-hint">
+                        Uses runtime speed/force values from the control state.
+                      </div>
+                    </>
+                  ) : selectedWidget.kind === "stream-display" ? (
+                    <>
+                      <div className="controls-property-title">Stream Display</div>
+                      <label className="controls-field">
+                        <span>Source</span>
+                        <select
+                          className="editor-input"
+                          value={selectedWidget.source}
+                          onChange={(event) =>
+                            updateSelectedStreamDisplay((widget) => ({
+                              ...widget,
+                              source: event.target.value === "rviz" ? "rviz" : "camera",
+                            }))
+                          }
+                        >
+                          <option value="camera">camera</option>
+                          <option value="rviz">rviz</option>
+                        </select>
+                      </label>
+                      <label className="controls-field">
+                        <span>Fallback Stream URL</span>
+                        <input
+                          className="editor-input"
+                          value={selectedWidget.streamUrl}
+                          onChange={(event) =>
+                            updateSelectedStreamDisplay((widget) => ({
+                              ...widget,
+                              streamUrl: event.target.value,
+                            }))
+                          }
+                        />
+                      </label>
                     </>
                   ) : (
                     <>
                       <div className="controls-property-title">Save Pose Button</div>
                       <div className="controls-hint">
-                        Saves the current canvas topic state into the selected configuration.
+                        Saves the current canvas topic state into the selected screen.
                       </div>
                     </>
                   )}
@@ -1121,10 +1804,6 @@ export function ControlsPage({ focusOnly = false }: ControlsPageProps) {
               )}
             </section>
 
-            <section className="card">
-              <h2>Mode</h2>
-              <ModeSelector />
-            </section>
           </aside>
         </div>
         </section>

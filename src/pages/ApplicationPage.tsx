@@ -1,0 +1,509 @@
+import { useEffect, useMemo, useState } from "react";
+
+import { loadApplicationsFromLocalStorage } from "../app/applications";
+import type { CanvasRect } from "../components/layout/CanvasItem";
+import {
+  ActionButtonWidget,
+  GripperControlWidget,
+  JoystickWidget,
+  LoadPoseButtonWidget,
+  MaxVelocityWidget,
+  NavigationBarWidget,
+  NavigationButtonWidget,
+  RosbagControlWidget,
+  SavePoseButtonWidget,
+  SliderWidget,
+  StreamDisplayWidget,
+  TextareaWidget,
+  TextWidget,
+  cloneWidgets,
+  loadConfigurationsFromLocalStorage,
+  persistConfigurationsToLocalStorage,
+  type CanvasWidget,
+  type PoseSnapshot,
+  type PoseTopicValue,
+  type WidgetConfiguration,
+} from "../components/widgets";
+import { wsClient } from "../services/wsClient";
+import { useTeleopStore } from "../store/teleopStore";
+import { useUiStore } from "../store/uiStore";
+
+type ApplicationPageProps = {
+  applicationId: string;
+  routeScreenId: string | null;
+  onNavigateToScreen: (screenId: string) => void;
+};
+
+const TOPIC_FRESHNESS_MS = 200;
+const TOPIC_FRESHNESS_TICK_MS = 100;
+
+const clampSignedUnit = (value: number) => Math.max(-1, Math.min(1, value));
+
+const NOOP_RECT_CHANGE = (_next: CanvasRect) => {};
+
+export function ApplicationPage({
+  applicationId,
+  routeScreenId,
+  onNavigateToScreen,
+}: ApplicationPageProps) {
+  const joyX = useTeleopStore((s) => s.joyX);
+  const joyY = useTeleopStore((s) => s.joyY);
+  const rotX = useTeleopStore((s) => s.rotX);
+  const rotY = useTeleopStore((s) => s.rotY);
+  const z = useTeleopStore((s) => s.z);
+  const rz = useTeleopStore((s) => s.rz);
+  const setJoy = useTeleopStore((s) => s.setJoy);
+  const setRot = useTeleopStore((s) => s.setRot);
+  const setZ = useTeleopStore((s) => s.setZ);
+  const setRz = useTeleopStore((s) => s.setRz);
+  const maxVelocity = useTeleopStore((s) => s.maxVelocity);
+  const setMaxVelocity = useTeleopStore((s) => s.setMaxVelocity);
+  const gripperSpeed = useUiStore((s) => s.gripperSpeed);
+  const gripperForce = useUiStore((s) => s.gripperForce);
+  const setGripperSpeed = useUiStore((s) => s.setGripperSpeed);
+  const setGripperForce = useUiStore((s) => s.setGripperForce);
+  const cameraStreamUrl = useUiStore((s) => s.cameraStreamUrl);
+  const rvizStreamUrl = useUiStore((s) => s.rvizStreamUrl);
+
+  const [configurations, setConfigurations] = useState<WidgetConfiguration[]>(() =>
+    loadConfigurationsFromLocalStorage()
+  );
+  const [widgetPulseMap, setWidgetPulseMap] = useState<Record<string, number>>({});
+  const [freshnessClock, setFreshnessClock] = useState<number>(() => Date.now());
+  const [rosbagRecording, setRosbagRecording] = useState(false);
+  const [rosbagStatus, setRosbagStatus] = useState("idle");
+
+  const applications = useMemo(() => loadApplicationsFromLocalStorage(), []);
+  const activeApplication = useMemo(
+    () => applications.find((application) => application.id === applicationId) ?? null,
+    [applicationId, applications]
+  );
+
+  const activeScreenId = useMemo(() => {
+    if (!activeApplication) return null;
+    if (routeScreenId && activeApplication.screenIds.includes(routeScreenId)) {
+      return routeScreenId;
+    }
+    if (activeApplication.homeScreenId && activeApplication.screenIds.includes(activeApplication.homeScreenId)) {
+      return activeApplication.homeScreenId;
+    }
+    return activeApplication.screenIds[0] ?? null;
+  }, [activeApplication, routeScreenId]);
+
+  const activeConfiguration = useMemo(
+    () => configurations.find((configuration) => configuration.name === activeScreenId) ?? null,
+    [activeScreenId, configurations]
+  );
+
+  const widgets: CanvasWidget[] = useMemo(
+    () => cloneWidgets(activeConfiguration?.widgets ?? []),
+    [activeConfiguration]
+  );
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setFreshnessClock(Date.now());
+    }, TOPIC_FRESHNESS_TICK_MS);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    persistConfigurationsToLocalStorage(configurations);
+  }, [configurations]);
+
+  useEffect(() => {
+    if (!activeScreenId) return;
+    if (routeScreenId === activeScreenId) return;
+    onNavigateToScreen(activeScreenId);
+  }, [activeScreenId, onNavigateToScreen, routeScreenId]);
+
+  const allowedScreenIds = useMemo(
+    () => new Set(activeApplication?.screenIds ?? []),
+    [activeApplication]
+  );
+
+  const canvasSize = useMemo(() => {
+    const maxRight = widgets.reduce((acc, widget) => Math.max(acc, widget.rect.x + widget.rect.w), 520);
+    const maxBottom = widgets.reduce((acc, widget) => Math.max(acc, widget.rect.y + widget.rect.h), 420);
+    return {
+      width: maxRight + 24,
+      height: maxBottom + 24,
+    };
+  }, [widgets]);
+
+  const markWidgetPulse = (widgetId: string) => {
+    const now = Date.now();
+    setWidgetPulseMap((prev) => ({
+      ...prev,
+      [widgetId]: now,
+    }));
+  };
+
+  const isWidgetFresh = (widgetId: string) =>
+    freshnessClock - (widgetPulseMap[widgetId] ?? 0) <= TOPIC_FRESHNESS_MS;
+
+  const upsertPose = (poses: PoseSnapshot[], pose: PoseSnapshot) => {
+    const index = poses.findIndex((item) => item.name === pose.name);
+    if (index === -1) return [...poses, pose].sort((a, b) => a.name.localeCompare(b.name));
+    return poses.map((item, itemIndex) => (itemIndex === index ? pose : item));
+  };
+
+  const collectCurrentPoseTopics = (): Record<string, PoseTopicValue> => {
+    const topics: Record<string, PoseTopicValue> = {};
+
+    for (const widget of widgets) {
+      if (widget.kind === "slider") {
+        const value = widget.binding === "z" ? z : rz;
+        topics[widget.topic] = { kind: "scalar", value };
+        continue;
+      }
+      if (widget.kind === "joystick") {
+        const source = widget.binding === "joy" ? { x: joyX, y: joyY } : { x: rotX, y: rotY };
+        topics[widget.topic] = { kind: "vector2", x: source.x, y: source.y };
+      }
+    }
+
+    return topics;
+  };
+
+  const saveCurrentPose = () => {
+    if (!activeConfiguration) return;
+    const defaultPoseName = `pose-${(activeConfiguration.poses.length ?? 0) + 1}`;
+    const rawPoseName = window.prompt("Pose name", defaultPoseName);
+    if (rawPoseName == null) return;
+    const poseName = rawPoseName.trim();
+    if (!poseName) return;
+
+    const nextPose: PoseSnapshot = {
+      name: poseName,
+      savedAt: new Date().toISOString(),
+      topics: collectCurrentPoseTopics(),
+    };
+
+    setConfigurations((prev) =>
+      prev.map((configuration) =>
+        configuration.name !== activeConfiguration.name
+          ? configuration
+          : {
+              ...configuration,
+              poses: upsertPose(configuration.poses, nextPose),
+              updatedAt: new Date().toISOString(),
+            }
+      )
+    );
+  };
+
+  const loadPoseByName = (poseName: string) => {
+    if (!activeConfiguration) return;
+    const pose = activeConfiguration.poses.find((item) => item.name === poseName);
+    if (!pose) return;
+
+    for (const widget of widgets) {
+      const topicValue = pose.topics[widget.topic];
+      if (!topicValue) continue;
+
+      if (widget.kind === "slider" && topicValue.kind === "scalar") {
+        const clamped = Math.min(widget.max, Math.max(widget.min, topicValue.value));
+        if (widget.binding === "z") {
+          setZ(clamped);
+        } else {
+          setRz(clamped);
+        }
+        markWidgetPulse(widget.id);
+        continue;
+      }
+
+      if (widget.kind === "joystick" && topicValue.kind === "vector2") {
+        const x = clampSignedUnit(topicValue.x);
+        const y = clampSignedUnit(topicValue.y);
+        if (widget.binding === "joy") {
+          setJoy(x, y);
+        } else {
+          setRot(x, y);
+        }
+        markWidgetPulse(widget.id);
+      }
+    }
+  };
+
+  const toggleRosbagRecording = (widget: Extract<CanvasWidget, { kind: "rosbag-control" }>) => {
+    const nextRecording = !rosbagRecording;
+    setRosbagRecording(nextRecording);
+    setRosbagStatus(nextRecording ? "recording" : "stopped");
+    wsClient.send({
+      type: "rosbag_cmd",
+      action: nextRecording ? "start" : "stop",
+      name: widget.bagName,
+      auto_timestamp: widget.autoTimestamp,
+    });
+  };
+
+  const renderWidget = (widget: CanvasWidget) => {
+    if (widget.kind === "save-pose-button") {
+      return (
+        <SavePoseButtonWidget
+          key={widget.id}
+          widget={widget}
+          selected={false}
+          onSelect={() => {}}
+          onRectChange={NOOP_RECT_CHANGE}
+          onTrigger={saveCurrentPose}
+        />
+      );
+    }
+
+    if (widget.kind === "load-pose-button") {
+      const poseAvailable = (activeConfiguration?.poses ?? []).some(
+        (pose) => pose.name === widget.poseName
+      );
+      return (
+        <LoadPoseButtonWidget
+          key={widget.id}
+          widget={widget}
+          selected={false}
+          onSelect={() => {}}
+          onRectChange={NOOP_RECT_CHANGE}
+          onTrigger={() => loadPoseByName(widget.poseName)}
+          poseAvailable={poseAvailable}
+        />
+      );
+    }
+
+    if (widget.kind === "navigation-button") {
+      const canNavigate = allowedScreenIds.has(widget.targetScreenId);
+      return (
+        <NavigationButtonWidget
+          key={widget.id}
+          widget={widget}
+          selected={false}
+          onSelect={() => {}}
+          onRectChange={NOOP_RECT_CHANGE}
+          onNavigate={onNavigateToScreen}
+          canNavigate={canNavigate}
+        />
+      );
+    }
+
+    if (widget.kind === "navigation-bar") {
+      return (
+        <NavigationBarWidget
+          key={widget.id}
+          widget={widget}
+          selected={false}
+          onSelect={() => {}}
+          onRectChange={NOOP_RECT_CHANGE}
+          onNavigate={onNavigateToScreen}
+          allowedScreenIds={allowedScreenIds}
+        />
+      );
+    }
+
+    if (widget.kind === "text") {
+      return (
+        <TextWidget
+          key={widget.id}
+          widget={widget}
+          selected={false}
+          onSelect={() => {}}
+          onRectChange={NOOP_RECT_CHANGE}
+        />
+      );
+    }
+
+    if (widget.kind === "textarea") {
+      return (
+        <TextareaWidget
+          key={widget.id}
+          widget={widget}
+          selected={false}
+          onSelect={() => {}}
+          onRectChange={NOOP_RECT_CHANGE}
+        />
+      );
+    }
+
+    if (widget.kind === "button") {
+      return (
+        <ActionButtonWidget
+          key={widget.id}
+          widget={widget}
+          selected={false}
+          onSelect={() => {}}
+          onRectChange={NOOP_RECT_CHANGE}
+          onTrigger={() =>
+            wsClient.send({
+              type: "ui_button",
+              topic: widget.topic,
+              payload: widget.payload,
+              widget_id: widget.id,
+            })
+          }
+        />
+      );
+    }
+
+    if (widget.kind === "rosbag-control") {
+      return (
+        <RosbagControlWidget
+          key={widget.id}
+          widget={widget}
+          selected={false}
+          onSelect={() => {}}
+          onRectChange={NOOP_RECT_CHANGE}
+          isRecording={rosbagRecording}
+          statusText={rosbagStatus}
+          onToggleRecording={() => toggleRosbagRecording(widget)}
+        />
+      );
+    }
+
+    if (widget.kind === "max-velocity") {
+      return (
+        <MaxVelocityWidget
+          key={widget.id}
+          widget={widget}
+          selected={false}
+          onSelect={() => {}}
+          onRectChange={NOOP_RECT_CHANGE}
+          value={maxVelocity}
+          onValueChange={setMaxVelocity}
+        />
+      );
+    }
+
+    if (widget.kind === "gripper-control") {
+      return (
+        <GripperControlWidget
+          key={widget.id}
+          widget={widget}
+          selected={false}
+          onSelect={() => {}}
+          onRectChange={NOOP_RECT_CHANGE}
+          speed={gripperSpeed}
+          force={gripperForce}
+          onSpeedChange={setGripperSpeed}
+          onForceChange={setGripperForce}
+          onOpen={() =>
+            wsClient.send({ type: "gripper_cmd", action: "open", speed: gripperSpeed, force: gripperForce })
+          }
+          onClose={() =>
+            wsClient.send({ type: "gripper_cmd", action: "close", speed: gripperSpeed, force: gripperForce })
+          }
+        />
+      );
+    }
+
+    if (widget.kind === "stream-display") {
+      const url = widget.source === "rviz" ? rvizStreamUrl : cameraStreamUrl;
+      return (
+        <StreamDisplayWidget
+          key={widget.id}
+          widget={{ ...widget, streamUrl: url || widget.streamUrl }}
+          selected={false}
+          onSelect={() => {}}
+          onRectChange={NOOP_RECT_CHANGE}
+          statusText={widget.source === "rviz" ? "RViz stream" : "Camera stream"}
+        />
+      );
+    }
+
+    if (widget.kind === "slider") {
+      const value = widget.binding === "z" ? z : rz;
+      const onChange = widget.binding === "z" ? setZ : setRz;
+      const topicPreview = `${widget.topic}: ${value.toFixed(2)}`;
+      return (
+        <SliderWidget
+          key={widget.id}
+          widget={widget}
+          value={value}
+          onValueChange={(nextValue) => {
+            onChange(nextValue);
+            markWidgetPulse(widget.id);
+          }}
+          topicPreview={topicPreview}
+          isTopicFresh={isWidgetFresh(widget.id)}
+          selected={false}
+          onSelect={() => {}}
+          onRectChange={NOOP_RECT_CHANGE}
+        />
+      );
+    }
+
+    const metrics =
+      widget.binding === "joy" ? { x: joyX, y: joyY, magnitude: Math.min(1, Math.hypot(joyX, joyY)) } : { x: rotX, y: rotY };
+    const topicPreview = `${widget.topic}: x=${metrics.x.toFixed(2)} y=${metrics.y.toFixed(2)}`;
+
+    return (
+      <JoystickWidget
+        key={widget.id}
+        widget={widget}
+        selected={false}
+        onSelect={() => {}}
+        onRectChange={NOOP_RECT_CHANGE}
+        onMove={(x, y) => {
+          if (widget.binding === "joy") {
+            setJoy(x, y);
+          } else {
+            setRot(x, y);
+          }
+          markWidgetPulse(widget.id);
+        }}
+        metrics={metrics}
+        topicPreview={topicPreview}
+        isTopicFresh={isWidgetFresh(widget.id)}
+      />
+    );
+  };
+
+  if (!activeApplication) {
+    return (
+      <main className="layout tab-accent tab-controls">
+        <section className="card">
+          <h2>Application not found</h2>
+          <div className="placeholder">Unknown application ID: {applicationId}</div>
+        </section>
+      </main>
+    );
+  }
+
+  if (!activeScreenId || !activeConfiguration) {
+    return (
+      <main className="layout tab-accent tab-controls">
+        <section className="card">
+          <h2>{activeApplication.name}</h2>
+          <div className="placeholder">
+            No valid screen selected. Configure at least one screen in <code>/canvas-design</code>.
+          </div>
+        </section>
+      </main>
+    );
+  }
+
+  return (
+    <main className="controls-page tab-accent tab-controls application-runtime-page">
+      <section className="card application-runtime-header">
+        <h2>{activeApplication.name}</h2>
+        <div className="application-runtime-links">
+          {activeApplication.screenIds.map((screenId) => (
+            <button
+              key={screenId}
+              type="button"
+              className={`tab-button ${screenId === activeScreenId ? "active" : ""}`}
+              onClick={() => onNavigateToScreen(screenId)}
+            >
+              {screenId}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="controls-workspace">
+        <div className="controls-canvas-surface">
+          <div className="controls-canvas" style={{ width: `${canvasSize.width}px`, height: `${canvasSize.height}px` }}>
+            {widgets.map(renderWidget)}
+          </div>
+        </div>
+      </section>
+    </main>
+  );
+}

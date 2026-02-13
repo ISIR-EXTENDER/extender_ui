@@ -3,6 +3,7 @@ import type { CanvasRect } from "../layout/CanvasItem";
 import type {
   LoadPoseButtonWidget as LoadPoseButtonWidgetModel,
   SavePoseButtonWidget as SavePoseButtonWidgetModel,
+  WidgetIcon,
 } from "./widgetTypes";
 
 type SavePoseButtonWidgetProps = {
@@ -22,7 +23,7 @@ type LoadPoseButtonWidgetProps = {
   poseAvailable: boolean;
 };
 
-const iconSvg = (icon: "home" | "save") => {
+const iconSvg = (icon: WidgetIcon) => {
   if (icon === "home") {
     return (
       <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -36,6 +37,29 @@ const iconSvg = (icon: "home" | "save") => {
         />
         <path
           d="M6.5 9.8V20h11V9.8"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    );
+  }
+
+  if (icon === "arrow-right") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path
+          d="M5 12h14"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M13 6l6 6-6 6"
           fill="none"
           stroke="currentColor"
           strokeWidth="1.8"

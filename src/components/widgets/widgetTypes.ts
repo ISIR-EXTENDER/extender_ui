@@ -3,11 +3,29 @@ import type { CanvasRect } from "../layout/CanvasItem";
 export type JoystickBinding = "joy" | "rot";
 export type SliderBinding = "z" | "rz";
 export type SliderDirection = "vertical" | "horizontal";
-export type WidgetIcon = "home" | "save";
+export type WidgetIcon = "home" | "save" | "arrow-right";
+export type NavigationOrientation = "horizontal" | "vertical";
+export type TextAlign = "left" | "center" | "right";
+export type StreamSource = "camera" | "rviz";
+
+export type WidgetKind =
+  | "joystick"
+  | "slider"
+  | "save-pose-button"
+  | "load-pose-button"
+  | "navigation-button"
+  | "navigation-bar"
+  | "text"
+  | "textarea"
+  | "button"
+  | "rosbag-control"
+  | "max-velocity"
+  | "gripper-control"
+  | "stream-display";
 
 type WidgetBase = {
   id: string;
-  kind: "joystick" | "slider" | "save-pose-button" | "load-pose-button";
+  kind: WidgetKind;
   label: string;
   topic: string;
   rect: CanvasRect;
@@ -46,11 +64,77 @@ export type LoadPoseButtonWidget = WidgetBase & {
   icon: WidgetIcon;
 };
 
+export type NavigationButtonWidget = WidgetBase & {
+  kind: "navigation-button";
+  targetScreenId: string;
+  icon: WidgetIcon;
+};
+
+export type NavigationBarWidget = WidgetBase & {
+  kind: "navigation-bar";
+  orientation: NavigationOrientation;
+  items: Array<{
+    id: string;
+    label: string;
+    targetScreenId: string;
+  }>;
+};
+
+export type TextWidget = WidgetBase & {
+  kind: "text";
+  text: string;
+  fontSize: number;
+  align: TextAlign;
+};
+
+export type TextareaWidget = WidgetBase & {
+  kind: "textarea";
+  text: string;
+  fontSize: number;
+};
+
+export type ButtonWidget = WidgetBase & {
+  kind: "button";
+  payload: string;
+};
+
+export type RosbagControlWidget = WidgetBase & {
+  kind: "rosbag-control";
+  bagName: string;
+  autoTimestamp: boolean;
+};
+
+export type MaxVelocityWidget = WidgetBase & {
+  kind: "max-velocity";
+  min: number;
+  max: number;
+  step: number;
+};
+
+export type GripperControlWidget = WidgetBase & {
+  kind: "gripper-control";
+};
+
+export type StreamDisplayWidget = WidgetBase & {
+  kind: "stream-display";
+  source: StreamSource;
+  streamUrl: string;
+};
+
 export type CanvasWidget =
   | JoystickWidget
   | SliderWidget
   | SavePoseButtonWidget
-  | LoadPoseButtonWidget;
+  | LoadPoseButtonWidget
+  | NavigationButtonWidget
+  | NavigationBarWidget
+  | TextWidget
+  | TextareaWidget
+  | ButtonWidget
+  | RosbagControlWidget
+  | MaxVelocityWidget
+  | GripperControlWidget
+  | StreamDisplayWidget;
 
 export const DEFAULT_WIDGETS: CanvasWidget[] = [
   {

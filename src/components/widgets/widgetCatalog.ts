@@ -1,9 +1,18 @@
 import type {
+  ButtonWidget,
   CanvasWidget,
+  GripperControlWidget,
   JoystickWidget,
   LoadPoseButtonWidget,
+  MaxVelocityWidget,
+  NavigationBarWidget,
+  NavigationButtonWidget,
+  RosbagControlWidget,
+  StreamDisplayWidget,
   SavePoseButtonWidget,
   SliderWidget,
+  TextareaWidget,
+  TextWidget,
 } from "./widgetTypes";
 import { nextWidgetId } from "./widgetTypes";
 
@@ -12,8 +21,16 @@ export type WidgetCatalogType =
   | "slider"
   | "save-pose-button"
   | "load-pose-button"
-  | "linear-joystick"
+  | "navigation-button"
+  | "navigation-bar"
+  | "text"
+  | "textarea"
   | "button"
+  | "rosbag-control"
+  | "max-velocity"
+  | "gripper-control"
+  | "stream-display"
+  | "linear-joystick"
   | "gauge"
   | "toggle"
   | "display"
@@ -31,8 +48,16 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
   { type: "slider", label: "Slider", enabled: true, defaultSize: { w: 60, h: 120 } },
   { type: "save-pose-button", label: "Save Pose Button", enabled: true, defaultSize: { w: 130, h: 52 } },
   { type: "load-pose-button", label: "Load Pose Button", enabled: true, defaultSize: { w: 130, h: 52 } },
+  { type: "navigation-button", label: "Navigation Button", enabled: true, defaultSize: { w: 160, h: 52 } },
+  { type: "navigation-bar", label: "Navigation Bar", enabled: true, defaultSize: { w: 220, h: 140 } },
+  { type: "text", label: "Text", enabled: true, defaultSize: { w: 280, h: 64 } },
+  { type: "textarea", label: "Textarea", enabled: true, defaultSize: { w: 300, h: 160 } },
+  { type: "button", label: "Action Button", enabled: true, defaultSize: { w: 140, h: 52 } },
+  { type: "rosbag-control", label: "Rosbag Control", enabled: true, defaultSize: { w: 300, h: 180 } },
+  { type: "max-velocity", label: "Max Velocity", enabled: true, defaultSize: { w: 260, h: 90 } },
+  { type: "gripper-control", label: "Gripper Control", enabled: true, defaultSize: { w: 300, h: 170 } },
+  { type: "stream-display", label: "Stream Display", enabled: true, defaultSize: { w: 360, h: 260 } },
   { type: "linear-joystick", label: "Linear Joystick", enabled: false, defaultSize: { w: 250, h: 60 } },
-  { type: "button", label: "Button", enabled: false, defaultSize: { w: 120, h: 50 } },
   { type: "gauge", label: "Gauge", enabled: false, defaultSize: { w: 150, h: 150 } },
   { type: "toggle", label: "Toggle", enabled: false, defaultSize: { w: 120, h: 80 } },
   { type: "display", label: "Display", enabled: false, defaultSize: { w: 150, h: 80 } },
@@ -100,6 +125,122 @@ export function createWidgetFromCatalogType(
       rect: { x, y, w: 130, h: 52 },
     };
     return loadButton;
+  }
+
+  if (type === "navigation-button") {
+    const widget: NavigationButtonWidget = {
+      id: nextWidgetId(),
+      kind: "navigation-button",
+      label: "Open Screen",
+      topic: "/ui/navigation",
+      targetScreenId: "",
+      icon: "arrow-right",
+      rect: { x, y, w: 160, h: 52 },
+    };
+    return widget;
+  }
+
+  if (type === "navigation-bar") {
+    const widget: NavigationBarWidget = {
+      id: nextWidgetId(),
+      kind: "navigation-bar",
+      label: "Navigation",
+      topic: "/ui/navigation",
+      orientation: "vertical",
+      items: [],
+      rect: { x, y, w: 220, h: 140 },
+    };
+    return widget;
+  }
+
+  if (type === "text") {
+    const widget: TextWidget = {
+      id: nextWidgetId(),
+      kind: "text",
+      label: "Text",
+      topic: "/ui/text",
+      text: "Text widget",
+      fontSize: 20,
+      align: "left",
+      rect: { x, y, w: 280, h: 64 },
+    };
+    return widget;
+  }
+
+  if (type === "textarea") {
+    const widget: TextareaWidget = {
+      id: nextWidgetId(),
+      kind: "textarea",
+      label: "Textarea",
+      topic: "/ui/textarea",
+      text: "Multiline text",
+      fontSize: 15,
+      rect: { x, y, w: 300, h: 160 },
+    };
+    return widget;
+  }
+
+  if (type === "button") {
+    const widget: ButtonWidget = {
+      id: nextWidgetId(),
+      kind: "button",
+      label: "Action",
+      topic: "/ui/button",
+      payload: "pressed",
+      rect: { x, y, w: 140, h: 52 },
+    };
+    return widget;
+  }
+
+  if (type === "rosbag-control") {
+    const widget: RosbagControlWidget = {
+      id: nextWidgetId(),
+      kind: "rosbag-control",
+      label: "Rosbag",
+      topic: "/rosbag/control",
+      bagName: "session_01",
+      autoTimestamp: true,
+      rect: { x, y, w: 300, h: 180 },
+    };
+    return widget;
+  }
+
+  if (type === "max-velocity") {
+    const widget: MaxVelocityWidget = {
+      id: nextWidgetId(),
+      kind: "max-velocity",
+      label: "Max Velocity",
+      topic: "/cmd/max_velocity",
+      min: 0,
+      max: 2,
+      step: 0.01,
+      rect: { x, y, w: 260, h: 90 },
+    };
+    return widget;
+  }
+
+  if (type === "gripper-control") {
+    const widget: GripperControlWidget = {
+      id: nextWidgetId(),
+      kind: "gripper-control",
+      label: "Gripper Control",
+      topic: "/cmd/gripper",
+      rect: { x, y, w: 300, h: 170 },
+    };
+    return widget;
+  }
+
+  if (type === "stream-display") {
+    const widget: StreamDisplayWidget = {
+      id: nextWidgetId(),
+      kind: "stream-display",
+      label: "Camera Stream",
+      topic: "/ui/stream",
+      source: "camera",
+      streamUrl: "webrtc://localhost:8001/stream",
+      rect: { x, y, w: 360, h: 260 },
+    };
+    return widget;
   }
 
   return null;

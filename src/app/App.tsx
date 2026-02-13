@@ -1,29 +1,77 @@
-import { useMemo } from "react";
+import { useEffect, useState } from "react";
 
 import { TopBar } from "../components/layout/TopBar";
-import { TabsNav } from "../components/layout/TabsNav";
-import { ControlsPage } from "../pages/ControlsPage";
-import { tabMap } from "./routes";
+import { ApplicationPage } from "../pages/ApplicationPage";
+import { CanvasDesignPage } from "../pages/CanvasDesignPage";
+import { HomePage } from "../pages/HomePage";
 import { useUiStore } from "../store/uiStore";
 import { useWsConnection } from "../hooks/useWsConnection";
 import { useTeleopPublisher } from "../hooks/useTeleopPublisher";
 import { useThemeMode } from "../hooks/useThemeMode";
+import { type AppRoute, useAppRouter } from "./router";
 
 export default function App() {
   useWsConnection();
   useThemeMode();
   const { stopAndZero } = useTeleopPublisher();
-
-  const activeTab = useUiStore((s) => s.activeTab);
+  const { route, navigate } = useAppRouter();
   const focusMode = useUiStore((s) => s.focusMode);
+  const [hasUnsavedCanvasChanges, setHasUnsavedCanvasChanges] = useState(false);
+  const pageTitle =
+    route.kind === "canvas-design"
+      ? "Canvas Design"
+      : route.kind === "application"
+        ? `Application: ${route.appId}`
+        : "Extender Tablet Interface";
 
-  const ActivePage = useMemo(() => tabMap[activeTab], [activeTab]);
+  useEffect(() => {
+    if (route.kind !== "canvas-design") {
+      setHasUnsavedCanvasChanges(false);
+    }
+  }, [route.kind]);
+
+  const guardedNavigate = (nextRoute: AppRoute) => {
+    const leavingCanvasDesign = route.kind === "canvas-design" && nextRoute.kind !== "canvas-design";
+    if (
+      leavingCanvasDesign &&
+      hasUnsavedCanvasChanges &&
+      !window.confirm("You have unsaved screen changes. Leave without saving?")
+    ) {
+      return;
+    }
+    navigate(nextRoute);
+  };
 
   return (
     <div className="app">
-      <TopBar onStop={stopAndZero} />
-      <TabsNav hidden={focusMode} />
-      {focusMode ? <ControlsPage focusOnly /> : <ActivePage />}
+      <TopBar
+        onStop={stopAndZero}
+        onHome={() => guardedNavigate({ kind: "home" })}
+        onOpenCanvasDesign={() => guardedNavigate({ kind: "canvas-design" })}
+        isCanvasDesign={route.kind === "canvas-design"}
+        pageTitle={pageTitle}
+      />
+      {route.kind === "home" ? (
+        <HomePage
+          onOpenCanvasDesign={() => guardedNavigate({ kind: "canvas-design" })}
+          onOpenApplication={(applicationId) =>
+            guardedNavigate({ kind: "application", appId: applicationId, screenId: null })
+          }
+        />
+      ) : route.kind === "canvas-design" ? (
+        <CanvasDesignPage
+          focusOnly={focusMode}
+          onDirtyChange={setHasUnsavedCanvasChanges}
+        />
+      ) : (
+        <ApplicationPage
+          applicationId={route.appId}
+          routeScreenId={route.screenId}
+          onNavigateToScreen={(screenId) =>
+            navigate({ kind: "application", appId: route.appId, screenId })
+          }
+        />
+      )}
     </div>
   );
 }

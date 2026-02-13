@@ -6,9 +6,19 @@ import { useUiStore } from "../../store/uiStore";
 
 type TopBarProps = {
   onStop: () => void;
+  onHome: () => void;
+  onOpenCanvasDesign: () => void;
+  isCanvasDesign: boolean;
+  pageTitle?: string;
 };
 
-export function TopBar({ onStop }: TopBarProps) {
+export function TopBar({
+  onStop,
+  onHome,
+  onOpenCanvasDesign,
+  isCanvasDesign,
+  pageTitle,
+}: TopBarProps) {
   const focusMode = useUiStore((s) => s.focusMode);
   const setFocusMode = useUiStore((s) => s.setFocusMode);
   const wsStatus = useTeleopStore((s) => s.wsStatus);
@@ -33,21 +43,26 @@ export function TopBar({ onStop }: TopBarProps) {
   return (
     <header className="header">
       <div className="header-main">
-        <h1>Extender Tablet Interface</h1>
+        <h1>{pageTitle || "Extender Tablet Interface"}</h1>
         <div className="header-actions">
           <div className={`connection-status connection-status-${connectionIndicator.level}`}>
             <span className="connection-led" aria-hidden />
             <span>{connectionIndicator.label}</span>
           </div>
-          <Button
-            className="focus"
-            type="button"
-            onClick={() => setFocusMode(!focusMode)}
-          >
-            {focusMode ? "Exit Focus" : "Focus"}
+          {isCanvasDesign ? (
+            <Button
+              className="focus"
+              type="button"
+              onClick={() => setFocusMode(!focusMode)}
+            >
+              {focusMode ? "Exit Focus" : "Focus"}
+            </Button>
+          ) : null}
+          <Button className="focus" type="button" onClick={onOpenCanvasDesign}>
+            Screen Builder
           </Button>
-          <Button className="home" type="button">
-            🏠 Home
+          <Button className="home" type="button" onClick={onHome}>
+            Home
           </Button>
           <Button className="stop" type="button" onClick={onStop}>
             STOP
