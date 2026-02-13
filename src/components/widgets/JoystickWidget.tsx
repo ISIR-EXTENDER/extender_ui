@@ -28,8 +28,24 @@ export function JoystickWidget({
   isTopicFresh,
   metrics,
 }: JoystickWidgetProps) {
-  const maxDisk = Math.max(36, Math.min(widget.rect.w, widget.rect.h) - 34);
-  const diskSize = Math.min(widget.diskSize, maxDisk);
+  // Keep a visible inner padding and title/readout room while maximizing joystick area.
+  const diskSize = Math.max(48, Math.min(widget.rect.w, widget.rect.h) - 58);
+
+  const handleRectChange = (next: CanvasRect) => {
+    const isMoveOnly = next.w === widget.rect.w && next.h === widget.rect.h;
+    if (isMoveOnly) {
+      onRectChange(next);
+      return;
+    }
+
+    // Joystick widgets stay square during resize.
+    const size = Math.max(90, Math.min(next.w, next.h));
+    onRectChange({
+      ...next,
+      w: size,
+      h: size,
+    });
+  };
 
   return (
     <CanvasItem
@@ -37,7 +53,7 @@ export function JoystickWidget({
       y={widget.rect.y}
       w={widget.rect.w}
       h={widget.rect.h}
-      onChange={onRectChange}
+      onChange={handleRectChange}
       onSelect={onSelect}
       selected={selected}
       minSize={{ w: 90, h: 90 }}

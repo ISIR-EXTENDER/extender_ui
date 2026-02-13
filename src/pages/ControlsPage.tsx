@@ -5,10 +5,15 @@ import {
   useState,
   type MouseEvent as ReactMouseEvent,
 } from "react";
+import { createPortal } from "react-dom";
 
 import type { CanvasRect } from "../components/layout/CanvasItem";
 import { ModeSelector } from "../components/teleop/ModeSelector";
 import { JoystickWidget } from "../components/widgets/JoystickWidget";
+import {
+  LoadPoseButtonWidget,
+  SavePoseButtonWidget,
+} from "../components/widgets/PoseButtonsWidget";
 import { SliderWidget } from "../components/widgets/SliderWidget";
 import {
   WIDGET_CATALOG,
@@ -24,7 +29,11 @@ import {
   TS_WIDGET_PRESETS,
   type CanvasWidget,
   type JoystickWidget as JoystickWidgetModel,
+  type LoadPoseButtonWidget as LoadPoseButtonWidgetModel,
+  type PoseSnapshot,
+  type PoseTopicValue,
   type SliderWidget as SliderWidgetModel,
+  type WidgetIcon,
   type WidgetCatalogType,
   type WidgetConfiguration,
   upsertConfiguration,
@@ -58,6 +67,7 @@ const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
 const HEX_COLOR_PATTERN = /^#(?:[0-9a-fA-F]{3}){1,2}$/;
 const toColorInputValue = (value: string, fallback = "#4a9eff") =>
   HEX_COLOR_PATTERN.test(value.trim()) ? value : fallback;
+const clampSignedUnit = (value: number) => Math.max(-1, Math.min(1, value));
 
 export function ControlsPage({ focusOnly = false }: ControlsPageProps) {
   const joyX = useTeleopStore((s) => s.joyX);
@@ -72,6 +82,7 @@ export function ControlsPage({ focusOnly = false }: ControlsPageProps) {
   const setRz = useTeleopStore((s) => s.setRz);
 
   const canvasSurfaceRef = useRef<HTMLDivElement | null>(null);
+  const [topBarSlotElement, setTopBarSlotElement] = useState<HTMLElement | null>(null);
 
   const [widgets, setWidgets] = useState<CanvasWidget[]>([]);
   const [selectedWidgetId, setSelectedWidgetId] = useState<string | null>(null);
@@ -104,6 +115,14 @@ export function ControlsPage({ focusOnly = false }: ControlsPageProps) {
   useEffect(() => {
     persistConfigurationsToLocalStorage(configurations);
   }, [configurations]);
+
+  useEffect(() => {
+    if (focusOnly) {
+      setTopBarSlotElement(null);
+      return;
+    }
+    setTopBarSlotElement(document.getElementById("topbar-controls-slot"));
+  }, [focusOnly]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -161,6 +180,10 @@ export function ControlsPage({ focusOnly = false }: ControlsPageProps) {
     () => widgets.find((widget) => widget.id === selectedWidgetId) ?? null,
     [selectedWidgetId, widgets]
   );
+  const activeConfiguration = useMemo(
+    () => configurations.find((configuration) => configuration.name === selectedConfigName) ?? null,
+    [configurations, selectedConfigName]
+  );
 
   const canvasSize = useMemo(() => {
     const maxRight = widgets.reduce((acc, widget) => Math.max(acc, widget.rect.x + widget.rect.w), 220);
@@ -184,6 +207,19 @@ export function ControlsPage({ focusOnly = false }: ControlsPageProps) {
     if (!selectedWidget) return;
     const fallback = selectedWidget.rect[field];
     const value = Math.max(0, Math.round(readNumber(raw, fallback)));
+
+    if (selectedWidget.kind === "joystick" && (field === "w" || field === "h")) {
+      updateSelectedWidget((widget) => ({
+        ...widget,
+        rect: {
+          ...widget.rect,
+          w: value,
+          h: value,
+        },
+      }));
+      return;
+    }
+
     updateSelectedWidget((widget) => ({
       ...widget,
       rect: {
@@ -199,6 +235,11 @@ export function ControlsPage({ focusOnly = false }: ControlsPageProps) {
 
   const updateSelectedJoystick = (updater: (widget: JoystickWidgetModel) => JoystickWidgetModel) => {
     updateSelectedWidget((widget) => (widget.kind === "joystick" ? updater(widget) : widget));
+  };
+  const updateSelectedLoadPoseButton = (
+    updater: (widget: LoadPoseButtonWidgetModel) => LoadPoseButtonWidgetModel
+  ) => {
+    updateSelectedWidget((widget) => (widget.kind === "load-pose-button" ? updater(widget) : widget));
   };
 
   const markWidgetPulse = (widgetId: string) => {
@@ -303,6 +344,129 @@ export function ControlsPage({ focusOnly = false }: ControlsPageProps) {
     setStatusMessage(`Loaded TS preset \"${presetName}\".`);
   };
 
+  const upsertPose = (poses: PoseSnapshot[], pose: PoseSnapshot) => {
+    const index = poses.findIndex((item) => item.name === pose.name);
+    if (index === -1) {
+      return [...poses, pose].sort((a, b) => a.name.localeCompare(b.name));
+    }
+    return poses.map((item, itemIndex) => (itemIndex === index ? pose : item));
+  };
+
+  const collectCurrentPoseTopics = (): Record<string, PoseTopicValue> => {
+    const topics: Record<string, PoseTopicValue> = {};
+
+    for (const widget of widgets) {
+      if (widget.kind === "slider") {
+        const value = widget.binding === "z" ? z : rz;
+        topics[widget.topic] = { kind: "scalar", value };
+        continue;
+      }
+
+      if (widget.kind === "joystick") {
+        const source = widget.binding === "joy" ? { x: joyX, y: joyY } : { x: rotX, y: rotY };
+        topics[widget.topic] = { kind: "vector2", x: source.x, y: source.y };
+      }
+    }
+
+    return topics;
+  };
+
+  const saveCurrentPose = () => {
+    if (!selectedConfigName) {
+      setStatusMessage("Select a configuration before saving a pose.");
+      return;
+    }
+
+    const defaultPoseName = `pose-${(activeConfiguration?.poses.length ?? 0) + 1}`;
+    const rawPoseName = window.prompt("Pose name", defaultPoseName);
+    if (rawPoseName == null) return;
+
+    const poseName = rawPoseName.trim();
+    if (!poseName) {
+      setStatusMessage("Pose name cannot be empty.");
+      return;
+    }
+
+    const nextPose: PoseSnapshot = {
+      name: poseName,
+      savedAt: new Date().toISOString(),
+      topics: collectCurrentPoseTopics(),
+    };
+
+    setConfigurations((prev) =>
+      prev.map((configuration) =>
+        configuration.name !== selectedConfigName
+          ? configuration
+          : {
+              ...configuration,
+              poses: upsertPose(configuration.poses ?? [], nextPose),
+              updatedAt: new Date().toISOString(),
+            }
+      )
+    );
+    setStatusMessage(`Pose \"${poseName}\" saved for configuration \"${selectedConfigName}\".`);
+  };
+
+  const loadPoseByName = (poseName: string) => {
+    if (!selectedConfigName) {
+      setStatusMessage("Select a configuration before loading a pose.");
+      return;
+    }
+    const configuration = configurations.find((item) => item.name === selectedConfigName);
+    if (!configuration) {
+      setStatusMessage("Configuration not found.");
+      return;
+    }
+
+    const pose = configuration.poses.find((item) => item.name === poseName);
+    if (!pose) {
+      setStatusMessage(`Pose \"${poseName}\" not found.`);
+      return;
+    }
+
+    const touchedWidgetIds: string[] = [];
+
+    for (const widget of widgets) {
+      const topicValue = pose.topics[widget.topic];
+      if (!topicValue) continue;
+
+      if (widget.kind === "slider" && topicValue.kind === "scalar") {
+        const clamped = Math.min(widget.max, Math.max(widget.min, topicValue.value));
+        if (widget.binding === "z") {
+          setZ(clamped);
+        } else {
+          setRz(clamped);
+        }
+        touchedWidgetIds.push(widget.id);
+        continue;
+      }
+
+      if (widget.kind === "joystick" && topicValue.kind === "vector2") {
+        const x = clampSignedUnit(topicValue.x);
+        const y = clampSignedUnit(topicValue.y);
+        if (widget.binding === "joy") {
+          setJoy(x, y);
+        } else {
+          setRot(x, y);
+        }
+        touchedWidgetIds.push(widget.id);
+      }
+    }
+
+    if (touchedWidgetIds.length) {
+      const now = Date.now();
+      setWidgetPulseMap((prev) => {
+        const next = { ...prev };
+        for (const widgetId of touchedWidgetIds) {
+          next[widgetId] = now;
+        }
+        return next;
+      });
+    }
+
+    setStatusMessage(`Pose \"${pose.name}\" loaded.`);
+  };
+
   const handleSyncToFolder = async () => {
     try {
       const count = await syncConfigurationsToFolder(configurations);
@@ -339,6 +503,36 @@ export function ControlsPage({ focusOnly = false }: ControlsPageProps) {
 
   const renderCanvasWidget = (widget: CanvasWidget) => {
     const selected = widget.id === selectedWidgetId;
+
+    if (widget.kind === "save-pose-button") {
+      return (
+        <SavePoseButtonWidget
+          key={widget.id}
+          widget={widget}
+          selected={selected}
+          onSelect={() => setSelectedWidgetId(widget.id)}
+          onRectChange={(next) => updateWidget(widget.id, (current) => ({ ...current, rect: next }))}
+          onTrigger={saveCurrentPose}
+        />
+      );
+    }
+
+    if (widget.kind === "load-pose-button") {
+      const poseAvailable = (activeConfiguration?.poses ?? []).some(
+        (pose) => pose.name === widget.poseName
+      );
+      return (
+        <LoadPoseButtonWidget
+          key={widget.id}
+          widget={widget}
+          selected={selected}
+          onSelect={() => setSelectedWidgetId(widget.id)}
+          onRectChange={(next) => updateWidget(widget.id, (current) => ({ ...current, rect: next }))}
+          onTrigger={() => loadPoseByName(widget.poseName)}
+          poseAvailable={poseAvailable}
+        />
+      );
+    }
 
     if (widget.kind === "slider") {
       const value = widget.binding === "z" ? z : rz;
@@ -390,6 +584,83 @@ export function ControlsPage({ focusOnly = false }: ControlsPageProps) {
     );
   };
 
+  const configToolbar = (
+    <div className="controls-header-inline">
+      <div className="controls-config-row">
+        <label className="controls-field controls-config-field">
+          <span>Configuration</span>
+          <select
+            className="editor-input"
+            value={selectedConfigName}
+            onChange={(event) => {
+              const name = event.target.value;
+              setSelectedConfigName(name);
+              setConfigNameInput(name);
+            }}
+          >
+            <option value="">-- select --</option>
+            {configurations.map((configuration) => (
+              <option key={configuration.name} value={configuration.name}>
+                {configuration.name}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="controls-field controls-config-field">
+          <span>Name</span>
+          <input
+            className="editor-input"
+            value={configNameInput}
+            onChange={(event) => setConfigNameInput(event.target.value)}
+            placeholder="new configuration"
+          />
+        </label>
+
+        <label className="controls-field controls-config-field">
+          <span>TS Preset</span>
+          <select
+            className="editor-input"
+            value={selectedTsPresetId}
+            onChange={(event) => setSelectedTsPresetId(event.target.value)}
+          >
+            {TS_WIDGET_PRESETS.map((preset) => (
+              <option key={preset.id} value={preset.id}>
+                {preset.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <button type="button" className="tab-button" onClick={() => selectedConfigName && loadConfigurationByName(selectedConfigName)}>
+          Load
+        </button>
+        <button type="button" className="tab-button" onClick={loadTsPreset} disabled={!selectedTsPresetId}>
+          Load Preset
+        </button>
+        <button type="button" className="tab-button" onClick={saveCurrentConfiguration}>
+          Save
+        </button>
+        <button type="button" className="tab-button" onClick={deleteSelectedConfiguration} disabled={!selectedConfigName}>
+          Delete
+        </button>
+        <button type="button" className="tab-button" onClick={clearCanvas}>
+          Clear Canvas
+        </button>
+        <button type="button" className="tab-button" onClick={loadDemoConfiguration}>
+          Load Demo
+        </button>
+        <button type="button" className="tab-button" onClick={handleSyncToFolder}>
+          Sync To Folder
+        </button>
+        <button type="button" className="tab-button" onClick={handleSyncFromFolder}>
+          Sync From Folder
+        </button>
+      </div>
+      {statusMessage ? <div className="controls-status-message">{statusMessage}</div> : null}
+    </div>
+  );
+
   if (focusOnly) {
     return (
       <main className="controls-page controls-page-focus tab-accent tab-controls">
@@ -431,84 +702,10 @@ export function ControlsPage({ focusOnly = false }: ControlsPageProps) {
   }
 
   return (
-    <main className="controls-page tab-accent tab-controls">
-      <section className="card controls-header">
-        <div className="controls-config-row">
-          <label className="controls-field controls-config-field">
-            <span>Configuration</span>
-            <select
-              className="editor-input"
-              value={selectedConfigName}
-              onChange={(event) => {
-                const name = event.target.value;
-                setSelectedConfigName(name);
-                setConfigNameInput(name);
-              }}
-            >
-              <option value="">-- select --</option>
-              {configurations.map((configuration) => (
-                <option key={configuration.name} value={configuration.name}>
-                  {configuration.name}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="controls-field controls-config-field">
-            <span>Name</span>
-            <input
-              className="editor-input"
-              value={configNameInput}
-              onChange={(event) => setConfigNameInput(event.target.value)}
-              placeholder="new configuration"
-            />
-          </label>
-
-          <label className="controls-field controls-config-field">
-            <span>TS Preset</span>
-            <select
-              className="editor-input"
-              value={selectedTsPresetId}
-              onChange={(event) => setSelectedTsPresetId(event.target.value)}
-            >
-              {TS_WIDGET_PRESETS.map((preset) => (
-                <option key={preset.id} value={preset.id}>
-                  {preset.label}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <button type="button" className="tab-button" onClick={() => selectedConfigName && loadConfigurationByName(selectedConfigName)}>
-            Load
-          </button>
-          <button type="button" className="tab-button" onClick={loadTsPreset} disabled={!selectedTsPresetId}>
-            Load Preset
-          </button>
-          <button type="button" className="tab-button" onClick={saveCurrentConfiguration}>
-            Save
-          </button>
-          <button type="button" className="tab-button" onClick={deleteSelectedConfiguration} disabled={!selectedConfigName}>
-            Delete
-          </button>
-          <button type="button" className="tab-button" onClick={clearCanvas}>
-            Clear Canvas
-          </button>
-          <button type="button" className="tab-button" onClick={loadDemoConfiguration}>
-            Load Demo
-          </button>
-          <button type="button" className="tab-button" onClick={handleSyncToFolder}>
-            Sync To Folder
-          </button>
-          <button type="button" className="tab-button" onClick={handleSyncFromFolder}>
-            Sync From Folder
-          </button>
-        </div>
-
-        {statusMessage ? <div className="controls-status-message">{statusMessage}</div> : null}
-      </section>
-
-      <section className="controls-workspace">
+    <>
+      {topBarSlotElement ? createPortal(configToolbar, topBarSlotElement) : null}
+      <main className="controls-page tab-accent tab-controls">
+        <section className="controls-workspace">
         <div className="controls-shell">
           <div className="controls-canvas-surface" ref={canvasSurfaceRef} onContextMenu={handleCanvasContextMenu}>
             <div className="controls-canvas" style={{ width: `${canvasSize.width}px`, height: `${canvasSize.height}px` }}>
@@ -780,7 +977,7 @@ export function ControlsPage({ focusOnly = false }: ControlsPageProps) {
                         </label>
                       </div>
                     </>
-                  ) : (
+                  ) : selectedWidget.kind === "slider" ? (
                     <>
                       <div className="controls-property-title">Slider</div>
                       <div className="controls-field-row">
@@ -869,6 +1066,56 @@ export function ControlsPage({ focusOnly = false }: ControlsPageProps) {
                         </label>
                       </div>
                     </>
+                  ) : selectedWidget.kind === "load-pose-button" ? (
+                    <>
+                      <div className="controls-property-title">Load Pose Button</div>
+                      <div className="controls-field-row">
+                        <label className="controls-field">
+                          <span>Pose</span>
+                          <select
+                            className="editor-input"
+                            value={selectedWidget.poseName}
+                            onChange={(event) =>
+                              updateSelectedLoadPoseButton((widget) => ({
+                                ...widget,
+                                poseName: event.target.value,
+                              }))
+                            }
+                          >
+                            <option value="">-- select pose --</option>
+                            {(activeConfiguration?.poses ?? []).map((pose) => (
+                              <option key={pose.name} value={pose.name}>
+                                {pose.name}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+
+                        <label className="controls-field">
+                          <span>Icon</span>
+                          <select
+                            className="editor-input"
+                            value={selectedWidget.icon}
+                            onChange={(event) =>
+                              updateSelectedLoadPoseButton((widget) => ({
+                                ...widget,
+                                icon: (event.target.value === "save" ? "save" : "home") as WidgetIcon,
+                              }))
+                            }
+                          >
+                            <option value="home">home</option>
+                            <option value="save">save</option>
+                          </select>
+                        </label>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="controls-property-title">Save Pose Button</div>
+                      <div className="controls-hint">
+                        Saves the current canvas topic state into the selected configuration.
+                      </div>
+                    </>
                   )}
                 </div>
               )}
@@ -880,33 +1127,34 @@ export function ControlsPage({ focusOnly = false }: ControlsPageProps) {
             </section>
           </aside>
         </div>
-      </section>
+        </section>
 
-      {contextMenu ? (
-        <div
-          className="controls-context-menu"
-          style={{ left: `${contextMenu.clientX}px`, top: `${contextMenu.clientY}px` }}
-        >
-          <div className="controls-context-title">Add Widget</div>
-          <div className="controls-context-list">
-            {WIDGET_CATALOG.map((entry) => (
-              <button
-                key={entry.type}
-                type="button"
-                className="controls-context-item"
-                disabled={!entry.enabled}
-                onClick={() => {
-                  addWidgetByType(entry.type, { x: contextMenu.canvasX, y: contextMenu.canvasY });
-                  setContextMenu(null);
-                }}
-              >
-                <span>{entry.label}</span>
-                <span className="controls-context-tag">{entry.enabled ? "add" : "soon"}</span>
-              </button>
-            ))}
+        {contextMenu ? (
+          <div
+            className="controls-context-menu"
+            style={{ left: `${contextMenu.clientX}px`, top: `${contextMenu.clientY}px` }}
+          >
+            <div className="controls-context-title">Add Widget</div>
+            <div className="controls-context-list">
+              {WIDGET_CATALOG.map((entry) => (
+                <button
+                  key={entry.type}
+                  type="button"
+                  className="controls-context-item"
+                  disabled={!entry.enabled}
+                  onClick={() => {
+                    addWidgetByType(entry.type, { x: contextMenu.canvasX, y: contextMenu.canvasY });
+                    setContextMenu(null);
+                  }}
+                >
+                  <span>{entry.label}</span>
+                  <span className="controls-context-tag">{entry.enabled ? "add" : "soon"}</span>
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
-      ) : null}
-    </main>
+        ) : null}
+      </main>
+    </>
   );
 }

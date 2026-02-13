@@ -3,10 +3,11 @@ import type { CanvasRect } from "../layout/CanvasItem";
 export type JoystickBinding = "joy" | "rot";
 export type SliderBinding = "z" | "rz";
 export type SliderDirection = "vertical" | "horizontal";
+export type WidgetIcon = "home" | "save";
 
 type WidgetBase = {
   id: string;
-  kind: "joystick" | "slider";
+  kind: "joystick" | "slider" | "save-pose-button" | "load-pose-button";
   label: string;
   topic: string;
   rect: CanvasRect;
@@ -35,7 +36,21 @@ export type SliderWidget = WidgetBase & {
   step: number;
 };
 
-export type CanvasWidget = JoystickWidget | SliderWidget;
+export type SavePoseButtonWidget = WidgetBase & {
+  kind: "save-pose-button";
+};
+
+export type LoadPoseButtonWidget = WidgetBase & {
+  kind: "load-pose-button";
+  poseName: string;
+  icon: WidgetIcon;
+};
+
+export type CanvasWidget =
+  | JoystickWidget
+  | SliderWidget
+  | SavePoseButtonWidget
+  | LoadPoseButtonWidget;
 
 export const DEFAULT_WIDGETS: CanvasWidget[] = [
   {

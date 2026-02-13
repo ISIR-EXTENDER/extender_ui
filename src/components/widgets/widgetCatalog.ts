@@ -1,9 +1,17 @@
-import type { CanvasWidget, JoystickWidget, SliderWidget } from "./widgetTypes";
+import type {
+  CanvasWidget,
+  JoystickWidget,
+  LoadPoseButtonWidget,
+  SavePoseButtonWidget,
+  SliderWidget,
+} from "./widgetTypes";
 import { nextWidgetId } from "./widgetTypes";
 
 export type WidgetCatalogType =
   | "joystick"
   | "slider"
+  | "save-pose-button"
+  | "load-pose-button"
   | "linear-joystick"
   | "button"
   | "gauge"
@@ -21,6 +29,8 @@ export type WidgetCatalogEntry = {
 export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
   { type: "joystick", label: "Joystick", enabled: true, defaultSize: { w: 150, h: 150 } },
   { type: "slider", label: "Slider", enabled: true, defaultSize: { w: 60, h: 120 } },
+  { type: "save-pose-button", label: "Save Pose Button", enabled: true, defaultSize: { w: 130, h: 52 } },
+  { type: "load-pose-button", label: "Load Pose Button", enabled: true, defaultSize: { w: 130, h: 52 } },
   { type: "linear-joystick", label: "Linear Joystick", enabled: false, defaultSize: { w: 250, h: 60 } },
   { type: "button", label: "Button", enabled: false, defaultSize: { w: 120, h: 50 } },
   { type: "gauge", label: "Gauge", enabled: false, defaultSize: { w: 150, h: 150 } },
@@ -66,6 +76,30 @@ export function createWidgetFromCatalogType(
       rect: { x, y, w: 150, h: 150 },
     };
     return joystick;
+  }
+
+  if (type === "save-pose-button") {
+    const saveButton: SavePoseButtonWidget = {
+      id: nextWidgetId(),
+      kind: "save-pose-button",
+      label: "Save Pose",
+      topic: "/ui/save_pose",
+      rect: { x, y, w: 130, h: 52 },
+    };
+    return saveButton;
+  }
+
+  if (type === "load-pose-button") {
+    const loadButton: LoadPoseButtonWidget = {
+      id: nextWidgetId(),
+      kind: "load-pose-button",
+      label: "Load Pose",
+      topic: "/ui/load_pose",
+      poseName: "",
+      icon: "home",
+      rect: { x, y, w: 130, h: 52 },
+    };
+    return loadButton;
   }
 
   return null;

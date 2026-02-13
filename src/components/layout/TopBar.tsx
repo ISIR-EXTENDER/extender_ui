@@ -11,8 +11,6 @@ type TopBarProps = {
 export function TopBar({ onStop }: TopBarProps) {
   const focusMode = useUiStore((s) => s.focusMode);
   const setFocusMode = useUiStore((s) => s.setFocusMode);
-  const isEditorMode = useUiStore((s) => s.isEditorMode);
-  const setEditorMode = useUiStore((s) => s.setEditorMode);
   const wsStatus = useTeleopStore((s) => s.wsStatus);
   const [everConnected, setEverConnected] = useState(false);
 
@@ -34,29 +32,29 @@ export function TopBar({ onStop }: TopBarProps) {
 
   return (
     <header className="header">
-      <h1>Extender Tablet Interface</h1>
-      <div className="header-actions">
-        <div className={`connection-status connection-status-${connectionIndicator.level}`}>
-          <span className="connection-led" aria-hidden />
-          <span>{connectionIndicator.label}</span>
+      <div className="header-main">
+        <h1>Extender Tablet Interface</h1>
+        <div className="header-actions">
+          <div className={`connection-status connection-status-${connectionIndicator.level}`}>
+            <span className="connection-led" aria-hidden />
+            <span>{connectionIndicator.label}</span>
+          </div>
+          <Button
+            className="focus"
+            type="button"
+            onClick={() => setFocusMode(!focusMode)}
+          >
+            {focusMode ? "Exit Focus" : "Focus"}
+          </Button>
+          <Button className="home" type="button">
+            🏠 Home
+          </Button>
+          <Button className="stop" type="button" onClick={onStop}>
+            STOP
+          </Button>
         </div>
-        <Button type="button" onClick={() => setEditorMode(!isEditorMode)}>
-          {isEditorMode ? "Editor On" : "Editor Off"}
-        </Button>
-        <Button
-          className="focus"
-          type="button"
-          onClick={() => setFocusMode(!focusMode)}
-        >
-          {focusMode ? "Exit Focus" : "Focus"}
-        </Button>
-        <Button className="home" type="button">
-          🏠 Home
-        </Button>
-        <Button className="stop" type="button" onClick={onStop}>
-          STOP
-        </Button>
       </div>
+      <div id="topbar-controls-slot" className="topbar-controls-slot" />
     </header>
   );
 }

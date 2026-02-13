@@ -63,6 +63,8 @@ export function NippleJoystick({
             size,
             restOpacity: 0.8,
             restJoystick: true,
+            // Recompute joystick coordinates against layout/scroll changes in parent containers.
+            dynamicPage: true,
             lockX: false,
             lockY: false,
           });

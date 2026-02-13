@@ -1,8 +1,19 @@
 import type { CanvasWidget } from "./widgetTypes";
 
+export type PoseTopicValue =
+  | { kind: "scalar"; value: number }
+  | { kind: "vector2"; x: number; y: number };
+
+export type PoseSnapshot = {
+  name: string;
+  savedAt: string;
+  topics: Record<string, PoseTopicValue>;
+};
+
 export type WidgetConfiguration = {
   name: string;
   widgets: CanvasWidget[];
+  poses: PoseSnapshot[];
   updatedAt: string;
 };
 
@@ -17,6 +28,42 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 export const cloneWidgets = (widgets: CanvasWidget[]): CanvasWidget[] =>
   JSON.parse(JSON.stringify(widgets)) as CanvasWidget[];
+export const clonePoses = (poses: PoseSnapshot[]): PoseSnapshot[] =>
+  JSON.parse(JSON.stringify(poses)) as PoseSnapshot[];
+
+const isPoseTopicValue = (value: unknown): value is PoseTopicValue => {
+  if (!isRecord(value) || typeof value.kind !== "string") return false;
+  if (value.kind === "scalar") {
+    return typeof value.value === "number";
+  }
+  if (value.kind === "vector2") {
+    return typeof value.x === "number" && typeof value.y === "number";
+  }
+  return false;
+};
+
+const parsePose = (value: unknown): PoseSnapshot | null => {
+  if (!isRecord(value) || typeof value.name !== "string" || !isRecord(value.topics)) {
+    return null;
+  }
+
+  const topics: Record<string, PoseTopicValue> = {};
+  for (const [topic, topicValue] of Object.entries(value.topics)) {
+    if (!isPoseTopicValue(topicValue)) continue;
+    topics[topic] = topicValue;
+  }
+
+  return {
+    name: value.name,
+    savedAt: typeof value.savedAt === "string" ? value.savedAt : new Date().toISOString(),
+    topics,
+  };
+};
+
+const parsePoses = (value: unknown): PoseSnapshot[] => {
+  if (!Array.isArray(value)) return [];
+  return value.map(parsePose).filter((pose): pose is PoseSnapshot => pose !== null);
+};
 
 export function loadConfigurationsFromLocalStorage(): WidgetConfiguration[] {
   try {
@@ -32,6 +79,7 @@ export function loadConfigurationsFromLocalStorage(): WidgetConfiguration[] {
       .map((item) => ({
         name: item.name,
         widgets: cloneWidgets(item.widgets),
+        poses: parsePoses(item.poses),
         updatedAt: typeof item.updatedAt === "string" ? item.updatedAt : new Date().toISOString(),
       }));
   } catch {
@@ -46,11 +94,14 @@ export function persistConfigurationsToLocalStorage(configurations: WidgetConfig
 export function upsertConfiguration(
   configurations: WidgetConfiguration[],
   name: string,
-  widgets: CanvasWidget[]
+  widgets: CanvasWidget[],
+  poses?: PoseSnapshot[]
 ): WidgetConfiguration[] {
+  const existing = configurations.find((config) => config.name === name);
   const nextConfig: WidgetConfiguration = {
     name,
     widgets: cloneWidgets(widgets),
+    poses: clonePoses(poses ?? existing?.poses ?? []),
     updatedAt: new Date().toISOString(),
   };
 
@@ -81,6 +132,7 @@ const parseConfigurationFile = async (entry: any): Promise<WidgetConfiguration |
     return {
       name: parsed.name,
       widgets: cloneWidgets(parsed.widgets as CanvasWidget[]),
+      poses: parsePoses(parsed.poses),
       updatedAt: typeof parsed.updatedAt === "string" ? parsed.updatedAt : new Date().toISOString(),
     };
   } catch {
@@ -127,7 +179,12 @@ export async function syncConfigurationsFromFolder(
 
   let merged = [...configurations];
   for (const configuration of loaded) {
-    merged = upsertConfiguration(merged, configuration.name, configuration.widgets);
+    merged = upsertConfiguration(
+      merged,
+      configuration.name,
+      configuration.widgets,
+      configuration.poses
+    );
   }
 
   return merged;
