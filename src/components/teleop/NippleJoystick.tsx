@@ -44,7 +44,7 @@ export function NippleJoystick({
         managerRef.current = api.create({
           zone: zoneRef.current,
           mode: "static",
-          position: { left: size / 2, top: size / 2 },
+          position: { left: `${size / 2}px`, top: `${size / 2}px` },
           color,
           size,
           restOpacity: 0.8,

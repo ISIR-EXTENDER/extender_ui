@@ -113,4 +113,4 @@ export class WsClient {
 
 export const WS_URL = "ws://127.0.0.1:8765/ws/control";
 
-export const wsClient = new WsClient(WS_URL, { autoReconnect: false });
+export const wsClient = new WsClient(WS_URL, { autoReconnect: true });

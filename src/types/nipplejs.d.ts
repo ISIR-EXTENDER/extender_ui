@@ -18,7 +18,7 @@ declare module "nipplejs" {
   export type JoystickOptions = {
     zone: HTMLElement;
     mode: "static" | "dynamic" | "semi";
-    position?: { left: number; top: number };
+    position?: { left: string; top: string };
     color?: string;
     size?: number;
     restOpacity?: number;

@@ -1,19 +1,23 @@
 import { useCallback } from "react";
 
 import { useUiStore } from "../store/uiStore";
+import { useWidgetsStore } from "../store/widgetsStore";
 
 export function useWidgetConfig() {
-  const widgetVisibility = useUiStore((s) => s.widgetVisibility);
-  const widgetTitles = useUiStore((s) => s.widgetTitles);
+  const activeTab = useUiStore((s) => s.activeTab);
+  const widgets = useWidgetsStore((s) => s.widgetsByTab[activeTab] ?? []);
 
   const isVisible = useCallback(
-    (id: string) => widgetVisibility[id] !== false,
-    [widgetVisibility]
+    () => true, // all widgets in the store are visible by default
+    []
   );
 
   const titleFor = useCallback(
-    (id: string, fallback: string) => widgetTitles[id] ?? fallback,
-    [widgetTitles]
+    (id: string, fallback: string) => {
+      const widget = widgets.find((w) => w.id === id);
+      return widget?.title ?? fallback;
+    },
+    [widgets]
   );
 
   return { isVisible, titleFor };

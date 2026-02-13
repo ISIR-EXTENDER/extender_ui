@@ -8,16 +8,11 @@ type TopBarProps = {
 export function TopBar({ onStop }: TopBarProps) {
   const focusMode = useUiStore((s) => s.focusMode);
   const setFocusMode = useUiStore((s) => s.setFocusMode);
-  const isEditorMode = useUiStore((s) => s.isEditorMode);
-  const setEditorMode = useUiStore((s) => s.setEditorMode);
 
   return (
     <header className="header">
       <h1>Extender Tablet Interface</h1>
       <div className="header-actions">
-        <Button type="button" onClick={() => setEditorMode(!isEditorMode)}>
-          {isEditorMode ? "Editor On" : "Editor Off"}
-        </Button>
         <Button
           className="focus"
           type="button"
