@@ -7,7 +7,7 @@ type JoystickCardProps = {
 
 export function JoystickCard({ title, children }: JoystickCardProps) {
   return (
-    <div className="joystick-panel">
+    <div className="card joystick-panel">
       <h3>{title}</h3>
       {children}
     </div>

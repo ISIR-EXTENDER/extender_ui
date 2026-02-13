@@ -34,44 +34,64 @@ export function NippleJoystick({
     if (!zoneRef.current) return;
 
     let active = true;
+    let frameId = 0;
 
-    // Static positioning keeps the stick centered inside a fixed-size container.
-    import("nipplejs")
-      .then((module) => {
-        if (!active || !zoneRef.current) return;
-        type NippleModule = typeof import("nipplejs");
-        const api = (module as NippleModule & { default?: NippleModule }).default ?? module;
-        managerRef.current = api.create({
-          zone: zoneRef.current,
-          mode: "static",
-          position: { left: `${size / 2}px`, top: `${size / 2}px` },
-          color,
-          size,
-          restOpacity: 0.8,
-          lockX: false,
-          lockY: false,
-        });
+    const setup = () =>
+      import("nipplejs")
+        .then((module) => {
+          if (!active || !zoneRef.current) return;
 
-        managerRef.current.on("move", (_, data) => {
-          const x = clamp(data.vector.x);
-          const y = clamp(data.vector.y);
-          onMoveRef.current(x, y);
-        });
+          const zone = zoneRef.current;
+          const centerX = Math.round(zone.clientWidth / 2);
+          const centerY = Math.round(zone.clientHeight / 2);
 
-        managerRef.current.on("end", () => {
-          if (onEndRef.current) {
-            onEndRef.current();
-          } else {
-            onMoveRef.current(0, 0);
+          if (centerX <= 0 || centerY <= 0) {
+            frameId = window.requestAnimationFrame(() => {
+              if (active) void setup();
+            });
+            return;
           }
-        });
-      })
+
+          type NippleModule = typeof import("nipplejs");
+          const api = (module as NippleModule & { default?: NippleModule }).default ?? module;
+          managerRef.current = api.create({
+            zone,
+            mode: "static",
+            // Use pixel coordinates from the rendered zone to avoid centering drift.
+            position: { left: `${centerX}px`, top: `${centerY}px` },
+            color,
+            size,
+            restOpacity: 0.8,
+            restJoystick: true,
+            lockX: false,
+            lockY: false,
+          });
+
+          managerRef.current.on("move", (_, data) => {
+            const x = clamp(data.vector.x);
+            const y = clamp(data.vector.y);
+            onMoveRef.current(x, y);
+          });
+
+          managerRef.current.on("end", () => {
+            if (onEndRef.current) {
+              onEndRef.current();
+            } else {
+              onMoveRef.current(0, 0);
+            }
+          });
+        })
       .catch(() => {
         onMoveRef.current(0, 0);
       });
 
+    void setup();
+
     return () => {
       active = false;
+      if (frameId) {
+        window.cancelAnimationFrame(frameId);
+      }
       managerRef.current?.destroy();
       managerRef.current = null;
     };

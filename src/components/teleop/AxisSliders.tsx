@@ -3,23 +3,44 @@ import * as Slider from "@radix-ui/react-slider";
 type ZSliderProps = {
   value: number;
   onChange: (value: number) => void;
+  min?: number;
+  max?: number;
+  step?: number;
+  label?: string;
+  showLabel?: boolean;
+  showReadout?: boolean;
 };
 
 type RzSliderProps = {
   value: number;
   onChange: (value: number) => void;
+  min?: number;
+  max?: number;
+  step?: number;
+  label?: string;
+  showLabel?: boolean;
+  showReadout?: boolean;
 };
 
-export function ZSlider({ value, onChange }: ZSliderProps) {
+export function ZSlider({
+  value,
+  onChange,
+  min = -1,
+  max = 1,
+  step = 0.01,
+  label = "Z Velocity",
+  showLabel = true,
+  showReadout = true,
+}: ZSliderProps) {
   return (
     <div className="z-vertical">
-      <label className="z-label">Z Velocity</label>
+      {showLabel && <label className="z-label">{label}</label>}
       <Slider.Root
         className="slider vertical z-slider"
         orientation="vertical"
-        min={-1}
-        max={1}
-        step={0.01}
+        min={min}
+        max={max}
+        step={step}
         value={[value]}
         onValueChange={(v) => onChange(v[0] ?? 0)}
       >
@@ -28,20 +49,29 @@ export function ZSlider({ value, onChange }: ZSliderProps) {
         </Slider.Track>
         <Slider.Thumb className="slider-thumb" />
       </Slider.Root>
-      <div className="z-readout">z: {value.toFixed(2)}</div>
+      {showReadout && <div className="z-readout">z: {value.toFixed(2)}</div>}
     </div>
   );
 }
 
-export function RzSlider({ value, onChange }: RzSliderProps) {
+export function RzSlider({
+  value,
+  onChange,
+  min = -1,
+  max = 1,
+  step = 0.01,
+  label = "RZ Velocity",
+  showLabel = true,
+  showReadout = true,
+}: RzSliderProps) {
   return (
     <div className="rz-top">
-      <label className="z-label">RZ Velocity</label>
+      {showLabel && <label className="z-label">{label}</label>}
       <Slider.Root
         className="slider rz-slider"
-        min={-1}
-        max={1}
-        step={0.01}
+        min={min}
+        max={max}
+        step={step}
         value={[value]}
         onValueChange={(v) => onChange(v[0] ?? 0)}
       >
@@ -50,7 +80,7 @@ export function RzSlider({ value, onChange }: RzSliderProps) {
         </Slider.Track>
         <Slider.Thumb className="slider-thumb" />
       </Slider.Root>
-      <div className="z-readout">rz: {value.toFixed(2)}</div>
+      {showReadout && <div className="z-readout">rz: {value.toFixed(2)}</div>}
     </div>
   );
 }
