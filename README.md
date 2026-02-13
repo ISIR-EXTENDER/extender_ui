@@ -19,26 +19,27 @@ This is a touch-first teleoperation UI for the Extender robot system. It is desi
 ## Tabs (What each tab answers)
 
 1. Controls — How do I move?
-  - Motion controls (translation + rotation joysticks) and live teleop dashboard.
-  - RViz live preview on the right.
-2. Articular — How do I position joints?
+  - Motion controls (translation + rotation joysticks).
+2. Live Teleop — What is happening while I move?
+  - Live teleop dashboard + RViz preview.
+3. Articular — How do I position joints?
   - Joint sliders with limits, torque display, and send/sync actions.
   - RViz live + joint mini plots on the right.
-3. Poses & Trajectories — How do I replay motion?
+4. Poses & Trajectories — How do I replay motion?
   - Saved poses list, trajectory builder, and preview panels (graphs, interpolation, Cartesian preview).
-4. Pétanque — Use-case optimized interface.
+5. Pétanque — Use-case optimized interface.
   - Game status, actions, and vision/trajectory cards.
-5. Camera — What do I see?
+6. Camera — What do I see?
   - Central feed, camera settings side panel, and recording controls.
-6. Visual Servoing — How do I servo to a target?
+7. Visual Servoing — How do I servo to a target?
   - Target selection, enable toggle, PID, and live visual overlays.
-7. Curves — What do the signals look like?
+8. Curves — What do the signals look like?
   - Live plots for linear/angular velocity, joint velocities, error norms, and gains.
-8. Logs / Rosbags — What did I record?
+9. Logs / Rosbags — What did I record?
   - Start/stop capture, bag naming, and session metrics.
-9. Configuration — How do I configure?
+10. Configuration — How do I configure?
   - Advanced settings (gains, filters, frames, inversion, robot type, deadman).
-10. Debug — What is happening internally?
+11. Debug — What is happening internally?
    - Raw streams, controller state, latency, and watchdog diagnostics.
 
 ## Libraries Used (and why)

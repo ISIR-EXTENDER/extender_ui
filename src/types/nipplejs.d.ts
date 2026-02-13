@@ -1,8 +1,30 @@
 declare module "nipplejs" {
+  export type JoystickVector = {
+    x: number;
+    y: number;
+  };
+
+  export type JoystickOutputData = {
+    vector: JoystickVector;
+  };
+
+  export type JoystickEventHandler = (event: Event, data: JoystickOutputData) => void;
+
   export interface JoystickManager {
-    on: (event: string, cb: (evt: unknown, data: any) => void) => void;
+    on: (event: string, cb: JoystickEventHandler) => void;
     destroy: () => void;
   }
 
-  export function create(options: Record<string, unknown>): JoystickManager;
+  export type JoystickOptions = {
+    zone: HTMLElement;
+    mode: "static" | "dynamic" | "semi";
+    position?: { left: number; top: number };
+    color?: string;
+    size?: number;
+    restOpacity?: number;
+    lockX?: boolean;
+    lockY?: boolean;
+  };
+
+  export function create(options: JoystickOptions): JoystickManager;
 }
