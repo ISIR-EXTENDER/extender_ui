@@ -325,6 +325,17 @@ body,
 .controls-workspace {
   flex: 1;
   min-height: 0;
+  position: relative;
+}
+
+.controls-workspace-editor {
+  overflow: hidden;
+}
+
+.controls-canvas-zone {
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
 }
 
 .controls-canvas-surface {
@@ -348,6 +359,39 @@ body,
   min-height: 0;
 }
 
+.controls-canvas-viewport {
+  display: flex;
+  width: 100%;
+  min-height: 100%;
+}
+
+.controls-canvas-mode-left {
+  justify-content: flex-start;
+  align-items: flex-start;
+  min-width: max-content;
+}
+
+.controls-canvas-mode-center {
+  justify-content: center;
+  align-items: flex-start;
+  min-width: max-content;
+}
+
+.controls-canvas-mode-fit {
+  justify-content: center;
+  align-items: flex-start;
+  min-width: 100%;
+}
+
+.controls-canvas-frame {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.controls-canvas-transform {
+  position: relative;
+}
+
 .controls-canvas {
   position: relative;
   min-width: 520px;
@@ -355,7 +399,7 @@ body,
 }
 
 .controls-page-focus .controls-canvas {
-  margin: 0 auto;
+  margin: 0;
 }
 
 .controls-aside {
@@ -366,6 +410,23 @@ body,
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
+}
+
+.controls-aside-overlay {
+  position: absolute;
+  inset: 0 0 0 auto;
+  width: min(var(--design-aside-width, 360px), 42vw);
+  z-index: 6;
+  padding: 0.55rem 0.55rem 0.55rem 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, transparent 35%, var(--panel) 65%) 100%
+  );
+}
+
+.controls-aside-overlay .card {
+  backdrop-filter: blur(3px);
 }
 
 .controls-aside-menu {
@@ -1155,6 +1216,36 @@ body,
   overflow-x: auto;
 }
 
+@media (min-width: 1201px) {
+  .controls-design-page {
+    --design-aside-width: 360px;
+  }
+
+  .controls-design-page .controls-workspace {
+    overflow: hidden;
+  }
+
+  .controls-design-page .controls-canvas-zone {
+    width: 100%;
+  }
+
+  .controls-design-page .controls-canvas-surface {
+    width: 100%;
+  }
+
+  .application-runtime-page .controls-workspace {
+    overflow: auto;
+  }
+
+  .application-runtime-page .controls-canvas-zone {
+    width: 100%;
+  }
+
+  .application-runtime-page .controls-canvas-surface {
+    width: 100%;
+  }
+}
+
 @media (max-width: 1200px) {
   .controls-shell {
     grid-template-columns: minmax(0, 1fr);
@@ -1170,6 +1261,11 @@ body,
 
   .controls-aside-menu {
     position: static;
+  }
+
+  .controls-aside-overlay {
+    width: min(var(--design-aside-width, 360px), 92vw);
+    padding-right: 0.35rem;
   }
 
   .controls-field-row {

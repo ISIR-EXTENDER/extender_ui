@@ -50,6 +50,13 @@ import {
   type WidgetIcon,
   type WidgetCatalogType,
   type WidgetConfiguration,
+  CANVAS_PRESETS,
+  DEFAULT_CANVAS_SETTINGS,
+  cloneCanvasSettings,
+  resolveCanvasArtboardSize,
+  resolveCanvasFitScale,
+  type CanvasSettings,
+  type RuntimeCanvasMode,
   upsertConfiguration,
 } from "../components/widgets";
 import { useTeleopStore } from "../store/teleopStore";
@@ -108,6 +115,7 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
   const setRz = useTeleopStore((s) => s.setRz);
   const maxVelocity = useTeleopStore((s) => s.maxVelocity);
   const setMaxVelocity = useTeleopStore((s) => s.setMaxVelocity);
+  const setFocusMode = useUiStore((s) => s.setFocusMode);
   const gripperSpeed = useUiStore((s) => s.gripperSpeed);
   const gripperForce = useUiStore((s) => s.gripperForce);
   const setGripperSpeed = useUiStore((s) => s.setGripperSpeed);
@@ -116,6 +124,8 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
   const rvizStreamUrl = useUiStore((s) => s.rvizStreamUrl);
 
   const canvasSurfaceRef = useRef<HTMLDivElement | null>(null);
+  const canvasViewportRef = useRef<HTMLDivElement | null>(null);
+  const canvasFrameRef = useRef<HTMLDivElement | null>(null);
   const [topBarSlotElement, setTopBarSlotElement] = useState<HTMLElement | null>(null);
 
   const [widgets, setWidgets] = useState<CanvasWidget[]>([]);
@@ -123,9 +133,13 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
   const [quickAddType, setQuickAddType] = useState<WidgetCatalogType>(DEFAULT_ADD_WIDGET_TYPE);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [pendingNavBarScreenId, setPendingNavBarScreenId] = useState<string>("");
+  const [isInspectorOpen, setIsInspectorOpen] = useState(true);
 
   const [configurations, setConfigurations] = useState<WidgetConfiguration[]>(() =>
     loadConfigurationsFromLocalStorage()
+  );
+  const [canvasSettings, setCanvasSettings] = useState<CanvasSettings>(() =>
+    cloneCanvasSettings(DEFAULT_CANVAS_SETTINGS)
   );
   const [selectedConfigName, setSelectedConfigName] = useState<string>("");
   const [configNameInput, setConfigNameInput] = useState<string>("");
@@ -134,9 +148,18 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
   const [freshnessClock, setFreshnessClock] = useState<number>(() => Date.now());
   const [rosbagRecording, setRosbagRecording] = useState(false);
   const [rosbagStatus, setRosbagStatus] = useState("idle");
-  const [savedBaseline, setSavedBaseline] = useState<{ name: string; widgetSignature: string }>({
+  const [savedBaseline, setSavedBaseline] = useState<{
+    name: string;
+    widgetSignature: string;
+    canvasSignature: string;
+  }>({
     name: "",
     widgetSignature: JSON.stringify([]),
+    canvasSignature: JSON.stringify(DEFAULT_CANVAS_SETTINGS),
+  });
+  const [canvasViewportSize, setCanvasViewportSize] = useState<{ width: number; height: number }>({
+    width: 0,
+    height: 0,
   });
 
   const magnitude = useMemo(() => Math.min(1, Math.hypot(joyX, joyY)), [joyX, joyY]);
@@ -162,6 +185,25 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
       return;
     }
     setTopBarSlotElement(document.getElementById("topbar-controls-slot"));
+  }, [focusOnly]);
+
+  useEffect(() => {
+    const viewport = canvasViewportRef.current;
+    if (!viewport) return;
+
+    const updateSize = () => {
+      setCanvasViewportSize({
+        width: viewport.clientWidth,
+        height: viewport.clientHeight,
+      });
+    };
+
+    updateSize();
+
+    const observer = new ResizeObserver(updateSize);
+    observer.observe(viewport);
+
+    return () => observer.disconnect();
   }, [focusOnly]);
 
   useEffect(() => {
@@ -234,6 +276,18 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [selectedWidgetId]);
 
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (isTypingTarget(event.target)) return;
+      if (!event.ctrlKey || event.key !== "\\") return;
+      event.preventDefault();
+      setIsInspectorOpen((prev) => !prev);
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
   const selectedWidget = useMemo(
     () => widgets.find((widget) => widget.id === selectedWidgetId) ?? null,
     [selectedWidgetId, widgets]
@@ -247,19 +301,29 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
     [configurations]
   );
   const widgetSignature = useMemo(() => JSON.stringify(widgets), [widgets]);
+  const canvasSettingsSignature = useMemo(() => JSON.stringify(canvasSettings), [canvasSettings]);
   const trimmedNameInput = configNameInput.trim();
   const hasWidgetDiff = widgetSignature !== savedBaseline.widgetSignature;
+  const hasCanvasSettingsDiff = canvasSettingsSignature !== savedBaseline.canvasSignature;
   const hasNameDiff = trimmedNameInput.length > 0 && trimmedNameInput !== savedBaseline.name;
-  const isCanvasDirty = hasWidgetDiff || hasNameDiff;
+  const isCanvasDirty = hasWidgetDiff || hasCanvasSettingsDiff || hasNameDiff;
 
-  const canvasSize = useMemo(() => {
-    const maxRight = widgets.reduce((acc, widget) => Math.max(acc, widget.rect.x + widget.rect.w), 220);
-    const maxBottom = widgets.reduce((acc, widget) => Math.max(acc, widget.rect.y + widget.rect.h), 220);
-    return {
-      width: maxRight + 24,
-      height: maxBottom + 24,
-    };
-  }, [widgets]);
+  const canvasSize = useMemo(
+    () => resolveCanvasArtboardSize(widgets, canvasSettings),
+    [canvasSettings, widgets]
+  );
+  const runtimeCanvasMode: RuntimeCanvasMode = focusOnly ? "fit" : "left";
+  const canvasScale = useMemo(
+    () => resolveCanvasFitScale(runtimeCanvasMode, canvasSize, canvasViewportSize),
+    [canvasSize, canvasViewportSize, runtimeCanvasMode]
+  );
+  const scaledCanvasSize = useMemo(
+    () => ({
+      width: Math.round(canvasSize.width * canvasScale),
+      height: Math.round(canvasSize.height * canvasScale),
+    }),
+    [canvasScale, canvasSize]
+  );
 
   useEffect(() => {
     onDirtyChange?.(isCanvasDirty);
@@ -412,6 +476,7 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
     if (!name) {
       setSelectedConfigName("");
       setConfigNameInput("");
+      setCanvasSettings(cloneCanvasSettings(DEFAULT_CANVAS_SETTINGS));
       setStatusMessage("No screen selected.");
       return;
     }
@@ -450,12 +515,14 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
     }
     const loadedWidgets = cloneWidgets(configuration.widgets);
     setWidgets(loadedWidgets);
+    setCanvasSettings(cloneCanvasSettings(configuration.canvas));
     setSelectedWidgetId(null);
     setSelectedConfigName(name);
     setConfigNameInput(name);
     setSavedBaseline({
       name,
       widgetSignature: JSON.stringify(loadedWidgets),
+      canvasSignature: JSON.stringify(configuration.canvas),
     });
     setStatusMessage(`Loaded \"${name}\".`);
   };
@@ -467,12 +534,13 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
       return;
     }
 
-    setConfigurations((prev) => upsertConfiguration(prev, name, widgets));
+    setConfigurations((prev) => upsertConfiguration(prev, name, widgets, undefined, canvasSettings));
     setSelectedConfigName(name);
     setConfigNameInput(name);
     setSavedBaseline({
       name,
       widgetSignature,
+      canvasSignature: canvasSettingsSignature,
     });
     setStatusMessage(`Saved \"${name}\".`);
   };
@@ -489,6 +557,7 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
       setSavedBaseline({
         name: "",
         widgetSignature: JSON.stringify([]),
+        canvasSignature: JSON.stringify(DEFAULT_CANVAS_SETTINGS),
       });
     }
     setSelectedConfigName("");
@@ -682,15 +751,19 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
   const handleCanvasContextMenu = (event: ReactMouseEvent<HTMLDivElement>) => {
     event.preventDefault();
 
-    const surface = canvasSurfaceRef.current;
-    if (!surface) return;
+    const frame = canvasFrameRef.current;
+    if (!frame) return;
 
-    const rect = surface.getBoundingClientRect();
+    const rect = frame.getBoundingClientRect();
+    const safeScale = canvasScale > 0 ? canvasScale : 1;
+    const rawX = (event.clientX - rect.left) / safeScale;
+    const rawY = (event.clientY - rect.top) / safeScale;
+
     setContextMenu({
       clientX: event.clientX,
       clientY: event.clientY,
-      canvasX: Math.max(0, Math.round(event.clientX - rect.left + surface.scrollLeft)),
-      canvasY: Math.max(0, Math.round(event.clientY - rect.top + surface.scrollTop)),
+      canvasX: Math.max(0, Math.min(canvasSize.width, Math.round(rawX))),
+      canvasY: Math.max(0, Math.min(canvasSize.height, Math.round(rawY))),
     });
   };
 
@@ -976,6 +1049,18 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
     );
   };
 
+  const canvasViewportClassName = `controls-canvas-viewport controls-canvas-mode-${runtimeCanvasMode}`;
+  const canvasFrameStyle = {
+    width: `${scaledCanvasSize.width}px`,
+    height: `${scaledCanvasSize.height}px`,
+  };
+  const canvasTransformStyle = {
+    width: `${canvasSize.width}px`,
+    height: `${canvasSize.height}px`,
+    transform: `scale(${canvasScale})`,
+    transformOrigin: "top left",
+  };
+
   const configToolbar = (
     <div className="controls-header-inline">
       <div className="controls-config-row">
@@ -1005,6 +1090,44 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
           />
         </label>
 
+        <label className="controls-field controls-config-field">
+          <span>Canvas Size</span>
+          <select
+            className="editor-input"
+            value={canvasSettings.presetId}
+            onChange={(event) =>
+              setCanvasSettings((prev) => ({
+                ...prev,
+                presetId: event.target.value as CanvasSettings["presetId"],
+              }))
+            }
+          >
+            {CANVAS_PRESETS.map((preset) => (
+              <option key={preset.id} value={preset.id}>
+                {preset.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="controls-field controls-config-field">
+          <span>Runtime Layout</span>
+          <select
+            className="editor-input"
+            value={canvasSettings.runtimeMode}
+            onChange={(event) =>
+              setCanvasSettings((prev) => ({
+                ...prev,
+                runtimeMode: event.target.value as RuntimeCanvasMode,
+              }))
+            }
+          >
+            <option value="left">left</option>
+            <option value="center">center</option>
+            <option value="fit">fit (uniform)</option>
+          </select>
+        </label>
+
         <button type="button" className="tab-button" onClick={() => selectedConfigName && loadConfigurationByName(selectedConfigName)}>
           Load
         </button>
@@ -1024,6 +1147,12 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
         <button type="button" className="tab-button" onClick={loadDemoConfiguration}>
           Load Demo
         </button>
+        <button type="button" className="tab-button" onClick={() => setIsInspectorOpen((prev) => !prev)}>
+          {isInspectorOpen ? "Hide Panel" : "Show Panel"}
+        </button>
+        <button type="button" className="tab-button" onClick={() => setFocusMode(true)}>
+          Preview
+        </button>
         <button type="button" className="tab-button" onClick={handleSyncToFolder}>
           Sync To Folder
         </button>
@@ -1040,8 +1169,14 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
       <main className="controls-page controls-page-focus tab-accent tab-controls">
         <section className="controls-workspace">
           <div className="controls-canvas-surface" ref={canvasSurfaceRef} onContextMenu={handleCanvasContextMenu}>
-            <div className="controls-canvas" style={{ width: `${canvasSize.width}px`, height: `${canvasSize.height}px` }}>
-              {widgets.map(renderCanvasWidget)}
+            <div className={canvasViewportClassName} ref={canvasViewportRef}>
+              <div className="controls-canvas-frame" ref={canvasFrameRef} style={canvasFrameStyle}>
+                <div className="controls-canvas-transform" style={canvasTransformStyle}>
+                  <div className="controls-canvas" style={{ width: `${canvasSize.width}px`, height: `${canvasSize.height}px` }}>
+                    {widgets.map(renderCanvasWidget)}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </section>
@@ -1078,17 +1213,25 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
   return (
     <>
       {topBarSlotElement ? createPortal(configToolbar, topBarSlotElement) : null}
-      <main className="controls-page tab-accent tab-controls">
-        <section className="controls-workspace">
-        <div className="controls-shell">
-          <div className="controls-canvas-surface" ref={canvasSurfaceRef} onContextMenu={handleCanvasContextMenu}>
-            <div className="controls-canvas" style={{ width: `${canvasSize.width}px`, height: `${canvasSize.height}px` }}>
-              {widgets.map(renderCanvasWidget)}
+      <main className="controls-page controls-design-page tab-accent tab-controls">
+        <section className="controls-workspace controls-workspace-editor">
+          <div className="controls-canvas-zone">
+            <div className="controls-canvas-surface" ref={canvasSurfaceRef} onContextMenu={handleCanvasContextMenu}>
+              <div className={canvasViewportClassName} ref={canvasViewportRef}>
+                <div className="controls-canvas-frame" ref={canvasFrameRef} style={canvasFrameStyle}>
+                  <div className="controls-canvas-transform" style={canvasTransformStyle}>
+                    <div className="controls-canvas" style={{ width: `${canvasSize.width}px`, height: `${canvasSize.height}px` }}>
+                      {widgets.map(renderCanvasWidget)}
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
-          <aside className="controls-aside">
-            <section className="card controls-aside-menu">
+          {isInspectorOpen ? (
+            <aside className="controls-aside controls-aside-overlay">
+              <section className="card controls-aside-menu">
               <h2>Widgets</h2>
 
               <div className="controls-widget-actions">
@@ -1130,7 +1273,7 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
               </div>
             </section>
 
-            <section className="card controls-inspector-card">
+              <section className="card controls-inspector-card">
               <h2>Properties</h2>
               {!selectedWidget ? (
                 <div className="placeholder">Select a widget to edit properties.</div>
@@ -1964,10 +2107,9 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
                   )}
                 </div>
               )}
-            </section>
-
-          </aside>
-        </div>
+              </section>
+            </aside>
+          ) : null}
         </section>
 
         {contextMenu ? (

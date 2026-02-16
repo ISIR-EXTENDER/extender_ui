@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { loadApplicationsFromLocalStorage } from "../app/applications";
 import type { CanvasRect } from "../components/layout/CanvasItem";
@@ -16,6 +16,9 @@ import {
   StreamDisplayWidget,
   TextareaWidget,
   TextWidget,
+  DEFAULT_CANVAS_SETTINGS,
+  resolveCanvasArtboardSize,
+  resolveCanvasFitScale,
   cloneWidgets,
   loadConfigurationsFromLocalStorage,
   persistConfigurationsToLocalStorage,
@@ -73,6 +76,11 @@ export function ApplicationPage({
   const [freshnessClock, setFreshnessClock] = useState<number>(() => Date.now());
   const [rosbagRecording, setRosbagRecording] = useState(false);
   const [rosbagStatus, setRosbagStatus] = useState("idle");
+  const canvasViewportRef = useRef<HTMLDivElement | null>(null);
+  const [canvasViewportSize, setCanvasViewportSize] = useState<{ width: number; height: number }>({
+    width: 0,
+    height: 0,
+  });
 
   const applications = useMemo(() => loadApplicationsFromLocalStorage(), []);
   const activeApplication = useMemo(
@@ -109,6 +117,24 @@ export function ApplicationPage({
   }, []);
 
   useEffect(() => {
+    const viewport = canvasViewportRef.current;
+    if (!viewport) return;
+
+    const updateSize = () => {
+      setCanvasViewportSize({
+        width: viewport.clientWidth,
+        height: viewport.clientHeight,
+      });
+    };
+
+    updateSize();
+    const observer = new ResizeObserver(updateSize);
+    observer.observe(viewport);
+
+    return () => observer.disconnect();
+  }, [activeScreenId]);
+
+  useEffect(() => {
     persistConfigurationsToLocalStorage(configurations);
   }, [configurations]);
 
@@ -123,14 +149,22 @@ export function ApplicationPage({
     [activeApplication]
   );
 
-  const canvasSize = useMemo(() => {
-    const maxRight = widgets.reduce((acc, widget) => Math.max(acc, widget.rect.x + widget.rect.w), 520);
-    const maxBottom = widgets.reduce((acc, widget) => Math.max(acc, widget.rect.y + widget.rect.h), 420);
-    return {
-      width: maxRight + 24,
-      height: maxBottom + 24,
-    };
-  }, [widgets]);
+  const canvasSettings = activeConfiguration?.canvas ?? DEFAULT_CANVAS_SETTINGS;
+  const canvasSize = useMemo(
+    () => resolveCanvasArtboardSize(widgets, canvasSettings),
+    [canvasSettings, widgets]
+  );
+  const canvasScale = useMemo(
+    () => resolveCanvasFitScale(canvasSettings.runtimeMode, canvasSize, canvasViewportSize),
+    [canvasSettings.runtimeMode, canvasSize, canvasViewportSize]
+  );
+  const scaledCanvasSize = useMemo(
+    () => ({
+      width: Math.round(canvasSize.width * canvasScale),
+      height: Math.round(canvasSize.height * canvasScale),
+    }),
+    [canvasScale, canvasSize]
+  );
 
   const markWidgetPulse = (widgetId: string) => {
     const now = Date.now();
@@ -467,6 +501,18 @@ export function ApplicationPage({
     );
   };
 
+  const canvasViewportClassName = `controls-canvas-viewport controls-canvas-mode-${canvasSettings.runtimeMode}`;
+  const canvasFrameStyle = {
+    width: `${scaledCanvasSize.width}px`,
+    height: `${scaledCanvasSize.height}px`,
+  };
+  const canvasTransformStyle = {
+    width: `${canvasSize.width}px`,
+    height: `${canvasSize.height}px`,
+    transform: `scale(${canvasScale})`,
+    transformOrigin: "top left",
+  };
+
   if (!activeApplication) {
     return (
       <main className="layout tab-accent tab-controls">
@@ -510,9 +556,17 @@ export function ApplicationPage({
       </section>
 
       <section className="controls-workspace">
-        <div className="controls-canvas-surface">
-          <div className="controls-canvas" style={{ width: `${canvasSize.width}px`, height: `${canvasSize.height}px` }}>
-            {widgets.map(renderWidget)}
+        <div className="controls-canvas-zone">
+          <div className="controls-canvas-surface">
+            <div className={canvasViewportClassName} ref={canvasViewportRef}>
+              <div className="controls-canvas-frame" style={canvasFrameStyle}>
+                <div className="controls-canvas-transform" style={canvasTransformStyle}>
+                  <div className="controls-canvas" style={{ width: `${canvasSize.width}px`, height: `${canvasSize.height}px` }}>
+                    {widgets.map(renderWidget)}
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>

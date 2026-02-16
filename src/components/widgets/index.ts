@@ -65,3 +65,16 @@ export {
   type TsWidgetPreset,
   type TsPresetWidget,
 } from "./tsPresets";
+export {
+  CANVAS_PRESETS,
+  DEFAULT_CANVAS_SETTINGS,
+  cloneCanvasSettings,
+  getCanvasPreset,
+  normalizeCanvasSettings,
+  resolveCanvasArtboardSize,
+  resolveCanvasFitScale,
+  type CanvasPreset,
+  type CanvasPresetId,
+  type CanvasSettings,
+  type RuntimeCanvasMode,
+} from "./canvasSettings";

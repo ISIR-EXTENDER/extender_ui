@@ -1,4 +1,10 @@
 import type { CanvasWidget } from "./widgetTypes";
+import {
+  DEFAULT_CANVAS_SETTINGS,
+  cloneCanvasSettings,
+  normalizeCanvasSettings,
+  type CanvasSettings,
+} from "./canvasSettings";
 
 export type PoseTopicValue =
   | { kind: "scalar"; value: number }
@@ -14,6 +20,7 @@ export type WidgetConfiguration = {
   name: string;
   widgets: CanvasWidget[];
   poses: PoseSnapshot[];
+  canvas: CanvasSettings;
   updatedAt: string;
 };
 
@@ -80,6 +87,7 @@ export function loadConfigurationsFromLocalStorage(): WidgetConfiguration[] {
         name: item.name,
         widgets: cloneWidgets(item.widgets),
         poses: parsePoses(item.poses),
+        canvas: normalizeCanvasSettings(item.canvas),
         updatedAt: typeof item.updatedAt === "string" ? item.updatedAt : new Date().toISOString(),
       }));
   } catch {
@@ -95,13 +103,15 @@ export function upsertConfiguration(
   configurations: WidgetConfiguration[],
   name: string,
   widgets: CanvasWidget[],
-  poses?: PoseSnapshot[]
+  poses?: PoseSnapshot[],
+  canvas?: CanvasSettings
 ): WidgetConfiguration[] {
   const existing = configurations.find((config) => config.name === name);
   const nextConfig: WidgetConfiguration = {
     name,
     widgets: cloneWidgets(widgets),
     poses: clonePoses(poses ?? existing?.poses ?? []),
+    canvas: cloneCanvasSettings(canvas ?? existing?.canvas ?? DEFAULT_CANVAS_SETTINGS),
     updatedAt: new Date().toISOString(),
   };
 
@@ -133,6 +143,7 @@ const parseConfigurationFile = async (entry: any): Promise<WidgetConfiguration |
       name: parsed.name,
       widgets: cloneWidgets(parsed.widgets as CanvasWidget[]),
       poses: parsePoses(parsed.poses),
+      canvas: normalizeCanvasSettings(parsed.canvas),
       updatedAt: typeof parsed.updatedAt === "string" ? parsed.updatedAt : new Date().toISOString(),
     };
   } catch {
@@ -183,7 +194,8 @@ export async function syncConfigurationsFromFolder(
       merged,
       configuration.name,
       configuration.widgets,
-      configuration.poses
+      configuration.poses,
+      configuration.canvas
     );
   }
 

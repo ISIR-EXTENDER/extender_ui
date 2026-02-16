@@ -55,7 +55,7 @@ export function TopBar({
               type="button"
               onClick={() => setFocusMode(!focusMode)}
             >
-              {focusMode ? "Exit Focus" : "Focus"}
+              {focusMode ? "Exit Preview" : "Preview"}
             </Button>
           ) : null}
           <Button className="focus" type="button" onClick={onOpenCanvasDesign}>
