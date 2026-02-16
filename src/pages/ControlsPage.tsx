@@ -389,6 +389,17 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
     setStatusMessage("");
   };
 
+  const handleScreenSelectionChange = (name: string) => {
+    if (!name) {
+      setSelectedConfigName("");
+      setConfigNameInput("");
+      setStatusMessage("No screen selected.");
+      return;
+    }
+
+    loadConfigurationByName(name);
+  };
+
   const confirmDiscardUnsavedChanges = (nextAction: string) => {
     if (!isCanvasDirty) return true;
     return window.confirm(
@@ -895,10 +906,7 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
           <select
             className="editor-input"
             value={selectedConfigName}
-            onChange={(event) => {
-              const name = event.target.value;
-              setSelectedConfigName(name);
-            }}
+            onChange={(event) => handleScreenSelectionChange(event.target.value)}
           >
             <option value="">-- select --</option>
             {configurations.map((configuration) => (

@@ -43,6 +43,7 @@ export function ZSlider({
         step={step}
         value={[value]}
         onValueChange={(v) => onChange(v[0] ?? 0)}
+        onPointerDown={(event) => event.stopPropagation()}
       >
         <Slider.Track className="slider-track">
           <Slider.Range className="slider-range" />
@@ -74,6 +75,7 @@ export function RzSlider({
         step={step}
         value={[value]}
         onValueChange={(v) => onChange(v[0] ?? 0)}
+        onPointerDown={(event) => event.stopPropagation()}
       >
         <Slider.Track className="slider-track">
           <Slider.Range className="slider-range" />

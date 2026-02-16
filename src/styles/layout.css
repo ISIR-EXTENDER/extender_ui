@@ -644,9 +644,15 @@ body,
 }
 
 .controls-mini-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 0;
   padding: 0.35rem;
   border-radius: 10px;
   box-shadow: none;
+  overflow: hidden;
 }
 
 .controls-slider-item.is-horizontal .rz-top {
@@ -680,8 +686,9 @@ body,
 }
 
 .controls-slider-item.is-vertical .slider.vertical {
-  width: 18px;
+  width: 24px;
   height: 100%;
+  min-height: 80px;
 }
 
 .controls-joystick-item .joystick-panel {
@@ -1868,6 +1875,7 @@ body,
   display: flex;
   align-items: center;
   height: 32px;
+  touch-action: none;
 }
 
 .joint-header {
