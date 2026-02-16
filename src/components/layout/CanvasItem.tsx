@@ -24,6 +24,7 @@ type CanvasItemProps = {
 const clampMin = (value: number, min: number) => Math.max(min, value);
 const INTERACTIVE_TARGET_SELECTOR =
   "button, a, input, select, textarea, [role='button'], [role='slider'], [contenteditable='true'], [data-canvas-interactive='true']";
+const BUTTON_DRAG_TARGET_SELECTOR = "button, a, [role='button']";
 
 export function CanvasItem({
   x,
@@ -43,6 +44,10 @@ export function CanvasItem({
   const isInteractiveTarget = (target: EventTarget | null) => {
     if (!(target instanceof Element)) return false;
     return target.closest(INTERACTIVE_TARGET_SELECTOR) !== null;
+  };
+  const isButtonDragTarget = (target: EventTarget | null) => {
+    if (!(target instanceof Element)) return false;
+    return target.closest(BUTTON_DRAG_TARGET_SELECTOR) !== null;
   };
 
   const startInteraction = useCallback(
@@ -107,7 +112,7 @@ export function CanvasItem({
       return;
     }
 
-    if (isInteractiveTarget(event.target)) {
+    if (isInteractiveTarget(event.target) && !isButtonDragTarget(event.target)) {
       return;
     }
 
