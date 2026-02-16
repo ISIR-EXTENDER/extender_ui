@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 type JoystickCardProps = {
-  title: string;
+  title: ReactNode;
   children: ReactNode;
 };
 

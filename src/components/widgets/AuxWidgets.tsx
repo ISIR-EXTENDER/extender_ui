@@ -1,6 +1,7 @@
 import { CanvasItem } from "../layout/CanvasItem";
 import type { CanvasRect } from "../layout/CanvasItem";
 import * as Slider from "@radix-ui/react-slider";
+import { InlineEditableText } from "./InlineEditableText";
 import type {
   ButtonWidget as ButtonWidgetModel,
   GripperControlWidget as GripperControlWidgetModel,
@@ -22,19 +23,23 @@ type BaseWidgetProps = {
 
 type TextWidgetProps = BaseWidgetProps & {
   widget: TextWidgetModel;
+  onTextChange: (nextText: string) => void;
 };
 
 type TextareaWidgetProps = BaseWidgetProps & {
   widget: TextareaWidgetModel;
+  onTextChange: (nextText: string) => void;
 };
 
 type ActionButtonWidgetProps = BaseWidgetProps & {
   widget: ButtonWidgetModel;
+  onLabelChange: (nextLabel: string) => void;
   onTrigger: () => void;
 };
 
 type NavigationButtonWidgetProps = BaseWidgetProps & {
   widget: NavigationButtonWidgetModel;
+  onLabelChange: (nextLabel: string) => void;
   onNavigate: (screenId: string) => void;
   canNavigate: boolean;
 };
@@ -47,6 +52,7 @@ type NavigationBarWidgetProps = BaseWidgetProps & {
 
 type RosbagControlWidgetProps = BaseWidgetProps & {
   widget: RosbagControlWidgetModel;
+  onLabelChange: (nextLabel: string) => void;
   isRecording: boolean;
   statusText: string;
   onToggleRecording: () => void;
@@ -54,12 +60,14 @@ type RosbagControlWidgetProps = BaseWidgetProps & {
 
 type MaxVelocityWidgetProps = BaseWidgetProps & {
   widget: MaxVelocityWidgetModel;
+  onLabelChange: (nextLabel: string) => void;
   value: number;
   onValueChange: (value: number) => void;
 };
 
 type GripperControlWidgetProps = BaseWidgetProps & {
   widget: GripperControlWidgetModel;
+  onLabelChange: (nextLabel: string) => void;
   speed: number;
   force: number;
   onSpeedChange: (value: number) => void;
@@ -70,6 +78,7 @@ type GripperControlWidgetProps = BaseWidgetProps & {
 
 type StreamDisplayWidgetProps = BaseWidgetProps & {
   widget: StreamDisplayWidgetModel;
+  onLabelChange: (nextLabel: string) => void;
   statusText: string;
 };
 
@@ -105,6 +114,7 @@ export function TextWidget({
   selected,
   onSelect,
   onRectChange,
+  onTextChange,
 }: TextWidgetProps) {
   return (
     <CanvasItem
@@ -122,7 +132,7 @@ export function TextWidget({
         className={`controls-text-widget controls-align-${widget.align}`}
         style={{ fontSize: `${widget.fontSize}px` }}
       >
-        {widget.text}
+        <InlineEditableText value={widget.text} onCommit={onTextChange} className="controls-inline-label" />
       </div>
     </CanvasItem>
   );
@@ -133,6 +143,7 @@ export function TextareaWidget({
   selected,
   onSelect,
   onRectChange,
+  onTextChange,
 }: TextareaWidgetProps) {
   return (
     <CanvasItem
@@ -147,7 +158,7 @@ export function TextareaWidget({
       className="controls-textarea-item"
     >
       <div className="controls-textarea-widget" style={{ fontSize: `${widget.fontSize}px` }}>
-        {widget.text}
+        <InlineEditableText value={widget.text} onCommit={onTextChange} className="controls-inline-label" />
       </div>
     </CanvasItem>
   );
@@ -158,6 +169,7 @@ export function ActionButtonWidget({
   selected,
   onSelect,
   onRectChange,
+  onLabelChange,
   onTrigger,
 }: ActionButtonWidgetProps) {
   return (
@@ -173,7 +185,7 @@ export function ActionButtonWidget({
       className="controls-action-button-item"
     >
       <button type="button" className="controls-action-button-widget" onClick={onTrigger}>
-        {widget.label}
+        <InlineEditableText value={widget.label} onCommit={onLabelChange} className="controls-inline-label" />
       </button>
     </CanvasItem>
   );
@@ -184,6 +196,7 @@ export function NavigationButtonWidget({
   selected,
   onSelect,
   onRectChange,
+  onLabelChange,
   onNavigate,
   canNavigate,
 }: NavigationButtonWidgetProps) {
@@ -206,7 +219,9 @@ export function NavigationButtonWidget({
         onClick={() => onNavigate(widget.targetScreenId)}
       >
         <span className="controls-navigation-icon">{renderIcon(widget.icon)}</span>
-        <span className="controls-navigation-label">{widget.label}</span>
+        <span className="controls-navigation-label">
+          <InlineEditableText value={widget.label} onCommit={onLabelChange} className="controls-inline-label" />
+        </span>
       </button>
     </CanvasItem>
   );
@@ -265,6 +280,7 @@ export function RosbagControlWidget({
   selected,
   onSelect,
   onRectChange,
+  onLabelChange,
   isRecording,
   statusText,
   onToggleRecording,
@@ -282,7 +298,9 @@ export function RosbagControlWidget({
       className="controls-rosbag-item"
     >
       <div className="controls-rosbag-widget">
-        <div className="controls-rosbag-title">{widget.label}</div>
+        <div className="controls-rosbag-title">
+          <InlineEditableText value={widget.label} onCommit={onLabelChange} className="controls-inline-label" />
+        </div>
         <div className="controls-rosbag-status-row">
           <span className={`controls-rosbag-led ${isRecording ? "is-on" : "is-off"}`} />
           <span className="controls-rosbag-status">{statusText}</span>
@@ -308,6 +326,7 @@ export function MaxVelocityWidget({
   selected,
   onSelect,
   onRectChange,
+  onLabelChange,
   value,
   onValueChange,
 }: MaxVelocityWidgetProps) {
@@ -324,7 +343,9 @@ export function MaxVelocityWidget({
       className="controls-max-velocity-item"
     >
       <div className="controls-max-velocity-widget">
-        <div className="controls-max-velocity-title">{widget.label}</div>
+        <div className="controls-max-velocity-title">
+          <InlineEditableText value={widget.label} onCommit={onLabelChange} className="controls-inline-label" />
+        </div>
         <Slider.Root
           className="slider"
           min={widget.min}
@@ -349,6 +370,7 @@ export function GripperControlWidget({
   selected,
   onSelect,
   onRectChange,
+  onLabelChange,
   speed,
   force,
   onSpeedChange,
@@ -369,7 +391,9 @@ export function GripperControlWidget({
       className="controls-gripper-item"
     >
       <div className="controls-gripper-widget">
-        <div className="controls-gripper-title">{widget.label}</div>
+        <div className="controls-gripper-title">
+          <InlineEditableText value={widget.label} onCommit={onLabelChange} className="controls-inline-label" />
+        </div>
         <div className="controls-gripper-actions">
           <button type="button" className="action-button open" onClick={onOpen}>
             Open
@@ -420,6 +444,7 @@ export function StreamDisplayWidget({
   selected,
   onSelect,
   onRectChange,
+  onLabelChange,
   statusText,
 }: StreamDisplayWidgetProps) {
   return (
@@ -435,7 +460,9 @@ export function StreamDisplayWidget({
       className="controls-stream-item"
     >
       <div className="controls-stream-widget">
-        <div className="controls-stream-title">{widget.label}</div>
+        <div className="controls-stream-title">
+          <InlineEditableText value={widget.label} onCommit={onLabelChange} className="controls-inline-label" />
+        </div>
         <div className="controls-stream-view">
           <div className="stream-placeholder">{statusText}</div>
         </div>

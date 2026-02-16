@@ -1,6 +1,7 @@
 import { CanvasItem } from "../layout/CanvasItem";
 import type { CanvasRect } from "../layout/CanvasItem";
 import { JoystickCardNipple } from "../teleop/JoystickCardNipple";
+import { InlineEditableText } from "./InlineEditableText";
 import type { JoystickWidget as JoystickWidgetModel } from "./widgetTypes";
 
 type JoystickWidgetProps = {
@@ -8,6 +9,7 @@ type JoystickWidgetProps = {
   selected: boolean;
   onSelect: () => void;
   onRectChange: (next: CanvasRect) => void;
+  onLabelChange: (nextLabel: string) => void;
   onMove: (x: number, y: number) => void;
   topicPreview: string;
   isTopicFresh: boolean;
@@ -23,6 +25,7 @@ export function JoystickWidget({
   selected,
   onSelect,
   onRectChange,
+  onLabelChange,
   onMove,
   topicPreview,
   isTopicFresh,
@@ -60,7 +63,13 @@ export function JoystickWidget({
       className="controls-joystick-item"
     >
       <JoystickCardNipple
-        title={widget.label}
+        title={
+          <InlineEditableText
+            value={widget.label}
+            onCommit={onLabelChange}
+            className="controls-inline-label"
+          />
+        }
         onMove={onMove}
         deadzone={widget.deadzone}
         size={diskSize}

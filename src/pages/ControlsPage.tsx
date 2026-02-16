@@ -83,6 +83,15 @@ const HEX_COLOR_PATTERN = /^#(?:[0-9a-fA-F]{3}){1,2}$/;
 const toColorInputValue = (value: string, fallback = "#4a9eff") =>
   HEX_COLOR_PATTERN.test(value.trim()) ? value : fallback;
 const clampSignedUnit = (value: number) => Math.max(-1, Math.min(1, value));
+const isTypingTarget = (target: EventTarget | null) => {
+  if (!(target instanceof HTMLElement)) return false;
+  return (
+    target.isContentEditable ||
+    target.tagName === "INPUT" ||
+    target.tagName === "TEXTAREA" ||
+    target.tagName === "SELECT"
+  );
+};
 const nextNavigationItemId = () =>
   `nav-item-${Date.now()}-${Math.random().toString(16).slice(2, 7)}`;
 
@@ -206,6 +215,24 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
       window.removeEventListener("keydown", onKeyDown);
     };
   }, [contextMenu]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.key !== "Delete" && event.key !== "Backspace") || !selectedWidgetId) {
+        return;
+      }
+      if (isTypingTarget(event.target)) {
+        return;
+      }
+
+      event.preventDefault();
+      setWidgets((prev) => prev.filter((widget) => widget.id !== selectedWidgetId));
+      setSelectedWidgetId(null);
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [selectedWidgetId]);
 
   const selectedWidget = useMemo(
     () => widgets.find((widget) => widget.id === selectedWidgetId) ?? null,
@@ -678,6 +705,11 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
           selected={selected}
           onSelect={() => setSelectedWidgetId(widget.id)}
           onRectChange={(next) => updateWidget(widget.id, (current) => ({ ...current, rect: next }))}
+          onLabelChange={(nextLabel) =>
+            updateWidget(widget.id, (current) =>
+              current.kind === "save-pose-button" ? { ...current, label: nextLabel } : current
+            )
+          }
           onTrigger={saveCurrentPose}
         />
       );
@@ -694,6 +726,15 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
           selected={selected}
           onSelect={() => setSelectedWidgetId(widget.id)}
           onRectChange={(next) => updateWidget(widget.id, (current) => ({ ...current, rect: next }))}
+          onLabelChange={(nextLabel) =>
+            updateWidget(widget.id, (current) =>
+              current.kind === "load-pose-button"
+                ? current.poseName
+                  ? { ...current, poseName: nextLabel }
+                  : { ...current, label: nextLabel }
+                : current
+            )
+          }
           onTrigger={() => loadPoseByName(widget.poseName)}
           poseAvailable={poseAvailable}
         />
@@ -709,6 +750,11 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
           selected={selected}
           onSelect={() => setSelectedWidgetId(widget.id)}
           onRectChange={(next) => updateWidget(widget.id, (current) => ({ ...current, rect: next }))}
+          onLabelChange={(nextLabel) =>
+            updateWidget(widget.id, (current) =>
+              current.kind === "navigation-button" ? { ...current, label: nextLabel } : current
+            )
+          }
           onNavigate={(screenId) => setStatusMessage(`Navigation target selected: ${screenId}`)}
           canNavigate={canNavigate}
         />
@@ -736,6 +782,11 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
           selected={selected}
           onSelect={() => setSelectedWidgetId(widget.id)}
           onRectChange={(next) => updateWidget(widget.id, (current) => ({ ...current, rect: next }))}
+          onTextChange={(nextText) =>
+            updateWidget(widget.id, (current) =>
+              current.kind === "text" ? { ...current, text: nextText } : current
+            )
+          }
         />
       );
     }
@@ -748,6 +799,11 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
           selected={selected}
           onSelect={() => setSelectedWidgetId(widget.id)}
           onRectChange={(next) => updateWidget(widget.id, (current) => ({ ...current, rect: next }))}
+          onTextChange={(nextText) =>
+            updateWidget(widget.id, (current) =>
+              current.kind === "textarea" ? { ...current, text: nextText } : current
+            )
+          }
         />
       );
     }
@@ -760,6 +816,11 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
           selected={selected}
           onSelect={() => setSelectedWidgetId(widget.id)}
           onRectChange={(next) => updateWidget(widget.id, (current) => ({ ...current, rect: next }))}
+          onLabelChange={(nextLabel) =>
+            updateWidget(widget.id, (current) =>
+              current.kind === "button" ? { ...current, label: nextLabel } : current
+            )
+          }
           onTrigger={() => {
             wsClient.send({
               type: "ui_button",
@@ -781,6 +842,11 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
           selected={selected}
           onSelect={() => setSelectedWidgetId(widget.id)}
           onRectChange={(next) => updateWidget(widget.id, (current) => ({ ...current, rect: next }))}
+          onLabelChange={(nextLabel) =>
+            updateWidget(widget.id, (current) =>
+              current.kind === "rosbag-control" ? { ...current, label: nextLabel } : current
+            )
+          }
           isRecording={rosbagRecording}
           statusText={rosbagStatus}
           onToggleRecording={() => toggleRosbagRecording(widget)}
@@ -796,6 +862,11 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
           selected={selected}
           onSelect={() => setSelectedWidgetId(widget.id)}
           onRectChange={(next) => updateWidget(widget.id, (current) => ({ ...current, rect: next }))}
+          onLabelChange={(nextLabel) =>
+            updateWidget(widget.id, (current) =>
+              current.kind === "max-velocity" ? { ...current, label: nextLabel } : current
+            )
+          }
           value={maxVelocity}
           onValueChange={setMaxVelocity}
         />
@@ -810,6 +881,11 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
           selected={selected}
           onSelect={() => setSelectedWidgetId(widget.id)}
           onRectChange={(next) => updateWidget(widget.id, (current) => ({ ...current, rect: next }))}
+          onLabelChange={(nextLabel) =>
+            updateWidget(widget.id, (current) =>
+              current.kind === "gripper-control" ? { ...current, label: nextLabel } : current
+            )
+          }
           speed={gripperSpeed}
           force={gripperForce}
           onSpeedChange={setGripperSpeed}
@@ -835,6 +911,11 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
           selected={selected}
           onSelect={() => setSelectedWidgetId(widget.id)}
           onRectChange={(next) => updateWidget(widget.id, (current) => ({ ...current, rect: next }))}
+          onLabelChange={(nextLabel) =>
+            updateWidget(widget.id, (current) =>
+              current.kind === "stream-display" ? { ...current, label: nextLabel } : current
+            )
+          }
           statusText={widget.source === "rviz" ? "RViz stream" : "Camera stream"}
         />
       );
@@ -875,6 +956,11 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
         selected={selected}
         onSelect={() => setSelectedWidgetId(widget.id)}
         onRectChange={(next) => updateWidget(widget.id, (current) => ({ ...current, rect: next }))}
+        onLabelChange={(nextLabel) =>
+          updateWidget(widget.id, (current) =>
+            current.kind === "joystick" ? { ...current, label: nextLabel } : current
+          )
+        }
         onMove={(x, y) => {
           if (widget.binding === "joy") {
             setJoy(x, y);

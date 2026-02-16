@@ -3,7 +3,7 @@ import { NippleJoystick } from "./NippleJoystick";
 import { JoystickCard } from "./JoystickCard";
 
 type JoystickCardNippleProps = {
-  title: string;
+  title: ReactNode;
   onMove: (x: number, y: number) => void;
   onEnd?: () => void;
   color?: string;

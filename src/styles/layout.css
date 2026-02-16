@@ -643,6 +643,30 @@ body,
   cursor: nwse-resize;
 }
 
+.controls-inline-label {
+  display: inline-block;
+  max-width: 100%;
+  border-radius: 4px;
+  padding: 0 0.16rem;
+  cursor: text;
+}
+
+.controls-inline-label:hover {
+  outline: 1px dashed color-mix(in srgb, var(--accent) 50%, transparent);
+}
+
+.controls-inline-edit-input {
+  width: 100%;
+  min-width: 48px;
+  border-radius: 4px;
+  border: 1px solid color-mix(in srgb, var(--accent) 55%, var(--border));
+  background: color-mix(in srgb, var(--panel) 94%, var(--accent) 6%);
+  color: inherit;
+  font: inherit;
+  text-align: inherit;
+  padding: 0.08rem 0.26rem;
+}
+
 .controls-mini-card {
   display: flex;
   align-items: center;

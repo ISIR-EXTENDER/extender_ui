@@ -1,5 +1,6 @@
 import { CanvasItem } from "../layout/CanvasItem";
 import type { CanvasRect } from "../layout/CanvasItem";
+import { InlineEditableText } from "./InlineEditableText";
 import type {
   LoadPoseButtonWidget as LoadPoseButtonWidgetModel,
   SavePoseButtonWidget as SavePoseButtonWidgetModel,
@@ -11,6 +12,7 @@ type SavePoseButtonWidgetProps = {
   selected: boolean;
   onSelect: () => void;
   onRectChange: (next: CanvasRect) => void;
+  onLabelChange: (nextLabel: string) => void;
   onTrigger: () => void;
 };
 
@@ -19,6 +21,7 @@ type LoadPoseButtonWidgetProps = {
   selected: boolean;
   onSelect: () => void;
   onRectChange: (next: CanvasRect) => void;
+  onLabelChange: (nextLabel: string) => void;
   onTrigger: () => void;
   poseAvailable: boolean;
 };
@@ -105,6 +108,7 @@ export function SavePoseButtonWidget({
   selected,
   onSelect,
   onRectChange,
+  onLabelChange,
   onTrigger,
 }: SavePoseButtonWidgetProps) {
   return (
@@ -121,7 +125,9 @@ export function SavePoseButtonWidget({
     >
       <button type="button" className="controls-pose-button" onClick={onTrigger}>
         <span className="controls-pose-button-icon">{iconSvg("save")}</span>
-        <span className="controls-pose-button-label">{widget.label}</span>
+        <span className="controls-pose-button-label">
+          <InlineEditableText value={widget.label} onCommit={onLabelChange} className="controls-inline-label" />
+        </span>
       </button>
     </CanvasItem>
   );
@@ -132,6 +138,7 @@ export function LoadPoseButtonWidget({
   selected,
   onSelect,
   onRectChange,
+  onLabelChange,
   onTrigger,
   poseAvailable,
 }: LoadPoseButtonWidgetProps) {
@@ -155,7 +162,7 @@ export function LoadPoseButtonWidget({
       >
         <span className="controls-pose-button-icon">{iconSvg(widget.icon)}</span>
         <span className="controls-pose-button-label">
-          {widget.poseName || widget.label}
+          <InlineEditableText value={widget.poseName || widget.label} onCommit={onLabelChange} className="controls-inline-label" />
         </span>
       </button>
     </CanvasItem>

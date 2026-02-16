@@ -40,6 +40,7 @@ const TOPIC_FRESHNESS_TICK_MS = 100;
 const clampSignedUnit = (value: number) => Math.max(-1, Math.min(1, value));
 
 const NOOP_RECT_CHANGE = (_next: CanvasRect) => {};
+const NOOP_TEXT_CHANGE = (_next: string) => {};
 
 export function ApplicationPage({
   applicationId,
@@ -247,6 +248,7 @@ export function ApplicationPage({
           selected={false}
           onSelect={() => {}}
           onRectChange={NOOP_RECT_CHANGE}
+          onLabelChange={NOOP_TEXT_CHANGE}
           onTrigger={saveCurrentPose}
         />
       );
@@ -263,6 +265,7 @@ export function ApplicationPage({
           selected={false}
           onSelect={() => {}}
           onRectChange={NOOP_RECT_CHANGE}
+          onLabelChange={NOOP_TEXT_CHANGE}
           onTrigger={() => loadPoseByName(widget.poseName)}
           poseAvailable={poseAvailable}
         />
@@ -278,6 +281,7 @@ export function ApplicationPage({
           selected={false}
           onSelect={() => {}}
           onRectChange={NOOP_RECT_CHANGE}
+          onLabelChange={NOOP_TEXT_CHANGE}
           onNavigate={onNavigateToScreen}
           canNavigate={canNavigate}
         />
@@ -306,6 +310,7 @@ export function ApplicationPage({
           selected={false}
           onSelect={() => {}}
           onRectChange={NOOP_RECT_CHANGE}
+          onTextChange={NOOP_TEXT_CHANGE}
         />
       );
     }
@@ -318,6 +323,7 @@ export function ApplicationPage({
           selected={false}
           onSelect={() => {}}
           onRectChange={NOOP_RECT_CHANGE}
+          onTextChange={NOOP_TEXT_CHANGE}
         />
       );
     }
@@ -330,6 +336,7 @@ export function ApplicationPage({
           selected={false}
           onSelect={() => {}}
           onRectChange={NOOP_RECT_CHANGE}
+          onLabelChange={NOOP_TEXT_CHANGE}
           onTrigger={() =>
             wsClient.send({
               type: "ui_button",
@@ -350,6 +357,7 @@ export function ApplicationPage({
           selected={false}
           onSelect={() => {}}
           onRectChange={NOOP_RECT_CHANGE}
+          onLabelChange={NOOP_TEXT_CHANGE}
           isRecording={rosbagRecording}
           statusText={rosbagStatus}
           onToggleRecording={() => toggleRosbagRecording(widget)}
@@ -365,6 +373,7 @@ export function ApplicationPage({
           selected={false}
           onSelect={() => {}}
           onRectChange={NOOP_RECT_CHANGE}
+          onLabelChange={NOOP_TEXT_CHANGE}
           value={maxVelocity}
           onValueChange={setMaxVelocity}
         />
@@ -379,6 +388,7 @@ export function ApplicationPage({
           selected={false}
           onSelect={() => {}}
           onRectChange={NOOP_RECT_CHANGE}
+          onLabelChange={NOOP_TEXT_CHANGE}
           speed={gripperSpeed}
           force={gripperForce}
           onSpeedChange={setGripperSpeed}
@@ -402,6 +412,7 @@ export function ApplicationPage({
           selected={false}
           onSelect={() => {}}
           onRectChange={NOOP_RECT_CHANGE}
+          onLabelChange={NOOP_TEXT_CHANGE}
           statusText={widget.source === "rviz" ? "RViz stream" : "Camera stream"}
         />
       );
@@ -440,6 +451,7 @@ export function ApplicationPage({
         selected={false}
         onSelect={() => {}}
         onRectChange={NOOP_RECT_CHANGE}
+        onLabelChange={NOOP_TEXT_CHANGE}
         onMove={(x, y) => {
           if (widget.binding === "joy") {
             setJoy(x, y);
