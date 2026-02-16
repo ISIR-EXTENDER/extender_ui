@@ -34,7 +34,6 @@ import {
   syncConfigurationsToFolder,
   type ButtonWidgetModel,
   type CanvasWidget,
-  type GripperControlWidgetModel,
   type JoystickWidgetModel,
   type LoadPoseButtonWidgetModel,
   type MaxVelocityWidgetModel,
@@ -106,8 +105,6 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
   const setGripperForce = useUiStore((s) => s.setGripperForce);
   const cameraStreamUrl = useUiStore((s) => s.cameraStreamUrl);
   const rvizStreamUrl = useUiStore((s) => s.rvizStreamUrl);
-  const setCameraStreamUrl = useUiStore((s) => s.setCameraStreamUrl);
-  const setRvizStreamUrl = useUiStore((s) => s.setRvizStreamUrl);
 
   const canvasSurfaceRef = useRef<HTMLDivElement | null>(null);
   const [topBarSlotElement, setTopBarSlotElement] = useState<HTMLElement | null>(null);
@@ -350,11 +347,6 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
     updater: (widget: MaxVelocityWidgetModel) => MaxVelocityWidgetModel
   ) => {
     updateSelectedWidget((widget) => (widget.kind === "max-velocity" ? updater(widget) : widget));
-  };
-  const updateSelectedGripperControl = (
-    updater: (widget: GripperControlWidgetModel) => GripperControlWidgetModel
-  ) => {
-    updateSelectedWidget((widget) => (widget.kind === "gripper-control" ? updater(widget) : widget));
   };
   const updateSelectedStreamDisplay = (
     updater: (widget: StreamDisplayWidgetModel) => StreamDisplayWidgetModel
@@ -1033,7 +1025,9 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
                 </button>
               </div>
 
-              <div className="controls-hint">Right click on canvas to add at cursor.</div>
+              <div className="controls-hint">
+                Drag widgets on the canvas to move. Right click to add at cursor.
+              </div>
 
               <div className="controls-menu-list">
                 {widgets.map((widget) => (

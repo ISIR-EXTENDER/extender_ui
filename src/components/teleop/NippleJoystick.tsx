@@ -102,6 +102,7 @@ export function NippleJoystick({
   return (
     <div
       className={`joystick-shell ${className ?? ""}`.trim()}
+      data-canvas-interactive="true"
       style={{
         ["--joy-size" as string]: `${size}px`,
         ["--joy-deadzone" as string]: `${deadzone}`,

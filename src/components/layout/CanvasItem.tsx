@@ -22,6 +22,8 @@ type CanvasItemProps = {
 };
 
 const clampMin = (value: number, min: number) => Math.max(min, value);
+const INTERACTIVE_TARGET_SELECTOR =
+  "button, a, input, select, textarea, [role='button'], [role='slider'], [contenteditable='true'], [data-canvas-interactive='true']";
 
 export function CanvasItem({
   x,
@@ -37,6 +39,11 @@ export function CanvasItem({
 }: CanvasItemProps) {
   const minW = minSize?.w ?? 40;
   const minH = minSize?.h ?? 40;
+
+  const isInteractiveTarget = (target: EventTarget | null) => {
+    if (!(target instanceof Element)) return false;
+    return target.closest(INTERACTIVE_TARGET_SELECTOR) !== null;
+  };
 
   const startInteraction = useCallback(
     (event: ReactPointerEvent, mode: "move" | "resize") => {
@@ -93,6 +100,20 @@ export function CanvasItem({
     [h, minH, minW, onChange, w, x, y]
   );
 
+  const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    onSelect?.();
+
+    if (!onChange || event.button !== 0) {
+      return;
+    }
+
+    if (isInteractiveTarget(event.target)) {
+      return;
+    }
+
+    startInteraction(event, "move");
+  };
+
   return (
     <div
       className={`canvas-item ${selected ? "is-selected" : ""} ${className ?? ""}`.trim()}
@@ -102,7 +123,7 @@ export function CanvasItem({
         width: `${w}px`,
         height: `${h}px`,
       }}
-      onPointerDown={() => onSelect?.()}
+      onPointerDown={handlePointerDown}
     >
       <div className="canvas-item-content">{children}</div>
       {onChange && (
