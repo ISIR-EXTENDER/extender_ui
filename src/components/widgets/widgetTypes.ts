@@ -34,6 +34,7 @@ type WidgetBase = {
 export type JoystickWidget = WidgetBase & {
   kind: "joystick";
   binding: JoystickBinding;
+  showTopicInfo?: boolean;
   color: string;
   deadzone: number;
   diskSize: number;
@@ -49,6 +50,9 @@ export type SliderWidget = WidgetBase & {
   kind: "slider";
   binding: SliderBinding;
   direction: SliderDirection;
+  showLabel?: boolean;
+  showTopicInfo?: boolean;
+  labelAlign?: TextAlign;
   min: number;
   max: number;
   step: number;
@@ -144,6 +148,9 @@ export const DEFAULT_WIDGETS: CanvasWidget[] = [
     label: "RZ",
     topic: "/cmd/joystick_rz",
     direction: "horizontal",
+    showLabel: true,
+    showTopicInfo: true,
+    labelAlign: "center",
     min: -1,
     max: 1,
     step: 0.01,
@@ -156,6 +163,9 @@ export const DEFAULT_WIDGETS: CanvasWidget[] = [
     label: "Z",
     topic: "/cmd/joystick_z",
     direction: "vertical",
+    showLabel: true,
+    showTopicInfo: true,
+    labelAlign: "center",
     min: -1,
     max: 1,
     step: 0.01,
@@ -167,6 +177,7 @@ export const DEFAULT_WIDGETS: CanvasWidget[] = [
     binding: "joy",
     label: "Translation",
     topic: "/cmd/joystick_xy",
+    showTopicInfo: true,
     color: "#4a9eff",
     deadzone: 0.1,
     diskSize: 64,
@@ -179,6 +190,7 @@ export const DEFAULT_WIDGETS: CanvasWidget[] = [
     binding: "rot",
     label: "Rotation",
     topic: "/cmd/joystick_rxry",
+    showTopicInfo: true,
     color: "#f97316",
     deadzone: 0.1,
     diskSize: 64,

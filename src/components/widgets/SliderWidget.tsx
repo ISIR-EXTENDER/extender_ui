@@ -25,6 +25,9 @@ export function SliderWidget({
   onRectChange,
 }: SliderWidgetProps) {
   const minSize = widget.direction === "vertical" ? { w: 40, h: 90 } : { w: 90, h: 40 };
+  const showLabel = widget.showLabel ?? true;
+  const showTopicInfo = widget.showTopicInfo ?? true;
+  const labelAlign = widget.labelAlign ?? "center";
 
   return (
     <CanvasItem
@@ -36,7 +39,7 @@ export function SliderWidget({
       onSelect={onSelect}
       selected={selected}
       minSize={minSize}
-      className={`controls-slider-item ${widget.direction === "vertical" ? "is-vertical" : "is-horizontal"}`}
+      className={`controls-slider-item ${widget.direction === "vertical" ? "is-vertical" : "is-horizontal"} ${showLabel ? "" : "hide-label"}`}
     >
       <div className="card controls-mini-card">
         {widget.direction === "vertical" ? (
@@ -47,7 +50,8 @@ export function SliderWidget({
             max={widget.max}
             step={widget.step}
             label={widget.label}
-            showLabel={false}
+            labelAlign={labelAlign}
+            showLabel={showLabel}
             showReadout={false}
           />
         ) : (
@@ -58,14 +62,17 @@ export function SliderWidget({
             max={widget.max}
             step={widget.step}
             label={widget.label}
-            showLabel={false}
+            labelAlign={labelAlign}
+            showLabel={showLabel}
             showReadout={false}
           />
         )}
       </div>
-      <div className={`widget-topic-readout ${isTopicFresh ? "is-fresh" : "is-stale"}`}>
-        {topicPreview}
-      </div>
+      {showTopicInfo ? (
+        <div className={`widget-topic-readout ${isTopicFresh ? "is-fresh" : "is-stale"}`}>
+          {topicPreview}
+        </div>
+      ) : null}
     </CanvasItem>
   );
 }

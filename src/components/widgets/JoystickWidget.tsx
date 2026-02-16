@@ -33,6 +33,7 @@ export function JoystickWidget({
 }: JoystickWidgetProps) {
   // Keep a visible inner padding and title/readout room while maximizing joystick area.
   const diskSize = Math.max(48, Math.min(widget.rect.w, widget.rect.h) - 58);
+  const showTopicInfo = widget.showTopicInfo ?? true;
 
   const handleRectChange = (next: CanvasRect) => {
     const isMoveOnly = next.w === widget.rect.w && next.h === widget.rect.h;
@@ -83,9 +84,11 @@ export function JoystickWidget({
           {typeof metrics.magnitude === "number" ? <div>mag: {metrics.magnitude.toFixed(2)}</div> : null}
         </div>
       </JoystickCardNipple>
-      <div className={`widget-topic-readout ${isTopicFresh ? "is-fresh" : "is-stale"}`}>
-        {topicPreview}
-      </div>
+      {showTopicInfo ? (
+        <div className={`widget-topic-readout ${isTopicFresh ? "is-fresh" : "is-stale"}`}>
+          {topicPreview}
+        </div>
+      ) : null}
     </CanvasItem>
   );
 }

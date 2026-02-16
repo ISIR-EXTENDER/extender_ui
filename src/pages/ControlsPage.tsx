@@ -1263,6 +1263,23 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
                             }
                           />
                         </label>
+
+                        <label className="controls-field">
+                          <span>Topic Info</span>
+                          <select
+                            className="editor-input"
+                            value={(selectedWidget.showTopicInfo ?? true) ? "visible" : "hidden"}
+                            onChange={(event) =>
+                              updateSelectedJoystick((widget) => ({
+                                ...widget,
+                                showTopicInfo: event.target.value === "visible",
+                              }))
+                            }
+                          >
+                            <option value="visible">visible</option>
+                            <option value="hidden">hidden</option>
+                          </select>
+                        </label>
                       </div>
 
                       <div className="controls-field-row">
@@ -1388,6 +1405,63 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
                           >
                             <option value="vertical">vertical</option>
                             <option value="horizontal">horizontal</option>
+                          </select>
+                        </label>
+
+                        <label className="controls-field">
+                          <span>Label Visibility</span>
+                          <select
+                            className="editor-input"
+                            value={(selectedWidget.showLabel ?? true) ? "visible" : "hidden"}
+                            onChange={(event) =>
+                              updateSelectedSlider((widget) => ({
+                                ...widget,
+                                showLabel: event.target.value === "visible",
+                              }))
+                            }
+                          >
+                            <option value="visible">visible</option>
+                            <option value="hidden">hidden</option>
+                          </select>
+                        </label>
+
+                        <label className="controls-field">
+                          <span>Label Align</span>
+                          <select
+                            className="editor-input"
+                            value={selectedWidget.labelAlign ?? "center"}
+                            onChange={(event) =>
+                              updateSelectedSlider((widget) => ({
+                                ...widget,
+                                labelAlign:
+                                  event.target.value === "left"
+                                    ? "left"
+                                    : event.target.value === "right"
+                                      ? "right"
+                                      : "center",
+                              }))
+                            }
+                          >
+                            <option value="left">left</option>
+                            <option value="center">center</option>
+                            <option value="right">right</option>
+                          </select>
+                        </label>
+
+                        <label className="controls-field">
+                          <span>Topic Info</span>
+                          <select
+                            className="editor-input"
+                            value={(selectedWidget.showTopicInfo ?? true) ? "visible" : "hidden"}
+                            onChange={(event) =>
+                              updateSelectedSlider((widget) => ({
+                                ...widget,
+                                showTopicInfo: event.target.value === "visible",
+                              }))
+                            }
+                          >
+                            <option value="visible">visible</option>
+                            <option value="hidden">hidden</option>
                           </select>
                         </label>
                       </div>

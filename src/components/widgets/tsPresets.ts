@@ -5,6 +5,7 @@ import type {
   SliderBinding,
   SliderDirection,
   SliderWidget,
+  TextAlign,
 } from "./widgetTypes";
 import { nextWidgetId } from "./widgetTypes";
 
@@ -21,6 +22,9 @@ type SliderPresetWidget = BasePresetWidget & {
   kind: "slider";
   binding?: SliderBinding;
   direction?: SliderDirection;
+  showLabel?: boolean;
+  showTopicInfo?: boolean;
+  labelAlign?: TextAlign;
   min?: number;
   max?: number;
   step?: number;
@@ -29,6 +33,7 @@ type SliderPresetWidget = BasePresetWidget & {
 type JoystickPresetWidget = BasePresetWidget & {
   kind: "joystick";
   binding?: JoystickBinding;
+  showTopicInfo?: boolean;
   color?: string;
   deadzone?: number;
   diskSize?: number;
@@ -73,6 +78,9 @@ const buildSliderWidget = (spec: SliderPresetWidget): SliderWidget => {
     direction,
     label: spec.label ?? binding.toUpperCase(),
     topic: spec.topic ?? topicForSliderBinding(binding),
+    showLabel: spec.showLabel ?? true,
+    showTopicInfo: spec.showTopicInfo ?? true,
+    labelAlign: spec.labelAlign ?? "center",
     min: spec.min ?? -1,
     max: spec.max ?? 1,
     step: spec.step ?? 0.01,
@@ -95,6 +103,7 @@ const buildJoystickWidget = (spec: JoystickPresetWidget): JoystickWidget => {
     binding,
     label: spec.label ?? (binding === "rot" ? "Rotation" : "Translation"),
     topic: spec.topic ?? topicForJoystickBinding(binding),
+    showTopicInfo: spec.showTopicInfo ?? true,
     color: spec.color ?? (binding === "rot" ? "#f97316" : "#4a9eff"),
     deadzone: spec.deadzone ?? 0.1,
     diskSize: clampPx(spec.diskSize ?? 64, 64),
