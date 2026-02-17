@@ -115,7 +115,6 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
   const setRz = useTeleopStore((s) => s.setRz);
   const maxVelocity = useTeleopStore((s) => s.maxVelocity);
   const setMaxVelocity = useTeleopStore((s) => s.setMaxVelocity);
-  const setFocusMode = useUiStore((s) => s.setFocusMode);
   const gripperSpeed = useUiStore((s) => s.gripperSpeed);
   const gripperForce = useUiStore((s) => s.gripperForce);
   const setGripperSpeed = useUiStore((s) => s.setGripperSpeed);
@@ -1149,9 +1148,6 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
         </button>
         <button type="button" className="tab-button" onClick={() => setIsInspectorOpen((prev) => !prev)}>
           {isInspectorOpen ? "Hide Panel" : "Show Panel"}
-        </button>
-        <button type="button" className="tab-button" onClick={() => setFocusMode(true)}>
-          Preview
         </button>
         <button type="button" className="tab-button" onClick={handleSyncToFolder}>
           Sync To Folder
