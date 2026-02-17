@@ -91,6 +91,11 @@ export const DEFAULT_DEMO_CONFIGURATIONS: WidgetConfiguration[] = [
       poseName: "home",
       rect: { w: 160, h: 64 },
     }),
+    createDemoWidget("ctrl-mode", "mode-button", 860, 10, {
+      label: "Mode",
+      topic: "/cmd/mode",
+      rect: { w: 170, h: 52 },
+    }),
     createDemoWidget("ctrl-z", "slider", 20, 190, {
       binding: "z",
       label: "Z",

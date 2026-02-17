@@ -9,6 +9,7 @@ import {
   JoystickWidget,
   LoadPoseButtonWidget,
   LogsWidget,
+  ModeButtonWidget,
   MaxVelocityWidget,
   NavigationBarWidget,
   NavigationButtonWidget,
@@ -304,6 +305,19 @@ export function ApplicationPage({
           onLabelChange={NOOP_TEXT_CHANGE}
           onTrigger={() => loadPoseByName(widget.poseName)}
           poseAvailable={poseAvailable}
+        />
+      );
+    }
+
+    if (widget.kind === "mode-button") {
+      return (
+        <ModeButtonWidget
+          key={widget.id}
+          widget={widget}
+          selected={false}
+          onSelect={() => {}}
+          onRectChange={NOOP_RECT_CHANGE}
+          onLabelChange={NOOP_TEXT_CHANGE}
         />
       );
     }

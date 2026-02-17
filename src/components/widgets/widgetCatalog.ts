@@ -6,6 +6,7 @@ import type {
   JoystickWidget,
   LogsWidget,
   LoadPoseButtonWidget,
+  ModeButtonWidget,
   MaxVelocityWidget,
   NavigationBarWidget,
   NavigationButtonWidget,
@@ -21,6 +22,7 @@ import { nextWidgetId } from "./widgetTypes";
 export type WidgetCatalogType =
   | "joystick"
   | "slider"
+  | "mode-button"
   | "save-pose-button"
   | "load-pose-button"
   | "navigation-button"
@@ -50,6 +52,7 @@ export type WidgetCatalogEntry = {
 export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
   { type: "joystick", label: "Joystick", enabled: true, defaultSize: { w: 150, h: 150 } },
   { type: "slider", label: "Slider", enabled: true, defaultSize: { w: 60, h: 120 } },
+  { type: "mode-button", label: "Mode Button", enabled: true, defaultSize: { w: 170, h: 52 } },
   { type: "save-pose-button", label: "Save Pose Button", enabled: true, defaultSize: { w: 130, h: 52 } },
   { type: "load-pose-button", label: "Load Pose Button", enabled: true, defaultSize: { w: 130, h: 52 } },
   { type: "navigation-button", label: "Navigation Button", enabled: true, defaultSize: { w: 160, h: 52 } },
@@ -122,6 +125,17 @@ export function createWidgetFromCatalogType(
       rect: { x, y, w: 130, h: 52 },
     };
     return saveButton;
+  }
+
+  if (type === "mode-button") {
+    const modeButton: ModeButtonWidget = {
+      id: nextWidgetId(),
+      kind: "mode-button",
+      label: "Mode",
+      topic: "/cmd/mode",
+      rect: { x, y, w: 170, h: 52 },
+    };
+    return modeButton;
   }
 
   if (type === "load-pose-button") {

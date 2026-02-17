@@ -16,6 +16,7 @@ import {
   JoystickWidget,
   LoadPoseButtonWidget,
   LogsWidget,
+  ModeButtonWidget,
   MaxVelocityWidget,
   NavigationBarWidget,
   NavigationButtonWidget,
@@ -1070,6 +1071,23 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
           }
           onTrigger={() => loadPoseByName(widget.poseName)}
           poseAvailable={poseAvailable}
+        />
+      );
+    }
+
+    if (widget.kind === "mode-button") {
+      return (
+        <ModeButtonWidget
+          key={widget.id}
+          widget={widget}
+          selected={selected}
+          onSelect={() => setSelectedWidgetId(widget.id)}
+          onRectChange={(next) => handleWidgetRectChange(widget.id, next)}
+          onLabelChange={(nextLabel) =>
+            updateWidget(widget.id, (current) =>
+              current.kind === "mode-button" ? { ...current, label: nextLabel } : current
+            )
+          }
         />
       );
     }
@@ -2682,6 +2700,13 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
                             <option value="off">off</option>
                           </select>
                         </label>
+                      </div>
+                    </>
+                  ) : selectedWidget.kind === "mode-button" ? (
+                    <>
+                      <div className="controls-property-title">Mode Button</div>
+                      <div className="controls-hint">
+                        Cycles teleop mode on click and updates <code>teleop_cmd.mode</code> (0..3).
                       </div>
                     </>
                   ) : (

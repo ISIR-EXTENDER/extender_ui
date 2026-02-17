@@ -19,6 +19,7 @@ import type {
   CurvesWidget as CurvesWidgetModel,
   GripperControlWidget as GripperControlWidgetModel,
   LogsWidget as LogsWidgetModel,
+  ModeButtonWidget as ModeButtonWidgetModel,
   MaxVelocityWidget as MaxVelocityWidgetModel,
   NavigationBarWidget as NavigationBarWidgetModel,
   NavigationButtonWidget as NavigationButtonWidgetModel,
@@ -49,6 +50,11 @@ type ActionButtonWidgetProps = BaseWidgetProps & {
   widget: ButtonWidgetModel;
   onLabelChange: (nextLabel: string) => void;
   onTrigger: () => void;
+};
+
+type ModeButtonWidgetProps = BaseWidgetProps & {
+  widget: ModeButtonWidgetModel;
+  onLabelChange: (nextLabel: string) => void;
 };
 
 type NavigationButtonWidgetProps = BaseWidgetProps & {
@@ -210,6 +216,43 @@ export function ActionButtonWidget({
     >
       <button type="button" className="controls-action-button-widget" onClick={onTrigger}>
         <InlineEditableText value={widget.label} onCommit={onLabelChange} className="controls-inline-label" />
+      </button>
+    </CanvasItem>
+  );
+}
+
+export function ModeButtonWidget({
+  widget,
+  selected,
+  onSelect,
+  onRectChange,
+  onLabelChange,
+}: ModeButtonWidgetProps) {
+  const mode = useTeleopStore((s) => s.mode);
+  const cycleMode = useTeleopStore((s) => s.cycleMode);
+
+  return (
+    <CanvasItem
+      x={widget.rect.x}
+      y={widget.rect.y}
+      w={widget.rect.w}
+      h={widget.rect.h}
+      onChange={onRectChange}
+      onSelect={onSelect}
+      selected={selected}
+      minSize={{ w: 132, h: 42 }}
+      className="controls-mode-button-item"
+    >
+      <button
+        type="button"
+        className="controls-mode-button-widget"
+        data-canvas-interactive="true"
+        onClick={cycleMode}
+      >
+        <span className="controls-mode-button-label">
+          <InlineEditableText value={widget.label} onCommit={onLabelChange} className="controls-inline-label" />
+        </span>
+        <span className="controls-mode-button-value">{selectModeLabel(mode)}</span>
       </button>
     </CanvasItem>
   );

@@ -1107,6 +1107,7 @@ body,
 .controls-text-item,
 .controls-textarea-item,
 .controls-action-button-item,
+.controls-mode-button-item,
 .controls-navigation-button-item,
 .controls-navigation-bar-item,
 .controls-rosbag-item {
@@ -1162,6 +1163,33 @@ body,
   background: color-mix(in srgb, var(--panel) 74%, var(--accent) 26%);
   color: var(--text);
   font-weight: 700;
+}
+
+.controls-mode-button-widget {
+  width: 100%;
+  height: 100%;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, #38bdf8 40%, var(--border));
+  background: color-mix(in srgb, var(--panel) 72%, #0ea5e9 28%);
+  color: var(--text);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.36rem 0.55rem;
+  font-weight: 700;
+}
+
+.controls-mode-button-value {
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, #38bdf8 45%, var(--border));
+  background: color-mix(in srgb, #0b1220 64%, var(--panel) 36%);
+  color: #e0f2fe;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  padding: 0.14rem 0.42rem;
+  white-space: nowrap;
 }
 
 .controls-navigation-button-widget {

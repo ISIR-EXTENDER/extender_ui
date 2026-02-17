@@ -13,6 +13,7 @@ export type LogLevelFilter = "all" | "info" | "warn" | "error";
 export type WidgetKind =
   | "joystick"
   | "slider"
+  | "mode-button"
   | "save-pose-button"
   | "load-pose-button"
   | "navigation-button"
@@ -64,6 +65,10 @@ export type SliderWidget = WidgetBase & {
 
 export type SavePoseButtonWidget = WidgetBase & {
   kind: "save-pose-button";
+};
+
+export type ModeButtonWidget = WidgetBase & {
+  kind: "mode-button";
 };
 
 export type LoadPoseButtonWidget = WidgetBase & {
@@ -152,6 +157,7 @@ export type LogsWidget = WidgetBase & {
 export type CanvasWidget =
   | JoystickWidget
   | SliderWidget
+  | ModeButtonWidget
   | SavePoseButtonWidget
   | LoadPoseButtonWidget
   | NavigationButtonWidget
@@ -196,6 +202,13 @@ export const DEFAULT_WIDGETS: CanvasWidget[] = [
     max: 1,
     step: 0.01,
     rect: { x: 0, y: 100, w: 50, h: 100 },
+  },
+  {
+    id: "mode-button",
+    kind: "mode-button",
+    label: "Mode",
+    topic: "/cmd/mode",
+    rect: { x: 210, y: 25, w: 170, h: 50 },
   },
   {
     id: "joystick-translation",
