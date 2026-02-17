@@ -540,7 +540,6 @@ export function ApplicationPage({
   return (
     <main className="controls-page tab-accent tab-controls application-runtime-page">
       <section className="card application-runtime-header">
-        <h2>{activeApplication.name}</h2>
         <div className="application-runtime-links">
           {activeApplication.screenIds.map((screenId) => (
             <button

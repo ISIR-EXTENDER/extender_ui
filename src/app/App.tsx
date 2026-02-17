@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
+import { loadApplicationsFromLocalStorage } from "./applications";
 import { TopBar } from "../components/layout/TopBar";
 import { ApplicationPage } from "../pages/ApplicationPage";
 import { CanvasDesignPage } from "../pages/CanvasDesignPage";
@@ -17,11 +18,18 @@ export default function App() {
   const { route, navigate } = useAppRouter();
   const focusMode = useUiStore((s) => s.focusMode);
   const [hasUnsavedCanvasChanges, setHasUnsavedCanvasChanges] = useState(false);
+  const applicationTitle = useMemo(() => {
+    if (route.kind !== "application") return null;
+    const match = loadApplicationsFromLocalStorage().find(
+      (application) => application.id === route.appId
+    );
+    return match?.name ?? route.appId;
+  }, [route]);
   const pageTitle =
     route.kind === "canvas-design"
       ? "Canvas Design"
       : route.kind === "application"
-        ? `Application: ${route.appId}`
+        ? applicationTitle ?? route.appId
         : "Extender Tablet Interface";
 
   useEffect(() => {
