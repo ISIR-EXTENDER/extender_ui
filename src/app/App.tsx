@@ -17,6 +17,7 @@ export default function App() {
   const { stopAndZero } = useTeleopPublisher();
   const { route, navigate } = useAppRouter();
   const focusMode = useUiStore((s) => s.focusMode);
+  const setIsEditorMode = useUiStore((s) => s.setIsEditorMode);
   const [hasUnsavedCanvasChanges, setHasUnsavedCanvasChanges] = useState(false);
   const applicationTitle = useMemo(() => {
     if (route.kind !== "application") return null;
@@ -37,6 +38,10 @@ export default function App() {
       setHasUnsavedCanvasChanges(false);
     }
   }, [route.kind]);
+
+  useEffect(() => {
+    setIsEditorMode(route.kind === "canvas-design" && !focusMode);
+  }, [focusMode, route.kind, setIsEditorMode]);
 
   const guardedNavigate = (nextRoute: AppRoute) => {
     const leavingCanvasDesign = route.kind === "canvas-design" && nextRoute.kind !== "canvas-design";

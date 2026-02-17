@@ -11,9 +11,11 @@ import type { CanvasRect } from "../components/layout/CanvasItem";
 import { wsClient } from "../services/wsClient";
 import {
   ActionButtonWidget,
+  CurvesWidget,
   GripperControlWidget,
   JoystickWidget,
   LoadPoseButtonWidget,
+  LogsWidget,
   MaxVelocityWidget,
   NavigationBarWidget,
   NavigationButtonWidget,
@@ -27,6 +29,7 @@ import {
   cloneWidgets,
   createWidgetFromCatalogType,
   DEFAULT_WIDGETS,
+  getDefaultDemoConfigurationByName,
   loadConfigurationsFromLocalStorage,
   persistConfigurationsToLocalStorage,
   removeConfiguration,
@@ -34,8 +37,10 @@ import {
   syncConfigurationsToFolder,
   type ButtonWidgetModel,
   type CanvasWidget,
+  type CurvesWidgetModel,
   type JoystickWidgetModel,
   type LoadPoseButtonWidgetModel,
+  type LogsWidgetModel,
   type MaxVelocityWidgetModel,
   type NavigationBarWidgetModel,
   type NavigationButtonWidgetModel,
@@ -53,6 +58,7 @@ import {
   CANVAS_PRESETS,
   DEFAULT_CANVAS_SETTINGS,
   cloneCanvasSettings,
+  getCanvasPreset,
   resolveCanvasArtboardSize,
   resolveCanvasFitScale,
   type CanvasSettings,
@@ -74,11 +80,28 @@ type ContextMenuState = {
   canvasY: number;
 };
 
+type SnapGuides = {
+  vertical: number[];
+  horizontal: number[];
+};
+
+type SnapMode = "off" | "slide" | "smart";
+
 const ENABLED_WIDGETS = WIDGET_CATALOG.filter((entry) => entry.enabled);
 const DEFAULT_ADD_WIDGET_TYPE: WidgetCatalogType =
   (ENABLED_WIDGETS[0]?.type as WidgetCatalogType | undefined) ?? "joystick";
 const TOPIC_FRESHNESS_MS = 200;
 const TOPIC_FRESHNESS_TICK_MS = 100;
+const SNAP_THRESHOLD_PX = 10;
+const SNAP_GUIDE_HIDE_DELAY_MS = 130;
+const MIN_EDITOR_ZOOM = 0.2;
+const MAX_EDITOR_ZOOM = 2.5;
+const EDITOR_ZOOM_STEP = 0.1;
+const SNAP_MODE_LABEL: Record<SnapMode, string> = {
+  off: "Off",
+  slide: "Slide",
+  smart: "Smart",
+};
 
 const readNumber = (raw: string, fallback: number) => {
   const parsed = Number(raw);
@@ -86,6 +109,8 @@ const readNumber = (raw: string, fallback: number) => {
 };
 
 const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
+const clampEditorZoom = (value: number) =>
+  Math.max(MIN_EDITOR_ZOOM, Math.min(MAX_EDITOR_ZOOM, Math.round(value * 100) / 100));
 const HEX_COLOR_PATTERN = /^#(?:[0-9a-fA-F]{3}){1,2}$/;
 const toColorInputValue = (value: string, fallback = "#4a9eff") =>
   HEX_COLOR_PATTERN.test(value.trim()) ? value : fallback;
@@ -160,6 +185,10 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
     width: 0,
     height: 0,
   });
+  const [editorZoom, setEditorZoom] = useState<number>(1);
+  const [snapMode, setSnapMode] = useState<SnapMode>("smart");
+  const [snapGuides, setSnapGuides] = useState<SnapGuides>({ vertical: [], horizontal: [] });
+  const snapGuideTimeoutRef = useRef<number | null>(null);
 
   const magnitude = useMemo(() => Math.min(1, Math.hypot(joyX, joyY)), [joyX, joyY]);
 
@@ -211,6 +240,14 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
     }, TOPIC_FRESHNESS_TICK_MS);
 
     return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (snapGuideTimeoutRef.current !== null) {
+        window.clearTimeout(snapGuideTimeoutRef.current);
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -311,10 +348,18 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
     () => resolveCanvasArtboardSize(widgets, canvasSettings),
     [canvasSettings, widgets]
   );
+  const targetCanvasPreset = useMemo(
+    () => getCanvasPreset(canvasSettings.presetId),
+    [canvasSettings.presetId]
+  );
   const runtimeCanvasMode: RuntimeCanvasMode = focusOnly ? "fit" : "left";
-  const canvasScale = useMemo(
+  const baseCanvasScale = useMemo(
     () => resolveCanvasFitScale(runtimeCanvasMode, canvasSize, canvasViewportSize),
     [canvasSize, canvasViewportSize, runtimeCanvasMode]
+  );
+  const canvasScale = useMemo(
+    () => baseCanvasScale * (focusOnly ? 1 : editorZoom),
+    [baseCanvasScale, editorZoom, focusOnly]
   );
   const scaledCanvasSize = useMemo(
     () => ({
@@ -323,6 +368,20 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
     }),
     [canvasScale, canvasSize]
   );
+  const fitZoomForTarget = useMemo(() => {
+    if (canvasViewportSize.width <= 0 || canvasViewportSize.height <= 0) {
+      return 1;
+    }
+    const viewportPadding = 28;
+    const availableWidth = Math.max(120, canvasViewportSize.width - viewportPadding);
+    const availableHeight = Math.max(120, canvasViewportSize.height - viewportPadding);
+    const fitScale = Math.min(
+      availableWidth / targetCanvasPreset.width,
+      availableHeight / targetCanvasPreset.height
+    );
+    return clampEditorZoom(fitScale);
+  }, [canvasViewportSize, targetCanvasPreset.height, targetCanvasPreset.width]);
+  const editorZoomPercent = Math.round(editorZoom * 100);
 
   useEffect(() => {
     onDirtyChange?.(isCanvasDirty);
@@ -364,6 +423,172 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
 
   const updateWidget = (id: string, updater: (widget: CanvasWidget) => CanvasWidget) => {
     setWidgets((prev) => prev.map((widget) => (widget.id === id ? updater(widget) : widget)));
+  };
+
+  const handleWidgetRectChange = (widgetId: string, nextRect: CanvasRect) => {
+    const currentWidget = widgets.find((widget) => widget.id === widgetId);
+    if (!currentWidget) return;
+
+    const roundedRect: CanvasRect = {
+      x: Math.round(nextRect.x),
+      y: Math.round(nextRect.y),
+      w: Math.round(nextRect.w),
+      h: Math.round(nextRect.h),
+    };
+
+    if (snapMode === "off") {
+      updateWidget(widgetId, (widget) => ({ ...widget, rect: roundedRect }));
+      setSnapGuides((prev) =>
+        prev.vertical.length || prev.horizontal.length ? { vertical: [], horizontal: [] } : prev
+      );
+      return;
+    }
+
+    const isResizeOnly =
+      nextRect.x === currentWidget.rect.x &&
+      nextRect.y === currentWidget.rect.y &&
+      (nextRect.w !== currentWidget.rect.w || nextRect.h !== currentWidget.rect.h);
+
+    const candidateVertical = [0, targetCanvasPreset.width / 2, targetCanvasPreset.width];
+    const candidateHorizontal = [0, targetCanvasPreset.height / 2, targetCanvasPreset.height];
+
+    if (snapMode === "smart") {
+      for (const widget of widgets) {
+        if (widget.id === widgetId) continue;
+        candidateVertical.push(
+          widget.rect.x,
+          widget.rect.x + widget.rect.w / 2,
+          widget.rect.x + widget.rect.w
+        );
+        candidateHorizontal.push(
+          widget.rect.y,
+          widget.rect.y + widget.rect.h / 2,
+          widget.rect.y + widget.rect.h
+        );
+      }
+    }
+
+    let snappedRect: CanvasRect = roundedRect;
+
+    const guides: SnapGuides = { vertical: [], horizontal: [] };
+
+    if (isResizeOnly) {
+      const right = snappedRect.x + snappedRect.w;
+      const bottom = snappedRect.y + snappedRect.h;
+
+      let bestVerticalDiff = Number.POSITIVE_INFINITY;
+      let verticalGuide: number | null = null;
+      for (const line of candidateVertical) {
+        const diff = line - right;
+        const distance = Math.abs(diff);
+        if (distance <= SNAP_THRESHOLD_PX && distance < bestVerticalDiff) {
+          bestVerticalDiff = distance;
+          verticalGuide = line;
+        }
+      }
+
+      if (verticalGuide !== null) {
+        snappedRect = {
+          ...snappedRect,
+          w: Math.max(24, Math.round(verticalGuide - snappedRect.x)),
+        };
+        guides.vertical = [Math.round(verticalGuide)];
+      }
+
+      let bestHorizontalDiff = Number.POSITIVE_INFINITY;
+      let horizontalGuide: number | null = null;
+      for (const line of candidateHorizontal) {
+        const diff = line - bottom;
+        const distance = Math.abs(diff);
+        if (distance <= SNAP_THRESHOLD_PX && distance < bestHorizontalDiff) {
+          bestHorizontalDiff = distance;
+          horizontalGuide = line;
+        }
+      }
+
+      if (horizontalGuide !== null) {
+        snappedRect = {
+          ...snappedRect,
+          h: Math.max(24, Math.round(horizontalGuide - snappedRect.y)),
+        };
+        guides.horizontal = [Math.round(horizontalGuide)];
+      }
+    } else {
+      const verticalAnchors = [
+        { value: snappedRect.x },
+        { value: snappedRect.x + snappedRect.w / 2 },
+        { value: snappedRect.x + snappedRect.w },
+      ];
+      const horizontalAnchors = [
+        { value: snappedRect.y },
+        { value: snappedRect.y + snappedRect.h / 2 },
+        { value: snappedRect.y + snappedRect.h },
+      ];
+
+      let bestVerticalDiff = Number.POSITIVE_INFINITY;
+      let verticalDelta = 0;
+      let verticalGuide: number | null = null;
+      for (const anchor of verticalAnchors) {
+        for (const line of candidateVertical) {
+          const diff = line - anchor.value;
+          const distance = Math.abs(diff);
+          if (distance <= SNAP_THRESHOLD_PX && distance < bestVerticalDiff) {
+            bestVerticalDiff = distance;
+            verticalDelta = diff;
+            verticalGuide = line;
+          }
+        }
+      }
+
+      if (verticalGuide !== null) {
+        snappedRect = {
+          ...snappedRect,
+          x: Math.max(0, Math.round(snappedRect.x + verticalDelta)),
+        };
+        guides.vertical = [Math.round(verticalGuide)];
+      }
+
+      let bestHorizontalDiff = Number.POSITIVE_INFINITY;
+      let horizontalDelta = 0;
+      let horizontalGuide: number | null = null;
+      for (const anchor of horizontalAnchors) {
+        for (const line of candidateHorizontal) {
+          const diff = line - anchor.value;
+          const distance = Math.abs(diff);
+          if (distance <= SNAP_THRESHOLD_PX && distance < bestHorizontalDiff) {
+            bestHorizontalDiff = distance;
+            horizontalDelta = diff;
+            horizontalGuide = line;
+          }
+        }
+      }
+
+      if (horizontalGuide !== null) {
+        snappedRect = {
+          ...snappedRect,
+          y: Math.max(0, Math.round(snappedRect.y + horizontalDelta)),
+        };
+        guides.horizontal = [Math.round(horizontalGuide)];
+      }
+    }
+
+    updateWidget(widgetId, (widget) => ({ ...widget, rect: snappedRect }));
+
+    const hasGuides = guides.vertical.length > 0 || guides.horizontal.length > 0;
+    if (hasGuides) {
+      setSnapGuides(guides);
+      if (snapGuideTimeoutRef.current !== null) {
+        window.clearTimeout(snapGuideTimeoutRef.current);
+      }
+      snapGuideTimeoutRef.current = window.setTimeout(() => {
+        setSnapGuides({ vertical: [], horizontal: [] });
+      }, SNAP_GUIDE_HIDE_DELAY_MS);
+      return;
+    }
+
+    setSnapGuides((prev) =>
+      prev.vertical.length || prev.horizontal.length ? { vertical: [], horizontal: [] } : prev
+    );
   };
 
   const updateSelectedWidget = (updater: (widget: CanvasWidget) => CanvasWidget) => {
@@ -442,6 +667,12 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
     updater: (widget: StreamDisplayWidgetModel) => StreamDisplayWidgetModel
   ) => {
     updateSelectedWidget((widget) => (widget.kind === "stream-display" ? updater(widget) : widget));
+  };
+  const updateSelectedCurves = (updater: (widget: CurvesWidgetModel) => CurvesWidgetModel) => {
+    updateSelectedWidget((widget) => (widget.kind === "curves" ? updater(widget) : widget));
+  };
+  const updateSelectedLogs = (updater: (widget: LogsWidgetModel) => LogsWidgetModel) => {
+    updateSelectedWidget((widget) => (widget.kind === "logs" ? updater(widget) : widget));
   };
 
   const markWidgetPulse = (widgetId: string) => {
@@ -565,9 +796,23 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
 
   const loadDemoConfiguration = () => {
     if (!confirmDiscardUnsavedChanges("Load demo widgets")) return;
+    const requestedName = (selectedConfigName || configNameInput || "default_control").trim();
+    const demoConfiguration =
+      getDefaultDemoConfigurationByName(requestedName) ??
+      getDefaultDemoConfigurationByName("default_control");
+
+    if (demoConfiguration) {
+      setWidgets(cloneWidgets(demoConfiguration.widgets));
+      setCanvasSettings(cloneCanvasSettings(demoConfiguration.canvas));
+      setSelectedWidgetId(null);
+      setStatusMessage(`Loaded demo layout for "${demoConfiguration.name}".`);
+      return;
+    }
+
     setWidgets(cloneWidgets(DEFAULT_WIDGETS));
+    setCanvasSettings(cloneCanvasSettings(DEFAULT_CANVAS_SETTINGS));
     setSelectedWidgetId(null);
-    setStatusMessage("Loaded default demo widgets.");
+    setStatusMessage("Loaded fallback demo widgets.");
   };
 
   const upsertPose = (poses: PoseSnapshot[], pose: PoseSnapshot) => {
@@ -747,6 +992,22 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
     }
   };
 
+  const zoomOutEditorCanvas = () => {
+    setEditorZoom((prev) => clampEditorZoom(prev - EDITOR_ZOOM_STEP));
+  };
+
+  const zoomInEditorCanvas = () => {
+    setEditorZoom((prev) => clampEditorZoom(prev + EDITOR_ZOOM_STEP));
+  };
+
+  const resetEditorCanvasZoom = () => {
+    setEditorZoom(1);
+  };
+
+  const fitEditorCanvasToTarget = () => {
+    setEditorZoom(fitZoomForTarget);
+  };
+
   const handleCanvasContextMenu = (event: ReactMouseEvent<HTMLDivElement>) => {
     event.preventDefault();
 
@@ -776,7 +1037,7 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
           widget={widget}
           selected={selected}
           onSelect={() => setSelectedWidgetId(widget.id)}
-          onRectChange={(next) => updateWidget(widget.id, (current) => ({ ...current, rect: next }))}
+          onRectChange={(next) => handleWidgetRectChange(widget.id, next)}
           onLabelChange={(nextLabel) =>
             updateWidget(widget.id, (current) =>
               current.kind === "save-pose-button" ? { ...current, label: nextLabel } : current
@@ -797,7 +1058,7 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
           widget={widget}
           selected={selected}
           onSelect={() => setSelectedWidgetId(widget.id)}
-          onRectChange={(next) => updateWidget(widget.id, (current) => ({ ...current, rect: next }))}
+          onRectChange={(next) => handleWidgetRectChange(widget.id, next)}
           onLabelChange={(nextLabel) =>
             updateWidget(widget.id, (current) =>
               current.kind === "load-pose-button"
@@ -821,7 +1082,7 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
           widget={widget}
           selected={selected}
           onSelect={() => setSelectedWidgetId(widget.id)}
-          onRectChange={(next) => updateWidget(widget.id, (current) => ({ ...current, rect: next }))}
+          onRectChange={(next) => handleWidgetRectChange(widget.id, next)}
           onLabelChange={(nextLabel) =>
             updateWidget(widget.id, (current) =>
               current.kind === "navigation-button" ? { ...current, label: nextLabel } : current
@@ -840,7 +1101,7 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
           widget={widget}
           selected={selected}
           onSelect={() => setSelectedWidgetId(widget.id)}
-          onRectChange={(next) => updateWidget(widget.id, (current) => ({ ...current, rect: next }))}
+          onRectChange={(next) => handleWidgetRectChange(widget.id, next)}
           onNavigate={(screenId) => setStatusMessage(`Navigation target selected: ${screenId}`)}
         />
       );
@@ -853,7 +1114,7 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
           widget={widget}
           selected={selected}
           onSelect={() => setSelectedWidgetId(widget.id)}
-          onRectChange={(next) => updateWidget(widget.id, (current) => ({ ...current, rect: next }))}
+          onRectChange={(next) => handleWidgetRectChange(widget.id, next)}
           onTextChange={(nextText) =>
             updateWidget(widget.id, (current) =>
               current.kind === "text" ? { ...current, text: nextText } : current
@@ -870,7 +1131,7 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
           widget={widget}
           selected={selected}
           onSelect={() => setSelectedWidgetId(widget.id)}
-          onRectChange={(next) => updateWidget(widget.id, (current) => ({ ...current, rect: next }))}
+          onRectChange={(next) => handleWidgetRectChange(widget.id, next)}
           onTextChange={(nextText) =>
             updateWidget(widget.id, (current) =>
               current.kind === "textarea" ? { ...current, text: nextText } : current
@@ -887,7 +1148,7 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
           widget={widget}
           selected={selected}
           onSelect={() => setSelectedWidgetId(widget.id)}
-          onRectChange={(next) => updateWidget(widget.id, (current) => ({ ...current, rect: next }))}
+          onRectChange={(next) => handleWidgetRectChange(widget.id, next)}
           onLabelChange={(nextLabel) =>
             updateWidget(widget.id, (current) =>
               current.kind === "button" ? { ...current, label: nextLabel } : current
@@ -913,7 +1174,7 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
           widget={widget}
           selected={selected}
           onSelect={() => setSelectedWidgetId(widget.id)}
-          onRectChange={(next) => updateWidget(widget.id, (current) => ({ ...current, rect: next }))}
+          onRectChange={(next) => handleWidgetRectChange(widget.id, next)}
           onLabelChange={(nextLabel) =>
             updateWidget(widget.id, (current) =>
               current.kind === "rosbag-control" ? { ...current, label: nextLabel } : current
@@ -933,7 +1194,7 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
           widget={widget}
           selected={selected}
           onSelect={() => setSelectedWidgetId(widget.id)}
-          onRectChange={(next) => updateWidget(widget.id, (current) => ({ ...current, rect: next }))}
+          onRectChange={(next) => handleWidgetRectChange(widget.id, next)}
           onLabelChange={(nextLabel) =>
             updateWidget(widget.id, (current) =>
               current.kind === "max-velocity" ? { ...current, label: nextLabel } : current
@@ -952,7 +1213,7 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
           widget={widget}
           selected={selected}
           onSelect={() => setSelectedWidgetId(widget.id)}
-          onRectChange={(next) => updateWidget(widget.id, (current) => ({ ...current, rect: next }))}
+          onRectChange={(next) => handleWidgetRectChange(widget.id, next)}
           onLabelChange={(nextLabel) =>
             updateWidget(widget.id, (current) =>
               current.kind === "gripper-control" ? { ...current, label: nextLabel } : current
@@ -975,20 +1236,67 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
     }
 
     if (widget.kind === "stream-display") {
-      const url = widget.source === "rviz" ? rvizStreamUrl : cameraStreamUrl;
+      const url = widget.source === "camera" ? cameraStreamUrl : rvizStreamUrl;
+      const sourceStatus =
+        widget.source === "rviz"
+          ? "RViz stream"
+          : widget.source === "visualization"
+            ? "Visualization stream"
+            : "Camera stream";
       return (
         <StreamDisplayWidget
           key={widget.id}
-          widget={{ ...widget, streamUrl: url || widget.streamUrl }}
+          widget={{
+            ...widget,
+            streamUrl: url || widget.streamUrl,
+            fitMode: widget.fitMode ?? "contain",
+            showStatus: widget.showStatus ?? true,
+            showUrl: widget.showUrl ?? true,
+            overlayText: widget.overlayText ?? "stream preview",
+          }}
           selected={selected}
           onSelect={() => setSelectedWidgetId(widget.id)}
-          onRectChange={(next) => updateWidget(widget.id, (current) => ({ ...current, rect: next }))}
+          onRectChange={(next) => handleWidgetRectChange(widget.id, next)}
           onLabelChange={(nextLabel) =>
             updateWidget(widget.id, (current) =>
               current.kind === "stream-display" ? { ...current, label: nextLabel } : current
             )
           }
-          statusText={widget.source === "rviz" ? "RViz stream" : "Camera stream"}
+          statusText={sourceStatus}
+        />
+      );
+    }
+
+    if (widget.kind === "curves") {
+      return (
+        <CurvesWidget
+          key={widget.id}
+          widget={widget}
+          selected={selected}
+          onSelect={() => setSelectedWidgetId(widget.id)}
+          onRectChange={(next) => handleWidgetRectChange(widget.id, next)}
+          onLabelChange={(nextLabel) =>
+            updateWidget(widget.id, (current) =>
+              current.kind === "curves" ? { ...current, label: nextLabel } : current
+            )
+          }
+        />
+      );
+    }
+
+    if (widget.kind === "logs") {
+      return (
+        <LogsWidget
+          key={widget.id}
+          widget={widget}
+          selected={selected}
+          onSelect={() => setSelectedWidgetId(widget.id)}
+          onRectChange={(next) => handleWidgetRectChange(widget.id, next)}
+          onLabelChange={(nextLabel) =>
+            updateWidget(widget.id, (current) =>
+              current.kind === "logs" ? { ...current, label: nextLabel } : current
+            )
+          }
         />
       );
     }
@@ -1012,7 +1320,7 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
           isTopicFresh={isTopicFresh}
           selected={selected}
           onSelect={() => setSelectedWidgetId(widget.id)}
-          onRectChange={(next) => updateWidget(widget.id, (current) => ({ ...current, rect: next }))}
+          onRectChange={(next) => handleWidgetRectChange(widget.id, next)}
         />
       );
     }
@@ -1027,7 +1335,7 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
         widget={widget}
         selected={selected}
         onSelect={() => setSelectedWidgetId(widget.id)}
-        onRectChange={(next) => updateWidget(widget.id, (current) => ({ ...current, rect: next }))}
+        onRectChange={(next) => handleWidgetRectChange(widget.id, next)}
         onLabelChange={(nextLabel) =>
           updateWidget(widget.id, (current) =>
             current.kind === "joystick" ? { ...current, label: nextLabel } : current
@@ -1127,6 +1435,37 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
           </select>
         </label>
 
+        <label className="controls-field controls-config-field">
+          <span>Snap</span>
+          <select
+            className="editor-input"
+            value={snapMode}
+            onChange={(event) => setSnapMode(event.target.value as SnapMode)}
+          >
+            <option value="off">off</option>
+            <option value="slide">slide</option>
+            <option value="smart">smart</option>
+          </select>
+        </label>
+
+        <div className="controls-field controls-config-field controls-zoom-field">
+          <span>Zoom</span>
+          <div className="controls-zoom-controls">
+            <button type="button" className="tab-button" onClick={zoomOutEditorCanvas} aria-label="Zoom out canvas">
+              -
+            </button>
+            <button type="button" className="tab-button" onClick={resetEditorCanvasZoom} title="Reset zoom to 100%">
+              {editorZoomPercent}%
+            </button>
+            <button type="button" className="tab-button" onClick={zoomInEditorCanvas} aria-label="Zoom in canvas">
+              +
+            </button>
+            <button type="button" className="tab-button" onClick={fitEditorCanvasToTarget} title="Fit target slide">
+              Fit
+            </button>
+          </div>
+        </div>
+
         <button type="button" className="tab-button" onClick={() => selectedConfigName && loadConfigurationByName(selectedConfigName)}>
           Load
         </button>
@@ -1164,6 +1503,9 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
     return (
       <main className="controls-page controls-page-focus tab-accent tab-controls">
         <section className="controls-workspace">
+          <div className="controls-mode-chip controls-mode-chip-runtime">
+            Operational Preview • Grid Off
+          </div>
           <div className="controls-canvas-surface" ref={canvasSurfaceRef} onContextMenu={handleCanvasContextMenu}>
             <div className={canvasViewportClassName} ref={canvasViewportRef}>
               <div className="controls-canvas-frame" ref={canvasFrameRef} style={canvasFrameStyle}>
@@ -1217,6 +1559,34 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
                 <div className="controls-canvas-frame" ref={canvasFrameRef} style={canvasFrameStyle}>
                   <div className="controls-canvas-transform" style={canvasTransformStyle}>
                     <div className="controls-canvas" style={{ width: `${canvasSize.width}px`, height: `${canvasSize.height}px` }}>
+                      <div
+                        className="controls-canvas-target-zone"
+                        style={{
+                          width: `${targetCanvasPreset.width}px`,
+                          height: `${targetCanvasPreset.height}px`,
+                        }}
+                        aria-hidden
+                      >
+                        <div className="controls-canvas-target-label">
+                          {targetCanvasPreset.label}
+                        </div>
+                      </div>
+                      {snapGuides.vertical.map((x) => (
+                        <div
+                          key={`snap-v-${x}`}
+                          className="controls-canvas-snap-guide controls-canvas-snap-guide-vertical"
+                          style={{ left: `${x}px` }}
+                          aria-hidden
+                        />
+                      ))}
+                      {snapGuides.horizontal.map((y) => (
+                        <div
+                          key={`snap-h-${y}`}
+                          className="controls-canvas-snap-guide controls-canvas-snap-guide-horizontal"
+                          style={{ top: `${y}px` }}
+                          aria-hidden
+                        />
+                      ))}
                       {widgets.map(renderCanvasWidget)}
                     </div>
                   </div>
@@ -1251,7 +1621,7 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
               </div>
 
               <div className="controls-hint">
-                Drag widgets on the canvas to move. Right click to add at cursor.
+                Drag widgets to move. Right click to add at cursor. Snap: {SNAP_MODE_LABEL[snapMode]}. Use Zoom +/- or Fit to frame the slide.
               </div>
 
               <div className="controls-menu-list">
@@ -2067,17 +2437,86 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
                         <span>Source</span>
                         <select
                           className="editor-input"
-                          value={selectedWidget.source}
+                          value={selectedWidget.source ?? "camera"}
                           onChange={(event) =>
                             updateSelectedStreamDisplay((widget) => ({
                               ...widget,
-                              source: event.target.value === "rviz" ? "rviz" : "camera",
+                              source:
+                                event.target.value === "rviz"
+                                  ? "rviz"
+                                  : event.target.value === "visualization"
+                                    ? "visualization"
+                                    : "camera",
                             }))
                           }
                         >
                           <option value="camera">camera</option>
                           <option value="rviz">rviz</option>
+                          <option value="visualization">visualization</option>
                         </select>
+                      </label>
+                      <label className="controls-field">
+                        <span>Fit Mode</span>
+                        <select
+                          className="editor-input"
+                          value={selectedWidget.fitMode ?? "contain"}
+                          onChange={(event) =>
+                            updateSelectedStreamDisplay((widget) => ({
+                              ...widget,
+                              fitMode: event.target.value === "cover" ? "cover" : "contain",
+                            }))
+                          }
+                        >
+                          <option value="contain">contain</option>
+                          <option value="cover">cover</option>
+                        </select>
+                      </label>
+                      <div className="controls-field-row">
+                        <label className="controls-field">
+                          <span>Status Label</span>
+                          <select
+                            className="editor-input"
+                            value={(selectedWidget.showStatus ?? true) ? "visible" : "hidden"}
+                            onChange={(event) =>
+                              updateSelectedStreamDisplay((widget) => ({
+                                ...widget,
+                                showStatus: event.target.value === "visible",
+                              }))
+                            }
+                          >
+                            <option value="visible">visible</option>
+                            <option value="hidden">hidden</option>
+                          </select>
+                        </label>
+                        <label className="controls-field">
+                          <span>Stream URL Row</span>
+                          <select
+                            className="editor-input"
+                            value={(selectedWidget.showUrl ?? true) ? "visible" : "hidden"}
+                            onChange={(event) =>
+                              updateSelectedStreamDisplay((widget) => ({
+                                ...widget,
+                                showUrl: event.target.value === "visible",
+                              }))
+                            }
+                          >
+                            <option value="visible">visible</option>
+                            <option value="hidden">hidden</option>
+                          </select>
+                        </label>
+                      </div>
+                      <label className="controls-field">
+                        <span>Overlay Text</span>
+                        <input
+                          className="editor-input"
+                          value={selectedWidget.overlayText ?? "stream preview"}
+                          onChange={(event) =>
+                            updateSelectedStreamDisplay((widget) => ({
+                              ...widget,
+                              overlayText: event.target.value,
+                            }))
+                          }
+                        />
                       </label>
                       <label className="controls-field">
                         <span>Fallback Stream URL</span>
@@ -2092,6 +2531,158 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
                           }
                         />
                       </label>
+                    </>
+                  ) : selectedWidget.kind === "curves" ? (
+                    <>
+                      <div className="controls-property-title">Curves</div>
+                      <div className="controls-field-row">
+                        <label className="controls-field">
+                          <span>Sample Rate (Hz)</span>
+                          <input
+                            type="number"
+                            min={1}
+                            max={60}
+                            step={1}
+                            className="editor-input"
+                            value={selectedWidget.sampleRateHz}
+                            onChange={(event) =>
+                              updateSelectedCurves((widget) => ({
+                                ...widget,
+                                sampleRateHz: Math.max(1, Math.min(60, Math.round(readNumber(event.target.value, widget.sampleRateHz)))),
+                              }))
+                            }
+                          />
+                        </label>
+                        <label className="controls-field">
+                          <span>History (s)</span>
+                          <input
+                            type="number"
+                            min={2}
+                            max={60}
+                            step={1}
+                            className="editor-input"
+                            value={selectedWidget.historySeconds}
+                            onChange={(event) =>
+                              updateSelectedCurves((widget) => ({
+                                ...widget,
+                                historySeconds: Math.max(2, Math.min(60, Math.round(readNumber(event.target.value, widget.historySeconds)))),
+                              }))
+                            }
+                          />
+                        </label>
+                        <label className="controls-field">
+                          <span>Legend</span>
+                          <select
+                            className="editor-input"
+                            value={selectedWidget.showLegend ? "visible" : "hidden"}
+                            onChange={(event) =>
+                              updateSelectedCurves((widget) => ({
+                                ...widget,
+                                showLegend: event.target.value === "visible",
+                              }))
+                            }
+                          >
+                            <option value="visible">visible</option>
+                            <option value="hidden">hidden</option>
+                          </select>
+                        </label>
+                        <label className="controls-field">
+                          <span>TCP Speed Line</span>
+                          <select
+                            className="editor-input"
+                            value={selectedWidget.showSpeed ? "visible" : "hidden"}
+                            onChange={(event) =>
+                              updateSelectedCurves((widget) => ({
+                                ...widget,
+                                showSpeed: event.target.value === "visible",
+                              }))
+                            }
+                          >
+                            <option value="visible">visible</option>
+                            <option value="hidden">hidden</option>
+                          </select>
+                        </label>
+                      </div>
+                    </>
+                  ) : selectedWidget.kind === "logs" ? (
+                    <>
+                      <div className="controls-property-title">Logs</div>
+                      <div className="controls-field-row">
+                        <label className="controls-field">
+                          <span>Max Entries</span>
+                          <input
+                            type="number"
+                            min={10}
+                            max={1000}
+                            step={1}
+                            className="editor-input"
+                            value={selectedWidget.maxEntries}
+                            onChange={(event) =>
+                              updateSelectedLogs((widget) => ({
+                                ...widget,
+                                maxEntries: Math.max(10, Math.min(1000, Math.round(readNumber(event.target.value, widget.maxEntries)))),
+                              }))
+                            }
+                          />
+                        </label>
+                        <label className="controls-field">
+                          <span>Level Filter</span>
+                          <select
+                            className="editor-input"
+                            value={selectedWidget.levelFilter}
+                            onChange={(event) =>
+                              updateSelectedLogs((widget) => ({
+                                ...widget,
+                                levelFilter:
+                                  event.target.value === "info"
+                                    ? "info"
+                                    : event.target.value === "warn"
+                                      ? "warn"
+                                      : event.target.value === "error"
+                                        ? "error"
+                                        : "all",
+                              }))
+                            }
+                          >
+                            <option value="all">all</option>
+                            <option value="info">info</option>
+                            <option value="warn">warn</option>
+                            <option value="error">error</option>
+                          </select>
+                        </label>
+                        <label className="controls-field">
+                          <span>Auto Scroll</span>
+                          <select
+                            className="editor-input"
+                            value={selectedWidget.autoScroll ? "on" : "off"}
+                            onChange={(event) =>
+                              updateSelectedLogs((widget) => ({
+                                ...widget,
+                                autoScroll: event.target.value === "on",
+                              }))
+                            }
+                          >
+                            <option value="on">on</option>
+                            <option value="off">off</option>
+                          </select>
+                        </label>
+                        <label className="controls-field">
+                          <span>Timestamps</span>
+                          <select
+                            className="editor-input"
+                            value={selectedWidget.showTimestamp ? "on" : "off"}
+                            onChange={(event) =>
+                              updateSelectedLogs((widget) => ({
+                                ...widget,
+                                showTimestamp: event.target.value === "on",
+                              }))
+                            }
+                          >
+                            <option value="on">on</option>
+                            <option value="off">off</option>
+                          </select>
+                        </label>
+                      </div>
                     </>
                   ) : (
                     <>

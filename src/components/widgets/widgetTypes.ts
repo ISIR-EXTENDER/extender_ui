@@ -6,7 +6,9 @@ export type SliderDirection = "vertical" | "horizontal";
 export type WidgetIcon = "home" | "save" | "arrow-right";
 export type NavigationOrientation = "horizontal" | "vertical";
 export type TextAlign = "left" | "center" | "right";
-export type StreamSource = "camera" | "rviz";
+export type StreamSource = "camera" | "rviz" | "visualization";
+export type StreamFitMode = "contain" | "cover";
+export type LogLevelFilter = "all" | "info" | "warn" | "error";
 
 export type WidgetKind =
   | "joystick"
@@ -21,7 +23,9 @@ export type WidgetKind =
   | "rosbag-control"
   | "max-velocity"
   | "gripper-control"
-  | "stream-display";
+  | "stream-display"
+  | "curves"
+  | "logs";
 
 type WidgetBase = {
   id: string;
@@ -123,6 +127,26 @@ export type StreamDisplayWidget = WidgetBase & {
   kind: "stream-display";
   source: StreamSource;
   streamUrl: string;
+  fitMode: StreamFitMode;
+  showStatus: boolean;
+  showUrl: boolean;
+  overlayText: string;
+};
+
+export type CurvesWidget = WidgetBase & {
+  kind: "curves";
+  sampleRateHz: number;
+  historySeconds: number;
+  showLegend: boolean;
+  showSpeed: boolean;
+};
+
+export type LogsWidget = WidgetBase & {
+  kind: "logs";
+  maxEntries: number;
+  levelFilter: LogLevelFilter;
+  autoScroll: boolean;
+  showTimestamp: boolean;
 };
 
 export type CanvasWidget =
@@ -138,7 +162,9 @@ export type CanvasWidget =
   | RosbagControlWidget
   | MaxVelocityWidget
   | GripperControlWidget
-  | StreamDisplayWidget;
+  | StreamDisplayWidget
+  | CurvesWidget
+  | LogsWidget;
 
 export const DEFAULT_WIDGETS: CanvasWidget[] = [
   {

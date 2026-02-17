@@ -1,8 +1,10 @@
 import type {
   ButtonWidget,
   CanvasWidget,
+  CurvesWidget,
   GripperControlWidget,
   JoystickWidget,
+  LogsWidget,
   LoadPoseButtonWidget,
   MaxVelocityWidget,
   NavigationBarWidget,
@@ -30,6 +32,8 @@ export type WidgetCatalogType =
   | "max-velocity"
   | "gripper-control"
   | "stream-display"
+  | "curves"
+  | "logs"
   | "linear-joystick"
   | "gauge"
   | "toggle"
@@ -57,6 +61,8 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
   { type: "max-velocity", label: "Max Velocity", enabled: true, defaultSize: { w: 260, h: 90 } },
   { type: "gripper-control", label: "Gripper Control", enabled: true, defaultSize: { w: 300, h: 170 } },
   { type: "stream-display", label: "Stream Display", enabled: true, defaultSize: { w: 360, h: 260 } },
+  { type: "curves", label: "Curves", enabled: true, defaultSize: { w: 420, h: 240 } },
+  { type: "logs", label: "Logs", enabled: true, defaultSize: { w: 360, h: 220 } },
   { type: "linear-joystick", label: "Linear Joystick", enabled: false, defaultSize: { w: 250, h: 60 } },
   { type: "gauge", label: "Gauge", enabled: false, defaultSize: { w: 150, h: 150 } },
   { type: "toggle", label: "Toggle", enabled: false, defaultSize: { w: 120, h: 80 } },
@@ -242,7 +248,41 @@ export function createWidgetFromCatalogType(
       topic: "/ui/stream",
       source: "camera",
       streamUrl: "webrtc://localhost:8001/stream",
+      fitMode: "contain",
+      showStatus: true,
+      showUrl: true,
+      overlayText: "stream preview",
       rect: { x, y, w: 360, h: 260 },
+    };
+    return widget;
+  }
+
+  if (type === "curves") {
+    const widget: CurvesWidget = {
+      id: nextWidgetId(),
+      kind: "curves",
+      label: "Control Curves",
+      topic: "/ui/curves",
+      sampleRateHz: 10,
+      historySeconds: 8,
+      showLegend: true,
+      showSpeed: true,
+      rect: { x, y, w: 420, h: 240 },
+    };
+    return widget;
+  }
+
+  if (type === "logs") {
+    const widget: LogsWidget = {
+      id: nextWidgetId(),
+      kind: "logs",
+      label: "Runtime Logs",
+      topic: "/ui/logs",
+      maxEntries: 120,
+      levelFilter: "all",
+      autoScroll: true,
+      showTimestamp: true,
+      rect: { x, y, w: 360, h: 220 },
     };
     return widget;
   }

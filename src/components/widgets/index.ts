@@ -2,7 +2,9 @@ export { JoystickWidget } from "./JoystickWidget";
 export { SliderWidget } from "./SliderWidget";
 export {
   ActionButtonWidget,
+  CurvesWidget,
   GripperControlWidget,
+  LogsWidget,
   MaxVelocityWidget,
   NavigationBarWidget,
   NavigationButtonWidget,
@@ -32,7 +34,11 @@ export {
   type MaxVelocityWidget as MaxVelocityWidgetModel,
   type GripperControlWidget as GripperControlWidgetModel,
   type StreamDisplayWidget as StreamDisplayWidgetModel,
+  type CurvesWidget as CurvesWidgetModel,
+  type LogsWidget as LogsWidgetModel,
   type NavigationOrientation,
+  type StreamFitMode,
+  type LogLevelFilter,
   type StreamSource,
   type TextAlign,
   type WidgetKind,
@@ -49,6 +55,8 @@ export {
 } from "./widgetCatalog";
 export {
   cloneWidgets,
+  DEFAULT_DEMO_CONFIGURATIONS,
+  getDefaultDemoConfigurationByName,
   loadConfigurationsFromLocalStorage,
   type PoseSnapshot,
   type PoseTopicValue,

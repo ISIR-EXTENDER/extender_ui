@@ -1,3 +1,10 @@
+import {
+  ADMIN_DEMO_APP_ID,
+  ADMIN_DEMO_APP_NAME,
+  ADMIN_DEMO_HOME_SCREEN_ID,
+  ADMIN_DEMO_SCREEN_IDS,
+} from "./demoDefaults";
+
 export type ApplicationConfig = {
   id: string;
   name: string;
@@ -26,6 +33,14 @@ const uniqStrings = (values: string[]) => {
   }
   return result;
 };
+
+const createDefaultAdminApplication = (): ApplicationConfig => ({
+  id: ADMIN_DEMO_APP_ID,
+  name: ADMIN_DEMO_APP_NAME,
+  screenIds: [...ADMIN_DEMO_SCREEN_IDS],
+  homeScreenId: ADMIN_DEMO_HOME_SCREEN_ID,
+  updatedAt: new Date().toISOString(),
+});
 
 const sanitizeApplication = (value: unknown): ApplicationConfig | null => {
   if (!isRecord(value)) return null;
@@ -64,15 +79,22 @@ export const createEmptyApplication = (seed?: string): ApplicationConfig => {
 export function loadApplicationsFromLocalStorage(): ApplicationConfig[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
+    if (!raw) return [createDefaultAdminApplication()];
     const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed
+    if (!Array.isArray(parsed)) return [createDefaultAdminApplication()];
+    const sanitized = parsed
       .map(sanitizeApplication)
       .filter((item): item is ApplicationConfig => item !== null)
       .sort((a, b) => a.name.localeCompare(b.name));
+    if (!sanitized.length) return [createDefaultAdminApplication()];
+    if (sanitized.some((application) => application.id === ADMIN_DEMO_APP_ID)) {
+      return sanitized;
+    }
+    return [...sanitized, createDefaultAdminApplication()].sort((a, b) =>
+      a.name.localeCompare(b.name)
+    );
   } catch {
-    return [];
+    return [createDefaultAdminApplication()];
   }
 }
 
@@ -163,4 +185,3 @@ export async function syncApplicationsFromFolder(
 
   return merged;
 }
-

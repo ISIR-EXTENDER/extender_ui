@@ -1,10 +1,24 @@
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CanvasItem } from "../layout/CanvasItem";
 import type { CanvasRect } from "../layout/CanvasItem";
 import * as Slider from "@radix-ui/react-slider";
+import {
+  CartesianGrid,
+  Legend,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { InlineEditableText } from "./InlineEditableText";
+import { selectModeLabel, useTeleopStore } from "../../store/teleopStore";
 import type {
   ButtonWidget as ButtonWidgetModel,
+  CurvesWidget as CurvesWidgetModel,
   GripperControlWidget as GripperControlWidgetModel,
+  LogsWidget as LogsWidgetModel,
   MaxVelocityWidget as MaxVelocityWidgetModel,
   NavigationBarWidget as NavigationBarWidgetModel,
   NavigationButtonWidget as NavigationButtonWidgetModel,
@@ -80,6 +94,16 @@ type StreamDisplayWidgetProps = BaseWidgetProps & {
   widget: StreamDisplayWidgetModel;
   onLabelChange: (nextLabel: string) => void;
   statusText: string;
+};
+
+type CurvesWidgetProps = BaseWidgetProps & {
+  widget: CurvesWidgetModel;
+  onLabelChange: (nextLabel: string) => void;
+};
+
+type LogsWidgetProps = BaseWidgetProps & {
+  widget: LogsWidgetModel;
+  onLabelChange: (nextLabel: string) => void;
 };
 
 const renderIcon = (icon: WidgetIcon) => {
@@ -447,6 +471,13 @@ export function StreamDisplayWidget({
   onLabelChange,
   statusText,
 }: StreamDisplayWidgetProps) {
+  const sourceLabel =
+    widget.source === "rviz"
+      ? "RViz"
+      : widget.source === "visualization"
+        ? "Visualization"
+        : "Camera";
+
   return (
     <CanvasItem
       x={widget.rect.x}
@@ -460,13 +491,257 @@ export function StreamDisplayWidget({
       className="controls-stream-item"
     >
       <div className="controls-stream-widget">
-        <div className="controls-stream-title">
-          <InlineEditableText value={widget.label} onCommit={onLabelChange} className="controls-inline-label" />
+        <div className="controls-stream-title-row">
+          <div className="controls-stream-title">
+            <InlineEditableText value={widget.label} onCommit={onLabelChange} className="controls-inline-label" />
+          </div>
+          <span className="controls-stream-source">{sourceLabel}</span>
         </div>
-        <div className="controls-stream-view">
-          <div className="stream-placeholder">{statusText}</div>
+        <div className={`controls-stream-view controls-stream-fit-${widget.fitMode}`}>
+          {/* TODO: Replace placeholder with backend-driven media (WebRTC/MJPEG/topic bridge). */}
+          <div className="stream-placeholder">
+            {widget.overlayText?.trim() || statusText}
+          </div>
         </div>
-        <div className="controls-stream-url">{widget.streamUrl || "no stream url"}</div>
+        {widget.showStatus ? <div className="controls-stream-status">{statusText}</div> : null}
+        {widget.showUrl ? <div className="controls-stream-url">{widget.streamUrl || "no stream url"}</div> : null}
+      </div>
+    </CanvasItem>
+  );
+}
+
+type CurveSample = {
+  tick: number;
+  joyX: number;
+  joyY: number;
+  rotX: number;
+  rotY: number;
+  z: number;
+  rz: number;
+  tcpSpeed: number;
+};
+
+export function CurvesWidget({
+  widget,
+  selected,
+  onSelect,
+  onRectChange,
+  onLabelChange,
+}: CurvesWidgetProps) {
+  const joyX = useTeleopStore((s) => s.joyX);
+  const joyY = useTeleopStore((s) => s.joyY);
+  const rotX = useTeleopStore((s) => s.rotX);
+  const rotY = useTeleopStore((s) => s.rotY);
+  const z = useTeleopStore((s) => s.z);
+  const rz = useTeleopStore((s) => s.rz);
+  const tcpSpeed = useTeleopStore((s) => s.wsState?.tcp_speed_mps ?? 0);
+  const [samples, setSamples] = useState<CurveSample[]>([]);
+
+  useEffect(() => {
+    const sampleRate = Math.max(1, Math.round(widget.sampleRateHz));
+    const historySeconds = Math.max(2, Math.round(widget.historySeconds));
+    const maxPoints = Math.max(16, sampleRate * historySeconds);
+    const intervalMs = Math.round(1000 / sampleRate);
+
+    // TODO: Replace client-side sampled values with backend telemetry history stream.
+    const timer = window.setInterval(() => {
+      setSamples((prev) => {
+        const next: CurveSample = {
+          tick: Date.now(),
+          joyX,
+          joyY,
+          rotX,
+          rotY,
+          z,
+          rz,
+          tcpSpeed,
+        };
+        const merged = [...prev, next];
+        if (merged.length <= maxPoints) return merged;
+        return merged.slice(merged.length - maxPoints);
+      });
+    }, intervalMs);
+
+    return () => window.clearInterval(timer);
+  }, [joyX, joyY, rotX, rotY, z, rz, tcpSpeed, widget.historySeconds, widget.sampleRateHz]);
+
+  const chartData = useMemo(
+    () =>
+      samples.map((sample) => ({
+        ...sample,
+        t: new Date(sample.tick).toLocaleTimeString([], {
+          minute: "2-digit",
+          second: "2-digit",
+        }),
+      })),
+    [samples]
+  );
+
+  return (
+    <CanvasItem
+      x={widget.rect.x}
+      y={widget.rect.y}
+      w={widget.rect.w}
+      h={widget.rect.h}
+      onChange={onRectChange}
+      onSelect={onSelect}
+      selected={selected}
+      minSize={{ w: 280, h: 180 }}
+      className="controls-curves-item"
+    >
+      <div className="controls-curves-widget">
+        <div className="controls-curves-header">
+          <div className="controls-curves-title">
+            <InlineEditableText value={widget.label} onCommit={onLabelChange} className="controls-inline-label" />
+          </div>
+          <div className="controls-curves-meta">
+            {widget.sampleRateHz}Hz / {widget.historySeconds}s
+          </div>
+        </div>
+        <div className="controls-curves-chart">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={chartData}>
+              <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+              <XAxis dataKey="t" minTickGap={18} />
+              <YAxis yAxisId="axes" domain={[-1, 1]} width={24} />
+              <YAxis yAxisId="speed" orientation="right" domain={[0, 2]} width={24} />
+              <Tooltip />
+              {widget.showLegend ? <Legend /> : null}
+              <Line yAxisId="axes" type="monotone" dataKey="joyX" name="joyX" dot={false} stroke="#60a5fa" strokeWidth={2} />
+              <Line yAxisId="axes" type="monotone" dataKey="joyY" name="joyY" dot={false} stroke="#93c5fd" strokeWidth={2} />
+              <Line yAxisId="axes" type="monotone" dataKey="rotX" name="rotX" dot={false} stroke="#f59e0b" strokeWidth={2} />
+              <Line yAxisId="axes" type="monotone" dataKey="rotY" name="rotY" dot={false} stroke="#fb7185" strokeWidth={2} />
+              <Line yAxisId="axes" type="monotone" dataKey="z" name="z" dot={false} stroke="#34d399" strokeWidth={2} />
+              <Line yAxisId="axes" type="monotone" dataKey="rz" name="rz" dot={false} stroke="#22d3ee" strokeWidth={2} />
+              {widget.showSpeed ? (
+                <Line
+                  yAxisId="speed"
+                  type="monotone"
+                  dataKey="tcpSpeed"
+                  name="tcpSpeed"
+                  dot={false}
+                  stroke="#facc15"
+                  strokeWidth={2}
+                />
+              ) : null}
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+    </CanvasItem>
+  );
+}
+
+type LogEntry = {
+  id: string;
+  ts: number;
+  level: "info" | "warn" | "error";
+  message: string;
+};
+
+export function LogsWidget({
+  widget,
+  selected,
+  onSelect,
+  onRectChange,
+  onLabelChange,
+}: LogsWidgetProps) {
+  const wsStatus = useTeleopStore((s) => s.wsStatus);
+  const wsState = useTeleopStore((s) => s.wsState);
+  const mode = useTeleopStore((s) => s.mode);
+  const [entries, setEntries] = useState<LogEntry[]>([]);
+  const listRef = useRef<HTMLDivElement | null>(null);
+
+  const appendEntry = (level: LogEntry["level"], message: string) => {
+    const maxEntries = Math.max(10, Math.round(widget.maxEntries));
+    setEntries((prev) => {
+      const entry: LogEntry = {
+        id: `log-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
+        ts: Date.now(),
+        level,
+        message,
+      };
+      const merged = [...prev, entry];
+      if (merged.length <= maxEntries) return merged;
+      return merged.slice(merged.length - maxEntries);
+    });
+  };
+
+  useEffect(() => {
+    const level = wsStatus === "connected" ? "info" : wsStatus === "connecting" ? "warn" : "error";
+    appendEntry(level, `WebSocket status: ${wsStatus}`);
+  }, [wsStatus]);
+
+  useEffect(() => {
+    appendEntry("info", `Control mode: ${selectModeLabel(mode)}`);
+  }, [mode]);
+
+  useEffect(() => {
+    // TODO: Replace synthetic heartbeat events with backend log stream subscription.
+    const timer = window.setInterval(() => {
+      const cmdAge = wsState?.cmd_age_ms ?? null;
+      if (cmdAge != null && cmdAge > 300) {
+        appendEntry("warn", `Command latency elevated (${cmdAge}ms)`);
+        return;
+      }
+      appendEntry("info", "Runtime heartbeat");
+    }, 3000);
+
+    return () => window.clearInterval(timer);
+  }, [wsState?.cmd_age_ms]);
+
+  const filteredEntries = useMemo(() => {
+    if (widget.levelFilter === "all") return entries;
+    return entries.filter((entry) => entry.level === widget.levelFilter);
+  }, [entries, widget.levelFilter]);
+
+  useEffect(() => {
+    if (!widget.autoScroll) return;
+    if (!listRef.current) return;
+    listRef.current.scrollTop = listRef.current.scrollHeight;
+  }, [filteredEntries, widget.autoScroll]);
+
+  return (
+    <CanvasItem
+      x={widget.rect.x}
+      y={widget.rect.y}
+      w={widget.rect.w}
+      h={widget.rect.h}
+      onChange={onRectChange}
+      onSelect={onSelect}
+      selected={selected}
+      minSize={{ w: 260, h: 170 }}
+      className="controls-logs-item"
+    >
+      <div className="controls-logs-widget">
+        <div className="controls-logs-header">
+          <div className="controls-logs-title">
+            <InlineEditableText value={widget.label} onCommit={onLabelChange} className="controls-inline-label" />
+          </div>
+          <div className="controls-logs-meta">{filteredEntries.length} entries</div>
+        </div>
+        <div className="controls-logs-list" ref={listRef}>
+          {filteredEntries.length ? (
+            filteredEntries.map((entry) => (
+              <div key={entry.id} className={`controls-log-entry is-${entry.level}`}>
+                {widget.showTimestamp ? (
+                  <span className="controls-log-ts">
+                    {new Date(entry.ts).toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      second: "2-digit",
+                    })}
+                  </span>
+                ) : null}
+                <span className="controls-log-level">{entry.level.toUpperCase()}</span>
+                <span className="controls-log-message">{entry.message}</span>
+              </div>
+            ))
+          ) : (
+            <div className="controls-log-empty">No logs for current filter.</div>
+          )}
+        </div>
+        <div className="controls-logs-footer">filter: {widget.levelFilter}</div>
       </div>
     </CanvasItem>
   );

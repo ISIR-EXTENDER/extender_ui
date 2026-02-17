@@ -27,6 +27,35 @@ const INTERACTIVE_TARGET_SELECTOR =
 const BUTTON_DRAG_TARGET_SELECTOR = "button, a, [role='button']";
 const EXPLICIT_INTERACTIVE_SELECTOR = "[data-canvas-interactive='true']";
 
+const parseScaleFromTransform = (transform: string) => {
+  if (!transform || transform === "none") return 1;
+
+  if (transform.startsWith("matrix3d(") && transform.endsWith(")")) {
+    const values = transform
+      .slice("matrix3d(".length, -1)
+      .split(",")
+      .map((value) => Number(value.trim()));
+    const scaleX = values[0];
+    if (Number.isFinite(scaleX) && scaleX !== 0) return Math.abs(scaleX);
+    return 1;
+  }
+
+  if (transform.startsWith("matrix(") && transform.endsWith(")")) {
+    const values = transform
+      .slice("matrix(".length, -1)
+      .split(",")
+      .map((value) => Number(value.trim()));
+    const a = values[0];
+    const b = values[1];
+    if (Number.isFinite(a) && Number.isFinite(b)) {
+      const scale = Math.hypot(a, b);
+      if (scale > 0) return scale;
+    }
+  }
+
+  return 1;
+};
+
 export function CanvasItem({
   x,
   y,
@@ -55,6 +84,20 @@ export function CanvasItem({
     return target.closest(EXPLICIT_INTERACTIVE_SELECTOR) !== null;
   };
 
+  const resolvePointerScale = (startNode: HTMLElement) => {
+    let node: HTMLElement | null = startNode;
+    let scale = 1;
+
+    while (node) {
+      const transform = window.getComputedStyle(node).transform;
+      scale *= parseScaleFromTransform(transform);
+      node = node.parentElement;
+    }
+
+    if (!Number.isFinite(scale) || scale <= 0) return 1;
+    return scale;
+  };
+
   const startInteraction = useCallback(
     (event: ReactPointerEvent, mode: "move" | "resize") => {
       if (!onChange) return;
@@ -65,6 +108,7 @@ export function CanvasItem({
       const startPointerX = event.clientX;
       const startPointerY = event.clientY;
       const startRect: CanvasRect = { x, y, w, h };
+      const pointerScale = resolvePointerScale(event.currentTarget as HTMLElement);
 
       const previousCursor = document.body.style.cursor;
       const previousUserSelect = document.body.style.userSelect;
@@ -72,8 +116,8 @@ export function CanvasItem({
       document.body.style.cursor = mode === "move" ? "grabbing" : "nwse-resize";
 
       const onPointerMove = (moveEvent: PointerEvent) => {
-        const dx = Math.round(moveEvent.clientX - startPointerX);
-        const dy = Math.round(moveEvent.clientY - startPointerY);
+        const dx = Math.round((moveEvent.clientX - startPointerX) / pointerScale);
+        const dy = Math.round((moveEvent.clientY - startPointerY) / pointerScale);
 
         if (mode === "move") {
           onChange({

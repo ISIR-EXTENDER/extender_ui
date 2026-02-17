@@ -92,9 +92,27 @@ body,
 
 .header-main {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 0.75rem;
+}
+
+.header-title-area {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.header-feedback {
+  display: flex;
+  align-items: center;
+  gap: 0.42rem;
+  flex-wrap: wrap;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--panel) 88%, #0f172a 12%);
+  padding: 0.3rem 0.4rem;
 }
 
 .header-actions {
@@ -118,14 +136,15 @@ body,
   display: inline-flex;
   align-items: center;
   gap: 0.42rem;
-  border-radius: 999px;
+  border-radius: 8px;
   border: 1px solid var(--border);
-  background: var(--panel);
-  color: var(--text);
-  padding: 0.33rem 0.68rem;
-  font-size: 0.8rem;
-  font-weight: 700;
+  background: color-mix(in srgb, var(--panel) 82%, #020617 18%);
+  color: color-mix(in srgb, var(--text) 92%, #cbd5e1 8%);
+  padding: 0.26rem 0.56rem;
+  font-size: 0.76rem;
+  font-weight: 800;
   line-height: 1;
+  letter-spacing: 0.01em;
 }
 
 .connection-led {
@@ -194,9 +213,51 @@ body,
   color: #f8fafc;
 }
 
+.header-button.focus.is-active {
+  background: color-mix(in srgb, #0ea5e9 70%, #0f172a 30%);
+  border-color: #67e8f9;
+  box-shadow: 0 0 0 1px color-mix(in srgb, #67e8f9 40%, transparent);
+}
+
+.mode-status {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  padding: 0.26rem 0.56rem;
+  font-size: 0.76rem;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+  letter-spacing: 0.01em;
+}
+
+.mode-status-editor {
+  border-color: color-mix(in srgb, #38bdf8 60%, var(--border));
+  background: color-mix(in srgb, #0ea5e9 35%, var(--panel) 65%);
+  color: #e0f2fe;
+}
+
+.mode-status-runtime {
+  border-color: color-mix(in srgb, #334155 70%, var(--border));
+  background: color-mix(in srgb, #0f172a 28%, var(--panel) 72%);
+  color: color-mix(in srgb, var(--text) 92%, #cbd5e1 8%);
+}
+
 .header h1 {
   margin: 0;
   font-size: 1.6rem;
+}
+
+@media (max-width: 1080px) {
+  .header-main {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .header-actions {
+    justify-content: flex-start;
+  }
 }
 
 .status {
@@ -284,6 +345,8 @@ body,
   border: 1px solid var(--border);
   background: color-mix(in srgb, var(--panel) 85%, var(--accent) 15%);
   padding: 0.45rem 0.6rem;
+  backdrop-filter: blur(4px);
+  box-shadow: 0 10px 24px color-mix(in srgb, #000 16%, transparent);
 }
 
 .controls-config-row {
@@ -300,6 +363,21 @@ body,
   min-width: 170px;
   max-width: none;
   flex: 0 0 200px;
+}
+
+.controls-zoom-field {
+  flex: 0 0 260px;
+}
+
+.controls-zoom-controls {
+  display: grid;
+  grid-template-columns: 40px minmax(68px, 1fr) 40px 1fr;
+  gap: 0.35rem;
+}
+
+.controls-zoom-controls .tab-button {
+  width: 100%;
+  min-width: 0;
 }
 
 .controls-status-message {
@@ -346,17 +424,76 @@ body,
   height: 100%;
   min-height: 0;
   overflow: auto;
-  background-color: color-mix(in srgb, var(--panel-2) 86%, var(--accent) 14%);
+  background-color: color-mix(in srgb, var(--panel-2) 84%, #020617 16%);
   background-image:
-    radial-gradient(circle at 15% 15%, color-mix(in srgb, var(--accent) 22%, transparent) 0%, transparent 34%),
-    radial-gradient(circle at 85% 82%, color-mix(in srgb, var(--accent-strong) 18%, transparent) 0%, transparent 30%),
-    linear-gradient(0deg, color-mix(in srgb, var(--panel) 86%, transparent), color-mix(in srgb, var(--panel) 86%, transparent)),
-    repeating-linear-gradient(0deg, color-mix(in srgb, var(--border) 55%, transparent) 0 1px, transparent 1px 24px),
-    repeating-linear-gradient(90deg, color-mix(in srgb, var(--border) 55%, transparent) 0 1px, transparent 1px 24px);
+    radial-gradient(circle at 12% 16%, color-mix(in srgb, var(--accent) 20%, transparent) 0%, transparent 36%),
+    radial-gradient(circle at 87% 81%, color-mix(in srgb, #38bdf8 16%, transparent) 0%, transparent 34%),
+    linear-gradient(
+      0deg,
+      color-mix(in srgb, #020617 50%, transparent),
+      color-mix(in srgb, #020617 50%, transparent)
+    );
+}
+
+.controls-design-page .controls-canvas-surface {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+  background-image:
+    radial-gradient(circle at 12% 16%, color-mix(in srgb, var(--accent) 26%, transparent) 0%, transparent 36%),
+    radial-gradient(circle at 87% 81%, color-mix(in srgb, #38bdf8 20%, transparent) 0%, transparent 34%),
+    linear-gradient(
+      0deg,
+      color-mix(in srgb, #020617 40%, transparent),
+      color-mix(in srgb, #020617 40%, transparent)
+    ),
+    repeating-linear-gradient(
+      0deg,
+      color-mix(in srgb, var(--accent-strong) 16%, transparent) 0 1px,
+      transparent 1px 24px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--accent-strong) 16%, transparent) 0 1px,
+      transparent 1px 24px
+    );
+}
+
+.controls-page-focus .controls-canvas-surface,
+.application-runtime-page .controls-canvas-surface {
+  border-color: color-mix(in srgb, #334155 45%, var(--border));
+  background-image:
+    radial-gradient(circle at 12% 16%, color-mix(in srgb, var(--accent) 17%, transparent) 0%, transparent 38%),
+    radial-gradient(circle at 87% 81%, color-mix(in srgb, #38bdf8 14%, transparent) 0%, transparent 36%),
+    linear-gradient(
+      0deg,
+      color-mix(in srgb, #020617 56%, transparent),
+      color-mix(in srgb, #020617 56%, transparent)
+    );
 }
 
 .controls-page-focus .controls-canvas-surface {
   min-height: 0;
+}
+
+.controls-mode-chip {
+  position: absolute;
+  top: 0.95rem;
+  left: 1rem;
+  z-index: 7;
+  pointer-events: none;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  padding: 0.24rem 0.62rem;
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  backdrop-filter: blur(4px);
+  box-shadow: 0 8px 18px color-mix(in srgb, #000 22%, transparent);
+}
+
+.controls-mode-chip-runtime {
+  border-color: color-mix(in srgb, #334155 72%, var(--border));
+  background: color-mix(in srgb, #020617 72%, var(--panel) 28%);
+  color: #cbd5e1;
 }
 
 .controls-canvas-viewport {
@@ -398,8 +535,64 @@ body,
   min-height: 420px;
 }
 
+.controls-canvas-target-zone {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  z-index: 0;
+  border-radius: 14px;
+  border: 2px solid color-mix(in srgb, var(--accent-strong) 70%, #f8fafc 30%);
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  box-shadow:
+    0 0 0 9999px color-mix(in srgb, #020617 42%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, #e2e8f0 18%, transparent),
+    inset 0 -40px 80px color-mix(in srgb, #0f172a 22%, transparent);
+}
+
+.controls-canvas-target-label {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent-strong) 55%, var(--border));
+  background: color-mix(in srgb, #0f172a 68%, var(--panel) 32%);
+  color: #e0f2fe;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  padding: 0.16rem 0.46rem;
+}
+
+.controls-canvas-snap-guide {
+  position: absolute;
+  pointer-events: none;
+  z-index: 1;
+  background: color-mix(in srgb, var(--accent-strong) 76%, #f8fafc 24%);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent-strong) 28%, transparent);
+}
+
+.controls-canvas-snap-guide-vertical {
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  transform: translateX(-1px);
+}
+
+.controls-canvas-snap-guide-horizontal {
+  left: 0;
+  right: 0;
+  height: 2px;
+  transform: translateY(-1px);
+}
+
 .controls-page-focus .controls-canvas {
   margin: 0;
+}
+
+.controls-page-focus .controls-canvas-target-zone,
+.application-runtime-page .controls-canvas-target-zone {
+  display: none;
 }
 
 .controls-aside {
@@ -667,6 +860,21 @@ body,
   border-style: solid;
 }
 
+.controls-design-page .canvas-item::after {
+  border-width: 2px;
+}
+
+.controls-design-page .canvas-item:hover::after {
+  opacity: 0.85;
+}
+
+.controls-design-page .canvas-item.is-selected::after {
+  border-color: color-mix(in srgb, var(--accent-strong) 78%, #fff 22%);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--accent-strong) 55%, transparent),
+    0 0 0 4px color-mix(in srgb, var(--accent-strong) 18%, transparent);
+}
+
 .canvas-item-drag-handle,
 .canvas-item-resize-handle {
   position: absolute;
@@ -686,6 +894,11 @@ body,
 .canvas-item.is-selected .canvas-item-resize-handle {
   opacity: 1;
   pointer-events: auto;
+}
+
+.controls-design-page .canvas-item.is-selected .canvas-item-drag-handle,
+.controls-design-page .canvas-item.is-selected .canvas-item-resize-handle {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-strong) 38%, transparent);
 }
 
 .canvas-item-drag-handle {
@@ -1082,13 +1295,17 @@ body,
 
 .controls-max-velocity-item,
 .controls-gripper-item,
-.controls-stream-item {
+.controls-stream-item,
+.controls-curves-item,
+.controls-logs-item {
   border-radius: 10px;
 }
 
 .controls-max-velocity-widget,
 .controls-gripper-widget,
-.controls-stream-widget {
+.controls-stream-widget,
+.controls-curves-widget,
+.controls-logs-widget {
   width: 100%;
   height: 100%;
   border-radius: 10px;
@@ -1135,13 +1352,32 @@ body,
 .controls-stream-widget {
   padding: 0.5rem 0.65rem;
   display: grid;
-  grid-template-rows: auto 1fr auto;
+  grid-template-rows: auto 1fr auto auto;
   gap: 0.45rem;
 }
 
 .controls-stream-title {
   font-weight: 800;
   font-size: 0.92rem;
+}
+
+.controls-stream-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.controls-stream-source {
+  font-size: 0.68rem;
+  font-weight: 700;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--border));
+  background: color-mix(in srgb, var(--panel) 75%, var(--accent) 25%);
+  color: var(--muted);
+  padding: 0.12rem 0.42rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 
 .controls-stream-view {
@@ -1154,12 +1390,139 @@ body,
   overflow: hidden;
 }
 
+.controls-stream-fit-contain .stream-placeholder {
+  width: calc(100% - 1rem);
+  height: calc(100% - 1rem);
+}
+
+.controls-stream-fit-cover .stream-placeholder {
+  width: calc(100% + 1rem);
+  height: calc(100% + 1rem);
+}
+
+.controls-stream-status {
+  font-size: 0.72rem;
+  color: color-mix(in srgb, var(--text) 70%, var(--muted));
+}
+
 .controls-stream-url {
   font-size: 0.72rem;
   color: var(--muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.controls-curves-widget {
+  padding: 0.5rem 0.65rem;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 0.45rem;
+}
+
+.controls-curves-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.controls-curves-title {
+  font-weight: 800;
+  font-size: 0.92rem;
+}
+
+.controls-curves-meta {
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.controls-curves-chart {
+  min-height: 120px;
+}
+
+.controls-logs-widget {
+  padding: 0.5rem 0.65rem;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 0.45rem;
+}
+
+.controls-logs-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.controls-logs-title {
+  font-weight: 800;
+  font-size: 0.92rem;
+}
+
+.controls-logs-meta {
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.controls-logs-list {
+  min-height: 80px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--panel) 90%, var(--accent) 10%);
+  padding: 0.35rem 0.45rem;
+  overflow: auto;
+  display: grid;
+  gap: 0.28rem;
+  align-content: start;
+}
+
+.controls-log-entry {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  gap: 0.38rem;
+  align-items: center;
+  font-size: 0.72rem;
+  color: var(--text);
+}
+
+.controls-log-entry.is-info .controls-log-level {
+  color: #60a5fa;
+}
+
+.controls-log-entry.is-warn .controls-log-level {
+  color: #f59e0b;
+}
+
+.controls-log-entry.is-error .controls-log-level {
+  color: #ef4444;
+}
+
+.controls-log-ts {
+  color: var(--muted);
+  font-family: "JetBrains Mono", "Fira Code", "SFMono-Regular", Consolas, monospace;
+}
+
+.controls-log-level {
+  font-weight: 800;
+}
+
+.controls-log-message {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.controls-log-empty {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.controls-logs-footer {
+  font-size: 0.72rem;
+  color: var(--muted);
+  text-transform: lowercase;
 }
 
 .builder-home-layout {

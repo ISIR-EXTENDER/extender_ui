@@ -40,27 +40,57 @@ export function TopBar({
     return { level: "error", label: "Backend off" };
   }, [everConnected, wsStatus]);
 
+  const modeIndicator = useMemo(() => {
+    if (!isCanvasDesign) {
+      return {
+        level: "runtime" as const,
+        label: "Operational Mode",
+      };
+    }
+
+    if (focusMode) {
+      return {
+        level: "runtime" as const,
+        label: "Operational Preview",
+      };
+    }
+
+    return {
+      level: "editor" as const,
+      label: "Screen Builder",
+    };
+  }, [focusMode, isCanvasDesign]);
+
   return (
     <header className="header">
       <div className="header-main">
-        <h1>{pageTitle || "Extender Tablet Interface"}</h1>
-        <div className="header-actions">
-          <div className={`connection-status connection-status-${connectionIndicator.level}`}>
-            <span className="connection-led" aria-hidden />
-            <span>{connectionIndicator.label}</span>
+        <div className="header-title-area">
+          <h1>{pageTitle || "Extender Tablet Interface"}</h1>
+          <div className="header-feedback" role="status" aria-live="polite">
+            <div className={`mode-status mode-status-${modeIndicator.level}`}>
+              <span>{modeIndicator.label}</span>
+            </div>
+            <div className={`connection-status connection-status-${connectionIndicator.level}`}>
+              <span className="connection-led" aria-hidden />
+              <span>{connectionIndicator.label}</span>
+            </div>
           </div>
+        </div>
+        <div className="header-actions">
           {isCanvasDesign ? (
             <Button
               className="focus"
               type="button"
               onClick={() => setFocusMode(!focusMode)}
             >
-              {focusMode ? "Exit Preview" : "Preview"}
+              {focusMode ? "Exit Preview" : "Enter Preview"}
             </Button>
           ) : null}
-          <Button className="focus" type="button" onClick={onOpenCanvasDesign}>
-            Screen Builder
-          </Button>
+          {!isCanvasDesign ? (
+            <Button className="focus" type="button" onClick={onOpenCanvasDesign}>
+              Screen Builder
+            </Button>
+          ) : null}
           <Button className="home" type="button" onClick={onHome}>
             Home
           </Button>

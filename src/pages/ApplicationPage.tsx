@@ -4,9 +4,11 @@ import { loadApplicationsFromLocalStorage } from "../app/applications";
 import type { CanvasRect } from "../components/layout/CanvasItem";
 import {
   ActionButtonWidget,
+  CurvesWidget,
   GripperControlWidget,
   JoystickWidget,
   LoadPoseButtonWidget,
+  LogsWidget,
   MaxVelocityWidget,
   NavigationBarWidget,
   NavigationButtonWidget,
@@ -438,16 +440,55 @@ export function ApplicationPage({
     }
 
     if (widget.kind === "stream-display") {
-      const url = widget.source === "rviz" ? rvizStreamUrl : cameraStreamUrl;
+      const url = widget.source === "camera" ? cameraStreamUrl : rvizStreamUrl;
+      const sourceStatus =
+        widget.source === "rviz"
+          ? "RViz stream"
+          : widget.source === "visualization"
+            ? "Visualization stream"
+            : "Camera stream";
       return (
         <StreamDisplayWidget
           key={widget.id}
-          widget={{ ...widget, streamUrl: url || widget.streamUrl }}
+          widget={{
+            ...widget,
+            streamUrl: url || widget.streamUrl,
+            fitMode: widget.fitMode ?? "contain",
+            showStatus: widget.showStatus ?? true,
+            showUrl: widget.showUrl ?? true,
+            overlayText: widget.overlayText ?? "stream preview",
+          }}
           selected={false}
           onSelect={() => {}}
           onRectChange={NOOP_RECT_CHANGE}
           onLabelChange={NOOP_TEXT_CHANGE}
-          statusText={widget.source === "rviz" ? "RViz stream" : "Camera stream"}
+          statusText={sourceStatus}
+        />
+      );
+    }
+
+    if (widget.kind === "curves") {
+      return (
+        <CurvesWidget
+          key={widget.id}
+          widget={widget}
+          selected={false}
+          onSelect={() => {}}
+          onRectChange={NOOP_RECT_CHANGE}
+          onLabelChange={NOOP_TEXT_CHANGE}
+        />
+      );
+    }
+
+    if (widget.kind === "logs") {
+      return (
+        <LogsWidget
+          key={widget.id}
+          widget={widget}
+          selected={false}
+          onSelect={() => {}}
+          onRectChange={NOOP_RECT_CHANGE}
+          onLabelChange={NOOP_TEXT_CHANGE}
         />
       );
     }
