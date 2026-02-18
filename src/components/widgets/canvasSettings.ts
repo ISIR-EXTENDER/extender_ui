@@ -1,6 +1,6 @@
 import type { CanvasWidget } from "./widgetTypes";
 
-export type CanvasPresetId = "hd" | "tablet" | "full-hd" | "local-screen";
+export type CanvasPresetId = "native-1024x600" | "hd" | "tablet" | "full-hd" | "local-screen";
 export type RuntimeCanvasMode = "left" | "center" | "fit";
 
 export type CanvasSettings = {
@@ -16,6 +16,7 @@ export type CanvasPreset = {
 };
 
 export const CANVAS_PRESETS: CanvasPreset[] = [
+  { id: "native-1024x600", label: "Native Tablet (1024x600)", width: 1024, height: 600 },
   { id: "hd", label: "HD (1280x720)", width: 1280, height: 720 },
   { id: "tablet", label: "Tablet (1280x800)", width: 1280, height: 800 },
   { id: "full-hd", label: "Full HD (1920x1080)", width: 1920, height: 1080 },
@@ -34,7 +35,11 @@ const CANVAS_WIDGET_EDGE_PADDING = 24;
 export const cloneCanvasSettings = (settings: CanvasSettings): CanvasSettings => ({ ...settings });
 
 const isCanvasPresetId = (value: unknown): value is CanvasPresetId =>
-  value === "hd" || value === "tablet" || value === "full-hd" || value === "local-screen";
+  value === "native-1024x600" ||
+  value === "hd" ||
+  value === "tablet" ||
+  value === "full-hd" ||
+  value === "local-screen";
 
 const isRuntimeCanvasMode = (value: unknown): value is RuntimeCanvasMode =>
   value === "left" || value === "center" || value === "fit";

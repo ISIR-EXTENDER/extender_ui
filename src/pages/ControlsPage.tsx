@@ -68,6 +68,10 @@ import {
 } from "../components/widgets";
 import { useTeleopStore } from "../store/teleopStore";
 import { useUiStore } from "../store/uiStore";
+import {
+  resizeWidgetsForPresetTransition,
+  resolvePendingResizeSourcePreset,
+} from "./controls/canvasPresetResizing";
 
 type ControlsPageProps = {
   focusOnly?: boolean;
@@ -87,6 +91,10 @@ type SnapGuides = {
 };
 
 type SnapMode = "off" | "slide" | "smart";
+type CanvasDesignerSnapshot = {
+  widgets: CanvasWidget[];
+  canvas: CanvasSettings;
+};
 
 const ENABLED_WIDGETS = WIDGET_CATALOG.filter((entry) => entry.enabled);
 const DEFAULT_ADD_WIDGET_TYPE: WidgetCatalogType =
@@ -98,10 +106,41 @@ const SNAP_GUIDE_HIDE_DELAY_MS = 130;
 const MIN_EDITOR_ZOOM = 0.2;
 const MAX_EDITOR_ZOOM = 2.5;
 const EDITOR_ZOOM_STEP = 0.1;
+const HISTORY_LIMIT = 120;
 const SNAP_MODE_LABEL: Record<SnapMode, string> = {
   off: "Off",
   slide: "Slide",
   smart: "Smart",
+};
+
+const readDetectedDisplaySize = () => {
+  if (typeof window === "undefined") {
+    return { width: 0, height: 0 };
+  }
+  const width = window.screen?.width ?? window.innerWidth;
+  const height = window.screen?.height ?? window.innerHeight;
+  return {
+    width: Math.max(0, Math.round(width)),
+    height: Math.max(0, Math.round(height)),
+  };
+};
+
+const pickClosestCanvasPreset = (width: number, height: number) => {
+  if (width <= 0 || height <= 0) return CANVAS_PRESETS[0];
+  const targetAspect = width / height;
+  const targetArea = width * height;
+
+  return CANVAS_PRESETS.reduce((best, preset) => {
+    const bestAspectDiff = Math.abs(best.width / best.height - targetAspect);
+    const presetAspectDiff = Math.abs(preset.width / preset.height - targetAspect);
+    if (presetAspectDiff < bestAspectDiff - 0.00001) return preset;
+    if (Math.abs(presetAspectDiff - bestAspectDiff) <= 0.00001) {
+      const bestAreaDiff = Math.abs(best.width * best.height - targetArea);
+      const presetAreaDiff = Math.abs(preset.width * preset.height - targetArea);
+      if (presetAreaDiff < bestAreaDiff) return preset;
+    }
+    return best;
+  }, CANVAS_PRESETS[0]);
 };
 
 const readNumber = (raw: string, fallback: number) => {
@@ -116,6 +155,13 @@ const HEX_COLOR_PATTERN = /^#(?:[0-9a-fA-F]{3}){1,2}$/;
 const toColorInputValue = (value: string, fallback = "#4a9eff") =>
   HEX_COLOR_PATTERN.test(value.trim()) ? value : fallback;
 const clampSignedUnit = (value: number) => Math.max(-1, Math.min(1, value));
+const createCanvasSnapshot = (
+  widgets: CanvasWidget[],
+  canvasSettings: CanvasSettings
+): CanvasDesignerSnapshot => ({
+  widgets: cloneWidgets(widgets),
+  canvas: cloneCanvasSettings(canvasSettings),
+});
 const isTypingTarget = (target: EventTarget | null) => {
   if (!(target instanceof HTMLElement)) return false;
   return (
@@ -186,10 +232,17 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
     width: 0,
     height: 0,
   });
+  const [detectedDisplaySize, setDetectedDisplaySize] = useState(() => readDetectedDisplaySize());
+  const [pendingResizeSourcePresetId, setPendingResizeSourcePresetId] = useState<CanvasSettings["presetId"] | null>(null);
   const [editorZoom, setEditorZoom] = useState<number>(1);
   const [snapMode, setSnapMode] = useState<SnapMode>("smart");
   const [snapGuides, setSnapGuides] = useState<SnapGuides>({ vertical: [], horizontal: [] });
   const snapGuideTimeoutRef = useRef<number | null>(null);
+  const undoStackRef = useRef<CanvasDesignerSnapshot[]>([]);
+  const redoStackRef = useRef<CanvasDesignerSnapshot[]>([]);
+  const committedSnapshotRef = useRef<CanvasDesignerSnapshot | null>(null);
+  const committedSignatureRef = useRef<{ widget: string; canvas: string } | null>(null);
+  const isApplyingHistoryRef = useRef(false);
 
   const magnitude = useMemo(() => Math.min(1, Math.hypot(joyX, joyY)), [joyX, joyY]);
 
@@ -234,6 +287,15 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
 
     return () => observer.disconnect();
   }, [focusOnly]);
+
+  useEffect(() => {
+    const updateDisplaySize = () => {
+      setDetectedDisplaySize(readDetectedDisplaySize());
+    };
+    updateDisplaySize();
+    window.addEventListener("resize", updateDisplaySize);
+    return () => window.removeEventListener("resize", updateDisplaySize);
+  }, []);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -353,6 +415,45 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
     () => getCanvasPreset(canvasSettings.presetId),
     [canvasSettings.presetId]
   );
+  const recommendedDisplayPreset = useMemo(
+    () => pickClosestCanvasPreset(detectedDisplaySize.width, detectedDisplaySize.height),
+    [detectedDisplaySize.height, detectedDisplaySize.width]
+  );
+  const displayFitScaleForCanvas = useMemo(() => {
+    if (detectedDisplaySize.width <= 0 || detectedDisplaySize.height <= 0) return 1;
+    return Math.min(
+      detectedDisplaySize.width / targetCanvasPreset.width,
+      detectedDisplaySize.height / targetCanvasPreset.height
+    );
+  }, [detectedDisplaySize.height, detectedDisplaySize.width, targetCanvasPreset.height, targetCanvasPreset.width]);
+  const canvasResolutionHint = useMemo(() => {
+    const canvasLabel = `${targetCanvasPreset.width}x${targetCanvasPreset.height}`;
+    if (detectedDisplaySize.width <= 0 || detectedDisplaySize.height <= 0) {
+      return `Canvas ${canvasLabel}.`;
+    }
+    const displayLabel = `${detectedDisplaySize.width}x${detectedDisplaySize.height}`;
+    const scalePercent = Math.round(displayFitScaleForCanvas * 100);
+    if (Math.abs(displayFitScaleForCanvas - 1) <= 0.01) {
+      return `Display ${displayLabel}. Canvas ${canvasLabel} is pixel-perfect (1:1).`;
+    }
+    const scalingHint =
+      displayFitScaleForCanvas < 1
+        ? `Display ${displayLabel}. Canvas ${canvasLabel} scales down to ${scalePercent}% (can look blurry).`
+        : `Display ${displayLabel}. Canvas ${canvasLabel} scales up to ${scalePercent}%.`;
+    if (recommendedDisplayPreset.id === canvasSettings.presetId) {
+      return scalingHint;
+    }
+    return `${scalingHint} Recommended: ${recommendedDisplayPreset.label}.`;
+  }, [
+    canvasSettings.presetId,
+    detectedDisplaySize.height,
+    detectedDisplaySize.width,
+    displayFitScaleForCanvas,
+    recommendedDisplayPreset.id,
+    recommendedDisplayPreset.label,
+    targetCanvasPreset.height,
+    targetCanvasPreset.width,
+  ]);
   const runtimeCanvasMode: RuntimeCanvasMode = focusOnly ? "fit" : "left";
   const baseCanvasScale = useMemo(
     () => resolveCanvasFitScale(runtimeCanvasMode, canvasSize, canvasViewportSize),
@@ -383,6 +484,42 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
     return clampEditorZoom(fitScale);
   }, [canvasViewportSize, targetCanvasPreset.height, targetCanvasPreset.width]);
   const editorZoomPercent = Math.round(editorZoom * 100);
+
+  useEffect(() => {
+    const currentSignature = {
+      widget: widgetSignature,
+      canvas: canvasSettingsSignature,
+    };
+    const currentSnapshot = createCanvasSnapshot(widgets, canvasSettings);
+
+    if (!committedSnapshotRef.current || !committedSignatureRef.current) {
+      committedSnapshotRef.current = currentSnapshot;
+      committedSignatureRef.current = currentSignature;
+      return;
+    }
+
+    if (
+      committedSignatureRef.current.widget === currentSignature.widget &&
+      committedSignatureRef.current.canvas === currentSignature.canvas
+    ) {
+      return;
+    }
+
+    if (isApplyingHistoryRef.current) {
+      isApplyingHistoryRef.current = false;
+      committedSnapshotRef.current = currentSnapshot;
+      committedSignatureRef.current = currentSignature;
+      return;
+    }
+
+    undoStackRef.current.push(committedSnapshotRef.current);
+    if (undoStackRef.current.length > HISTORY_LIMIT) {
+      undoStackRef.current.shift();
+    }
+    redoStackRef.current = [];
+    committedSnapshotRef.current = currentSnapshot;
+    committedSignatureRef.current = currentSignature;
+  }, [canvasSettings, canvasSettingsSignature, widgetSignature, widgets]);
 
   useEffect(() => {
     onDirtyChange?.(isCanvasDirty);
@@ -421,6 +558,64 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
       setPendingNavBarScreenId(available[0]);
     }
   }, [availableScreenIds, pendingNavBarScreenId, selectedWidget]);
+
+  const applyHistorySnapshot = (snapshot: CanvasDesignerSnapshot) => {
+    isApplyingHistoryRef.current = true;
+    setWidgets(cloneWidgets(snapshot.widgets));
+    setCanvasSettings(cloneCanvasSettings(snapshot.canvas));
+    setPendingResizeSourcePresetId(null);
+    setSelectedWidgetId((current) => {
+      if (current && snapshot.widgets.some((widget) => widget.id === current)) {
+        return current;
+      }
+      return snapshot.widgets[0]?.id ?? null;
+    });
+  };
+
+  const undoCanvasChange = () => {
+    const previousSnapshot = undoStackRef.current.pop();
+    if (!previousSnapshot) {
+      setStatusMessage("Nothing to undo.");
+      return;
+    }
+    redoStackRef.current.push(createCanvasSnapshot(widgets, canvasSettings));
+    applyHistorySnapshot(previousSnapshot);
+    setStatusMessage("Undo applied.");
+  };
+
+  const redoCanvasChange = () => {
+    const nextSnapshot = redoStackRef.current.pop();
+    if (!nextSnapshot) {
+      setStatusMessage("Nothing to redo.");
+      return;
+    }
+    undoStackRef.current.push(createCanvasSnapshot(widgets, canvasSettings));
+    applyHistorySnapshot(nextSnapshot);
+    setStatusMessage("Redo applied.");
+  };
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (isTypingTarget(event.target)) return;
+      const modifierPressed = event.ctrlKey || event.metaKey;
+      if (!modifierPressed) return;
+
+      const key = event.key.toLowerCase();
+      const wantsUndo = key === "z" && !event.shiftKey;
+      const wantsRedo = key === "y" || (key === "z" && event.shiftKey);
+      if (!wantsUndo && !wantsRedo) return;
+
+      event.preventDefault();
+      if (wantsUndo) {
+        undoCanvasChange();
+        return;
+      }
+      redoCanvasChange();
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [redoCanvasChange, undoCanvasChange]);
 
   const updateWidget = (id: string, updater: (widget: CanvasWidget) => CanvasWidget) => {
     setWidgets((prev) => prev.map((widget) => (widget.id === id ? updater(widget) : widget)));
@@ -677,10 +872,9 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
   };
 
   const markWidgetPulse = (widgetId: string) => {
-    const now = Date.now();
     setWidgetPulseMap((prev) => ({
       ...prev,
-      [widgetId]: now,
+      [widgetId]: Date.now(),
     }));
   };
 
@@ -694,7 +888,7 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
 
     const widget = createWidgetFromCatalogType(type, x, y);
     if (!widget) {
-      setStatusMessage(`Widget type \"${type}\" is not implemented yet.`);
+      setStatusMessage(`Widget type "${type}" is not implemented yet.`);
       return;
     }
 
@@ -708,6 +902,7 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
       setSelectedConfigName("");
       setConfigNameInput("");
       setCanvasSettings(cloneCanvasSettings(DEFAULT_CANVAS_SETTINGS));
+      setPendingResizeSourcePresetId(null);
       setStatusMessage("No screen selected.");
       return;
     }
@@ -732,6 +927,7 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
     if (!confirmDiscardUnsavedChanges("Clear the canvas")) return;
     setWidgets([]);
     setSelectedWidgetId(null);
+    setPendingResizeSourcePresetId(null);
     setStatusMessage("Canvas cleared.");
   };
 
@@ -747,6 +943,7 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
     const loadedWidgets = cloneWidgets(configuration.widgets);
     setWidgets(loadedWidgets);
     setCanvasSettings(cloneCanvasSettings(configuration.canvas));
+    setPendingResizeSourcePresetId(null);
     setSelectedWidgetId(null);
     setSelectedConfigName(name);
     setConfigNameInput(name);
@@ -755,7 +952,7 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
       widgetSignature: JSON.stringify(loadedWidgets),
       canvasSignature: JSON.stringify(configuration.canvas),
     });
-    setStatusMessage(`Loaded \"${name}\".`);
+    setStatusMessage(`Loaded "${name}".`);
   };
 
   const saveCurrentConfiguration = () => {
@@ -773,7 +970,7 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
       widgetSignature,
       canvasSignature: canvasSettingsSignature,
     });
-    setStatusMessage(`Saved \"${name}\".`);
+    setStatusMessage(`Saved "${name}".`);
   };
 
   const deleteSelectedConfiguration = () => {
@@ -783,7 +980,7 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
     }
 
     setConfigurations((prev) => removeConfiguration(prev, selectedConfigName));
-    setStatusMessage(`Deleted \"${selectedConfigName}\".`);
+    setStatusMessage(`Deleted "${selectedConfigName}".`);
     if (savedBaseline.name === selectedConfigName) {
       setSavedBaseline({
         name: "",
@@ -805,6 +1002,7 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
     if (demoConfiguration) {
       setWidgets(cloneWidgets(demoConfiguration.widgets));
       setCanvasSettings(cloneCanvasSettings(demoConfiguration.canvas));
+      setPendingResizeSourcePresetId(null);
       setSelectedWidgetId(null);
       setStatusMessage(`Loaded demo layout for "${demoConfiguration.name}".`);
       return;
@@ -812,6 +1010,7 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
 
     setWidgets(cloneWidgets(DEFAULT_WIDGETS));
     setCanvasSettings(cloneCanvasSettings(DEFAULT_CANVAS_SETTINGS));
+    setPendingResizeSourcePresetId(null);
     setSelectedWidgetId(null);
     setStatusMessage("Loaded fallback demo widgets.");
   };
@@ -876,7 +1075,7 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
             }
       )
     );
-    setStatusMessage(`Pose \"${poseName}\" saved for screen \"${selectedConfigName}\".`);
+    setStatusMessage(`Pose "${poseName}" saved for screen "${selectedConfigName}".`);
   };
 
   const loadPoseByName = (poseName: string) => {
@@ -892,7 +1091,7 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
 
     const pose = configuration.poses.find((item) => item.name === poseName);
     if (!pose) {
-      setStatusMessage(`Pose \"${poseName}\" not found.`);
+      setStatusMessage(`Pose "${poseName}" not found.`);
       return;
     }
 
@@ -926,8 +1125,8 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
     }
 
     if (touchedWidgetIds.length) {
-      const now = Date.now();
       setWidgetPulseMap((prev) => {
+        const now = Date.now();
         const next = { ...prev };
         for (const widgetId of touchedWidgetIds) {
           next[widgetId] = now;
@@ -936,7 +1135,7 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
       });
     }
 
-    setStatusMessage(`Pose \"${pose.name}\" loaded.`);
+    setStatusMessage(`Pose "${pose.name}" loaded.`);
   };
 
   const addSelectedScreenToNavigationBar = () => {
@@ -1007,6 +1206,78 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
 
   const fitEditorCanvasToTarget = () => {
     setEditorZoom(fitZoomForTarget);
+  };
+
+  const applyCanvasPreset = (nextPresetId: CanvasSettings["presetId"]) => {
+    const previousPreset = getCanvasPreset(canvasSettings.presetId);
+    const nextPreset = getCanvasPreset(nextPresetId);
+    if (previousPreset.id === nextPreset.id) {
+      return {
+        changed: false,
+        widgetCount: widgets.length,
+        previousPreset,
+        nextPreset,
+      };
+    }
+
+    const widgetCount = widgets.length;
+    setCanvasSettings((prev) => ({
+      ...prev,
+      presetId: nextPreset.id,
+    }));
+    setPendingResizeSourcePresetId((current) =>
+      resolvePendingResizeSourcePreset(
+        current,
+        previousPreset.id,
+        nextPreset.id,
+        widgetCount > 0
+      )
+    );
+
+    return {
+      changed: true,
+      widgetCount,
+      previousPreset,
+      nextPreset,
+    };
+  };
+
+  const resizeWidgetsToCurrentPreset = () => {
+    if (!widgets.length) {
+      setPendingResizeSourcePresetId(null);
+      setStatusMessage("No widgets to resize.");
+      return;
+    }
+    const sourcePresetId = pendingResizeSourcePresetId;
+    if (!sourcePresetId || sourcePresetId === canvasSettings.presetId) {
+      setStatusMessage("No pending canvas preset change to resize from.");
+      return;
+    }
+
+    const { resizedWidgets, resizedCount, fromPreset, toPreset } = resizeWidgetsForPresetTransition(
+      widgets,
+      sourcePresetId,
+      canvasSettings.presetId
+    );
+    setWidgets(resizedWidgets);
+    setPendingResizeSourcePresetId(null);
+    setStatusMessage(
+      `Resized ${resizedCount} widget(s) from ${fromPreset.label} to ${toPreset.label}.`
+    );
+  };
+
+  const matchCanvasToDetectedDisplay = () => {
+    if (recommendedDisplayPreset.id === canvasSettings.presetId) {
+      setStatusMessage(
+        `Canvas already matches ${recommendedDisplayPreset.label} for display ${detectedDisplaySize.width}x${detectedDisplaySize.height}.`
+      );
+      return;
+    }
+    const result = applyCanvasPreset(recommendedDisplayPreset.id);
+    const resizeHint = result.widgetCount > 0 ? ' Use "Resize Widgets" to scale layout.' : "";
+    setStatusMessage(
+      `Canvas set to ${recommendedDisplayPreset.label} for display ${detectedDisplaySize.width}x${detectedDisplaySize.height}.${resizeHint}`
+    );
   };
 
   const handleCanvasContextMenu = (event: ReactMouseEvent<HTMLDivElement>) => {
@@ -1420,12 +1691,15 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
           <select
             className="editor-input"
             value={canvasSettings.presetId}
-            onChange={(event) =>
-              setCanvasSettings((prev) => ({
-                ...prev,
-                presetId: event.target.value as CanvasSettings["presetId"],
-              }))
-            }
+            onChange={(event) => {
+              const nextPresetId = event.target.value as CanvasSettings["presetId"];
+              const result = applyCanvasPreset(nextPresetId);
+              if (!result.changed) return;
+              const resizeHint = result.widgetCount > 0 ? ' Use "Resize Widgets" to scale layout.' : "";
+              setStatusMessage(
+                `Canvas size changed to ${result.nextPreset.label}.${resizeHint}`
+              );
+            }}
           >
             {CANVAS_PRESETS.map((preset) => (
               <option key={preset.id} value={preset.id}>
@@ -1434,6 +1708,31 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
             ))}
           </select>
         </label>
+        <button
+          type="button"
+          className="tab-button"
+          onClick={resizeWidgetsToCurrentPreset}
+          disabled={
+            !pendingResizeSourcePresetId ||
+            pendingResizeSourcePresetId === canvasSettings.presetId ||
+            !widgets.length
+          }
+          title={
+            pendingResizeSourcePresetId
+              ? `Resize from ${getCanvasPreset(pendingResizeSourcePresetId).label} to ${targetCanvasPreset.label}`
+              : "Resize widgets after changing canvas size"
+          }
+        >
+          Resize Widgets
+        </button>
+        <button
+          type="button"
+          className="tab-button"
+          onClick={matchCanvasToDetectedDisplay}
+          title={`Detected display: ${detectedDisplaySize.width}x${detectedDisplaySize.height}`}
+        >
+          Match Display
+        </button>
 
         <label className="controls-field controls-config-field">
           <span>Runtime Layout</span>
@@ -1513,7 +1812,10 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
           Sync From Folder
         </button>
       </div>
-      {statusMessage ? <div className="controls-status-message">{statusMessage}</div> : null}
+      <div className="controls-status-message">
+        {statusMessage ? <div>{statusMessage}</div> : null}
+        <div className="controls-status-hint">{canvasResolutionHint}</div>
+      </div>
     </div>
   );
 

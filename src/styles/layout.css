@@ -384,6 +384,12 @@ body,
   margin-top: 0.55rem;
   font-size: 0.82rem;
   color: var(--muted);
+  display: grid;
+  gap: 0.2rem;
+}
+
+.controls-status-hint {
+  color: color-mix(in srgb, var(--muted) 88%, var(--text) 12%);
 }
 
 .controls-shell {
