@@ -72,6 +72,7 @@ import {
   resizeWidgetsForPresetTransition,
   resolvePendingResizeSourcePreset,
 } from "./controls/canvasPresetResizing";
+import { useCanvasHistory } from "./controls/useCanvasHistory";
 
 type ControlsPageProps = {
   focusOnly?: boolean;
@@ -91,10 +92,6 @@ type SnapGuides = {
 };
 
 type SnapMode = "off" | "slide" | "smart";
-type CanvasDesignerSnapshot = {
-  widgets: CanvasWidget[];
-  canvas: CanvasSettings;
-};
 
 const ENABLED_WIDGETS = WIDGET_CATALOG.filter((entry) => entry.enabled);
 const DEFAULT_ADD_WIDGET_TYPE: WidgetCatalogType =
@@ -106,7 +103,6 @@ const SNAP_GUIDE_HIDE_DELAY_MS = 130;
 const MIN_EDITOR_ZOOM = 0.2;
 const MAX_EDITOR_ZOOM = 2.5;
 const EDITOR_ZOOM_STEP = 0.1;
-const HISTORY_LIMIT = 120;
 const SNAP_MODE_LABEL: Record<SnapMode, string> = {
   off: "Off",
   slide: "Slide",
@@ -155,13 +151,6 @@ const HEX_COLOR_PATTERN = /^#(?:[0-9a-fA-F]{3}){1,2}$/;
 const toColorInputValue = (value: string, fallback = "#4a9eff") =>
   HEX_COLOR_PATTERN.test(value.trim()) ? value : fallback;
 const clampSignedUnit = (value: number) => Math.max(-1, Math.min(1, value));
-const createCanvasSnapshot = (
-  widgets: CanvasWidget[],
-  canvasSettings: CanvasSettings
-): CanvasDesignerSnapshot => ({
-  widgets: cloneWidgets(widgets),
-  canvas: cloneCanvasSettings(canvasSettings),
-});
 const isTypingTarget = (target: EventTarget | null) => {
   if (!(target instanceof HTMLElement)) return false;
   return (
@@ -238,11 +227,6 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
   const [snapMode, setSnapMode] = useState<SnapMode>("smart");
   const [snapGuides, setSnapGuides] = useState<SnapGuides>({ vertical: [], horizontal: [] });
   const snapGuideTimeoutRef = useRef<number | null>(null);
-  const undoStackRef = useRef<CanvasDesignerSnapshot[]>([]);
-  const redoStackRef = useRef<CanvasDesignerSnapshot[]>([]);
-  const committedSnapshotRef = useRef<CanvasDesignerSnapshot | null>(null);
-  const committedSignatureRef = useRef<{ widget: string; canvas: string } | null>(null);
-  const isApplyingHistoryRef = useRef(false);
 
   const magnitude = useMemo(() => Math.min(1, Math.hypot(joyX, joyY)), [joyX, joyY]);
 
@@ -485,41 +469,16 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
   }, [canvasViewportSize, targetCanvasPreset.height, targetCanvasPreset.width]);
   const editorZoomPercent = Math.round(editorZoom * 100);
 
-  useEffect(() => {
-    const currentSignature = {
-      widget: widgetSignature,
-      canvas: canvasSettingsSignature,
-    };
-    const currentSnapshot = createCanvasSnapshot(widgets, canvasSettings);
-
-    if (!committedSnapshotRef.current || !committedSignatureRef.current) {
-      committedSnapshotRef.current = currentSnapshot;
-      committedSignatureRef.current = currentSignature;
-      return;
-    }
-
-    if (
-      committedSignatureRef.current.widget === currentSignature.widget &&
-      committedSignatureRef.current.canvas === currentSignature.canvas
-    ) {
-      return;
-    }
-
-    if (isApplyingHistoryRef.current) {
-      isApplyingHistoryRef.current = false;
-      committedSnapshotRef.current = currentSnapshot;
-      committedSignatureRef.current = currentSignature;
-      return;
-    }
-
-    undoStackRef.current.push(committedSnapshotRef.current);
-    if (undoStackRef.current.length > HISTORY_LIMIT) {
-      undoStackRef.current.shift();
-    }
-    redoStackRef.current = [];
-    committedSnapshotRef.current = currentSnapshot;
-    committedSignatureRef.current = currentSignature;
-  }, [canvasSettings, canvasSettingsSignature, widgetSignature, widgets]);
+  useCanvasHistory({
+    widgets,
+    canvasSettings,
+    setWidgets,
+    setCanvasSettings,
+    setSelectedWidgetId,
+    isTypingTarget,
+    setStatusMessage,
+    onSnapshotApplied: () => setPendingResizeSourcePresetId(null),
+  });
 
   useEffect(() => {
     onDirtyChange?.(isCanvasDirty);
@@ -558,64 +517,6 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
       setPendingNavBarScreenId(available[0]);
     }
   }, [availableScreenIds, pendingNavBarScreenId, selectedWidget]);
-
-  const applyHistorySnapshot = (snapshot: CanvasDesignerSnapshot) => {
-    isApplyingHistoryRef.current = true;
-    setWidgets(cloneWidgets(snapshot.widgets));
-    setCanvasSettings(cloneCanvasSettings(snapshot.canvas));
-    setPendingResizeSourcePresetId(null);
-    setSelectedWidgetId((current) => {
-      if (current && snapshot.widgets.some((widget) => widget.id === current)) {
-        return current;
-      }
-      return snapshot.widgets[0]?.id ?? null;
-    });
-  };
-
-  const undoCanvasChange = () => {
-    const previousSnapshot = undoStackRef.current.pop();
-    if (!previousSnapshot) {
-      setStatusMessage("Nothing to undo.");
-      return;
-    }
-    redoStackRef.current.push(createCanvasSnapshot(widgets, canvasSettings));
-    applyHistorySnapshot(previousSnapshot);
-    setStatusMessage("Undo applied.");
-  };
-
-  const redoCanvasChange = () => {
-    const nextSnapshot = redoStackRef.current.pop();
-    if (!nextSnapshot) {
-      setStatusMessage("Nothing to redo.");
-      return;
-    }
-    undoStackRef.current.push(createCanvasSnapshot(widgets, canvasSettings));
-    applyHistorySnapshot(nextSnapshot);
-    setStatusMessage("Redo applied.");
-  };
-
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (isTypingTarget(event.target)) return;
-      const modifierPressed = event.ctrlKey || event.metaKey;
-      if (!modifierPressed) return;
-
-      const key = event.key.toLowerCase();
-      const wantsUndo = key === "z" && !event.shiftKey;
-      const wantsRedo = key === "y" || (key === "z" && event.shiftKey);
-      if (!wantsUndo && !wantsRedo) return;
-
-      event.preventDefault();
-      if (wantsUndo) {
-        undoCanvasChange();
-        return;
-      }
-      redoCanvasChange();
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [redoCanvasChange, undoCanvasChange]);
 
   const updateWidget = (id: string, updater: (widget: CanvasWidget) => CanvasWidget) => {
     setWidgets((prev) => prev.map((widget) => (widget.id === id ? updater(widget) : widget)));
