@@ -47,6 +47,8 @@ const clampSignedUnit = (value: number) => Math.max(-1, Math.min(1, value));
 
 const NOOP_RECT_CHANGE: (next: CanvasRect) => void = () => {};
 const NOOP_TEXT_CHANGE: (next: string) => void = () => {};
+const toScreenClassToken = (screenId: string) =>
+  screenId.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-");
 
 export function ApplicationPage({
   applicationId,
@@ -567,6 +569,9 @@ export function ApplicationPage({
     transformOrigin: "top left",
   };
   const showRuntimeScreenTabs = (activeApplication?.screenIds.length ?? 0) > 1;
+  const activeScreenClassName = activeScreenId
+    ? `application-runtime-screen-${toScreenClassToken(activeScreenId)}`
+    : "";
 
   if (!activeApplication) {
     return (
@@ -593,7 +598,9 @@ export function ApplicationPage({
   }
 
   return (
-    <main className="controls-page tab-accent tab-controls application-runtime-page">
+    <main
+      className={`controls-page tab-accent tab-controls application-runtime-page ${activeScreenClassName}`.trim()}
+    >
       <section className="controls-workspace">
         <div className="controls-canvas-zone application-runtime-canvas-zone">
           {showRuntimeScreenTabs ? (

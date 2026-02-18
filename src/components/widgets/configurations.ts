@@ -27,9 +27,9 @@ export type WidgetConfiguration = {
 };
 
 const STORAGE_KEY = "extender.controls.widget-configurations.v1";
-const DEMO_UPDATED_AT = "2026-02-17T00:00:00.000Z";
+const DEMO_UPDATED_AT = "2026-02-18T00:00:00.000Z";
 const DEMO_CANVAS_SETTINGS: CanvasSettings = {
-  presetId: "tablet",
+  presetId: "hd",
   runtimeMode: "fit",
 };
 
@@ -74,61 +74,57 @@ const createDemoConfiguration = (
 
 export const DEFAULT_DEMO_CONFIGURATIONS: WidgetConfiguration[] = [
   createDemoConfiguration("default_control", [
-    createDemoWidget("ctrl-rz", "slider", 660, 10, {
+    createDemoWidget("ctrl-rz", "slider", 724, 16, {
       binding: "rz",
-      label: "RZ",
+      label: "rz",
       topic: "/cmd/joystick_rz",
       direction: "horizontal",
-      showLabel: true,
-      showTopicInfo: true,
+      showLabel: false,
+      showTopicInfo: false,
       labelAlign: "left",
-      rect: { w: 340, h: 78 },
+      rect: { w: 520, h: 92 },
     }),
-    createDemoWidget("ctrl-home", "load-pose-button", 1040, 44, {
-      label: "home",
-      icon: "home",
-      topic: "/ui/load_home",
-      poseName: "home",
-      rect: { w: 160, h: 64 },
-    }),
-    createDemoWidget("ctrl-mode", "mode-button", 860, 10, {
-      label: "Mode",
+    createDemoWidget("ctrl-mode", "mode-button", 1048, 16, {
+      label: "mode",
       topic: "/cmd/mode",
-      rect: { w: 170, h: 52 },
+      rect: { w: 200, h: 62 },
     }),
-    createDemoWidget("ctrl-z", "slider", 20, 190, {
+    createDemoWidget("ctrl-z", "slider", 24, 146, {
       binding: "z",
-      label: "Z",
+      label: "z",
       topic: "/cmd/joystick_z",
       direction: "vertical",
       showLabel: true,
-      showTopicInfo: true,
+      showTopicInfo: false,
       labelAlign: "center",
-      rect: { w: 72, h: 420 },
+      rect: { w: 96, h: 500 },
     }),
-    createDemoWidget("ctrl-translation", "joystick", 120, 170, {
+    createDemoWidget("ctrl-translation", "joystick", 144, 146, {
       binding: "joy",
-      label: "Translation",
+      label: "",
       topic: "/cmd/joystick_xy",
+      showTopicInfo: false,
       color: "#4a9eff",
-      rect: { w: 430, h: 430 },
+      rect: { w: 470, h: 470 },
     }),
-    createDemoWidget("ctrl-rotation", "joystick", 580, 170, {
+    createDemoWidget("ctrl-rotation", "joystick", 640, 146, {
       binding: "rot",
-      label: "Rotation",
+      label: "",
       topic: "/cmd/joystick_rxry",
+      showTopicInfo: false,
       color: "#f97316",
-      rect: { w: 430, h: 430 },
+      rect: { w: 470, h: 470 },
     }),
-    createDemoWidget("ctrl-gripper", "gripper-control", 1040, 170, {
-      label: "Gripper Control",
+    createDemoWidget("ctrl-gripper", "gripper-control", 24, 16, {
+      label: "",
       topic: "/cmd/gripper",
-      rect: { w: 220, h: 270 },
+      showAdvancedControls: false,
+      rect: { w: 300, h: 108 },
     }),
-    createDemoWidget("ctrl-max-velocity", "max-velocity", 580, 620, {
-      label: "Max Velocity",
+    createDemoWidget("ctrl-max-velocity", "max-velocity", 334, 620, {
+      label: "velocity",
       topic: "/cmd/max_velocity",
-      rect: { w: 360, h: 110 },
+      rect: { w: 914, h: 92 },
     }),
   ]),
 
@@ -595,6 +591,35 @@ const cloneConfiguration = (configuration: WidgetConfiguration): WidgetConfigura
   updatedAt: configuration.updatedAt,
 });
 
+const LEGACY_DEMO_UPDATED_AT = "2026-02-17T00:00:00.000Z";
+
+const migrateLegacyDefaultControl = (
+  configurations: WidgetConfiguration[]
+): WidgetConfiguration[] => {
+  const latestDefaultControl = DEFAULT_DEMO_CONFIGURATIONS.find(
+    (configuration) => configuration.name === "default_control"
+  );
+  if (!latestDefaultControl) return configurations;
+
+  return configurations.map((configuration) => {
+    if (configuration.name !== "default_control") return configuration;
+
+    const hasLegacySignature =
+      configuration.updatedAt === LEGACY_DEMO_UPDATED_AT &&
+      configuration.widgets.some((widget) => widget.id === "ctrl-home") &&
+      configuration.widgets.some(
+        (widget) => widget.id === "ctrl-gripper" && widget.kind === "gripper-control"
+      );
+
+    if (!hasLegacySignature) return configuration;
+
+    return {
+      ...cloneConfiguration(latestDefaultControl),
+      poses: clonePoses(configuration.poses),
+    };
+  });
+};
+
 const cloneDefaultConfigurations = () => DEFAULT_DEMO_CONFIGURATIONS.map(cloneConfiguration);
 
 const mergeMissingDemoConfigurations = (
@@ -690,7 +715,7 @@ export function loadConfigurationsFromLocalStorage(): WidgetConfiguration[] {
         canvas: normalizeCanvasSettings(item.canvas),
         updatedAt: typeof item.updatedAt === "string" ? item.updatedAt : new Date().toISOString(),
       }));
-    return mergeMissingDemoConfigurations(sanitized);
+    return migrateLegacyDefaultControl(mergeMissingDemoConfigurations(sanitized));
   } catch {
     return cloneDefaultConfigurations();
   }

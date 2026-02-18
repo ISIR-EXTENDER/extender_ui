@@ -55,7 +55,7 @@ export function TopBar({
       label: "Screen Builder",
     };
   }, [focusMode, isCanvasDesign]);
-  const showRuntimeCompact = isRuntimeView && !isCanvasDesign;
+  const showRuntimeCompact = (isRuntimeView && !isCanvasDesign) || (isCanvasDesign && focusMode);
 
   return (
     <header className={`header ${showRuntimeCompact ? "header-runtime" : ""}`.trim()}>

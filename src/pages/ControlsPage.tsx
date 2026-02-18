@@ -163,6 +163,8 @@ const isTypingTarget = (target: EventTarget | null) => {
 };
 const nextNavigationItemId = () =>
   `nav-item-${Date.now()}-${Math.random().toString(16).slice(2, 7)}`;
+const toScreenClassToken = (screenId: string) =>
+  screenId.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-");
 
 export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageProps) {
   const joyX = useTeleopStore((s) => s.joyX);
@@ -1532,6 +1534,9 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
     transform: `scale(${canvasScale})`,
     transformOrigin: "top left",
   };
+  const focusScreenClassName = selectedConfigName
+    ? `controls-page-focus-screen-${toScreenClassToken(selectedConfigName)}`
+    : "";
 
   const configToolbar = (
     <div className="controls-header-inline">
@@ -1694,11 +1699,10 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
 
   if (focusOnly) {
     return (
-      <main className="controls-page controls-page-focus tab-accent tab-controls">
+      <main
+        className={`controls-page controls-page-focus tab-accent tab-controls ${focusScreenClassName}`.trim()}
+      >
         <section className="controls-workspace">
-          <div className="controls-mode-chip controls-mode-chip-runtime">
-            Operational Preview • Grid Off
-          </div>
           <div className="controls-canvas-surface" ref={canvasSurfaceRef} onContextMenu={handleCanvasContextMenu}>
             <div className={canvasViewportClassName} ref={canvasViewportRef}>
               <div className="controls-canvas-frame" ref={canvasFrameRef} style={canvasFrameStyle}>
@@ -2619,6 +2623,23 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
                   ) : selectedWidget.kind === "gripper-control" ? (
                     <>
                       <div className="controls-property-title">Gripper Control</div>
+                      <label className="controls-field">
+                        <span>Layout</span>
+                        <select
+                          className="editor-input"
+                          value={(selectedWidget.showAdvancedControls ?? true) ? "full" : "compact"}
+                          onChange={(event) =>
+                            updateSelectedWidget((widget) =>
+                              widget.kind === "gripper-control"
+                                ? { ...widget, showAdvancedControls: event.target.value === "full" }
+                                : widget
+                            )
+                          }
+                        >
+                          <option value="compact">buttons only</option>
+                          <option value="full">buttons + tuning</option>
+                        </select>
+                      </label>
                       <div className="controls-hint">
                         Uses runtime speed/force values from the control state.
                       </div>

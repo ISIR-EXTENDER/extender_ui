@@ -126,6 +126,7 @@ export type MaxVelocityWidget = WidgetBase & {
 
 export type GripperControlWidget = WidgetBase & {
   kind: "gripper-control";
+  showAdvancedControls?: boolean;
 };
 
 export type StreamDisplayWidget = WidgetBase & {

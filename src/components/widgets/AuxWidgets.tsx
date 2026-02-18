@@ -445,6 +445,9 @@ export function GripperControlWidget({
   onOpen,
   onClose,
 }: GripperControlWidgetProps) {
+  const showAdvancedControls = widget.showAdvancedControls ?? true;
+  const minSize = showAdvancedControls ? { w: 240, h: 140 } : { w: 180, h: 92 };
+
   return (
     <CanvasItem
       x={widget.rect.x}
@@ -454,13 +457,15 @@ export function GripperControlWidget({
       onChange={onRectChange}
       onSelect={onSelect}
       selected={selected}
-      minSize={{ w: 240, h: 140 }}
+      minSize={minSize}
       className="controls-gripper-item"
     >
-      <div className="controls-gripper-widget">
-        <div className="controls-gripper-title">
-          <InlineEditableText value={widget.label} onCommit={onLabelChange} className="controls-inline-label" />
-        </div>
+      <div className={`controls-gripper-widget ${showAdvancedControls ? "" : "is-compact"}`.trim()}>
+        {showAdvancedControls ? (
+          <div className="controls-gripper-title">
+            <InlineEditableText value={widget.label} onCommit={onLabelChange} className="controls-inline-label" />
+          </div>
+        ) : null}
         <div className="controls-gripper-actions">
           <button type="button" className="action-button open" onClick={onOpen}>
             Open
@@ -469,38 +474,42 @@ export function GripperControlWidget({
             Close
           </button>
         </div>
-        <div className="axis-row">
-          <label>Speed: {speed.toFixed(2)}</label>
-          <Slider.Root
-            className="slider"
-            min={0}
-            max={1}
-            step={0.01}
-            value={[speed]}
-            onValueChange={(next) => onSpeedChange(next[0] ?? speed)}
-          >
-            <Slider.Track className="slider-track">
-              <Slider.Range className="slider-range" />
-            </Slider.Track>
-            <Slider.Thumb className="slider-thumb" />
-          </Slider.Root>
-        </div>
-        <div className="axis-row">
-          <label>Force: {force.toFixed(2)}</label>
-          <Slider.Root
-            className="slider"
-            min={0}
-            max={1}
-            step={0.01}
-            value={[force]}
-            onValueChange={(next) => onForceChange(next[0] ?? force)}
-          >
-            <Slider.Track className="slider-track">
-              <Slider.Range className="slider-range" />
-            </Slider.Track>
-            <Slider.Thumb className="slider-thumb" />
-          </Slider.Root>
-        </div>
+        {showAdvancedControls ? (
+          <>
+            <div className="axis-row">
+              <label>Speed: {speed.toFixed(2)}</label>
+              <Slider.Root
+                className="slider"
+                min={0}
+                max={1}
+                step={0.01}
+                value={[speed]}
+                onValueChange={(next) => onSpeedChange(next[0] ?? speed)}
+              >
+                <Slider.Track className="slider-track">
+                  <Slider.Range className="slider-range" />
+                </Slider.Track>
+                <Slider.Thumb className="slider-thumb" />
+              </Slider.Root>
+            </div>
+            <div className="axis-row">
+              <label>Force: {force.toFixed(2)}</label>
+              <Slider.Root
+                className="slider"
+                min={0}
+                max={1}
+                step={0.01}
+                value={[force]}
+                onValueChange={(next) => onForceChange(next[0] ?? force)}
+              >
+                <Slider.Track className="slider-track">
+                  <Slider.Range className="slider-range" />
+                </Slider.Track>
+                <Slider.Thumb className="slider-thumb" />
+              </Slider.Root>
+            </div>
+          </>
+        ) : null}
       </div>
     </CanvasItem>
   );

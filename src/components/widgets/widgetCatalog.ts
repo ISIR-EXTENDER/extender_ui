@@ -249,6 +249,7 @@ export function createWidgetFromCatalogType(
       kind: "gripper-control",
       label: "Gripper Control",
       topic: "/cmd/gripper",
+      showAdvancedControls: true,
       rect: { x, y, w: 300, h: 170 },
     };
     return widget;
