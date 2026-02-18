@@ -83,6 +83,7 @@ export {
   normalizeCanvasSettings,
   resolveCanvasArtboardSize,
   resolveCanvasFitScale,
+  resolveCanvasPresetSize,
   type CanvasPreset,
   type CanvasPresetId,
   type CanvasSettings,

@@ -74,6 +74,14 @@ export const resolveCanvasArtboardSize = (
   };
 };
 
+export const resolveCanvasPresetSize = (settings: CanvasSettings): { width: number; height: number } => {
+  const preset = getCanvasPreset(settings.presetId);
+  return {
+    width: preset.width,
+    height: preset.height,
+  };
+};
+
 export const resolveCanvasFitScale = (
   mode: RuntimeCanvasMode,
   canvasSize: { width: number; height: number },

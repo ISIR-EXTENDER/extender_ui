@@ -20,8 +20,8 @@ import {
   TextareaWidget,
   TextWidget,
   DEFAULT_CANVAS_SETTINGS,
-  resolveCanvasArtboardSize,
   resolveCanvasFitScale,
+  resolveCanvasPresetSize,
   cloneWidgets,
   loadConfigurationsFromLocalStorage,
   persistConfigurationsToLocalStorage,
@@ -154,8 +154,8 @@ export function ApplicationPage({
 
   const canvasSettings = activeConfiguration?.canvas ?? DEFAULT_CANVAS_SETTINGS;
   const canvasSize = useMemo(
-    () => resolveCanvasArtboardSize(widgets, canvasSettings),
-    [canvasSettings, widgets]
+    () => resolveCanvasPresetSize(canvasSettings),
+    [canvasSettings]
   );
   const canvasScale = useMemo(
     () => resolveCanvasFitScale(canvasSettings.runtimeMode, canvasSize, canvasViewportSize),
@@ -566,6 +566,7 @@ export function ApplicationPage({
     transform: `scale(${canvasScale})`,
     transformOrigin: "top left",
   };
+  const showRuntimeScreenTabs = (activeApplication?.screenIds.length ?? 0) > 1;
 
   if (!activeApplication) {
     return (
@@ -593,23 +594,22 @@ export function ApplicationPage({
 
   return (
     <main className="controls-page tab-accent tab-controls application-runtime-page">
-      <section className="card application-runtime-header">
-        <div className="application-runtime-links">
-          {activeApplication.screenIds.map((screenId) => (
-            <button
-              key={screenId}
-              type="button"
-              className={`tab-button ${screenId === activeScreenId ? "active" : ""}`}
-              onClick={() => onNavigateToScreen(screenId)}
-            >
-              {screenId}
-            </button>
-          ))}
-        </div>
-      </section>
-
       <section className="controls-workspace">
-        <div className="controls-canvas-zone">
+        <div className="controls-canvas-zone application-runtime-canvas-zone">
+          {showRuntimeScreenTabs ? (
+            <div className="application-runtime-screen-tabs">
+              {activeApplication.screenIds.map((screenId) => (
+                <button
+                  key={screenId}
+                  type="button"
+                  className={`tab-button ${screenId === activeScreenId ? "active" : ""}`}
+                  onClick={() => onNavigateToScreen(screenId)}
+                >
+                  {screenId}
+                </button>
+              ))}
+            </div>
+          ) : null}
           <div className="controls-canvas-surface">
             <div className={canvasViewportClassName} ref={canvasViewportRef}>
               <div className="controls-canvas-frame" style={canvasFrameStyle}>

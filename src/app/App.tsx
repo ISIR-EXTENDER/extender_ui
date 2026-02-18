@@ -56,6 +56,7 @@ export default function App() {
         onHome={() => guardedNavigate({ kind: "home" })}
         onOpenCanvasDesign={() => guardedNavigate({ kind: "canvas-design" })}
         isCanvasDesign={route.kind === "canvas-design"}
+        isRuntimeView={route.kind === "application"}
         pageTitle={pageTitle}
       />
       {route.kind === "home" ? (

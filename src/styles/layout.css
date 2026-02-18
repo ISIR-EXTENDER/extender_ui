@@ -90,6 +90,11 @@ body,
   padding: 1rem 1.5rem 0.35rem;
 }
 
+.header-runtime {
+  gap: 0.3rem;
+  padding: 0.45rem 0.65rem 0.2rem;
+}
+
 .header-main {
   display: flex;
   align-items: flex-start;
@@ -97,11 +102,19 @@ body,
   gap: 0.75rem;
 }
 
+.header-runtime .header-main {
+  align-items: center;
+}
+
 .header-title-area {
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
   min-width: 0;
+}
+
+.header-runtime .header-title-area {
+  gap: 0.2rem;
 }
 
 .header-feedback {
@@ -113,6 +126,12 @@ body,
   border: 1px solid var(--border);
   background: color-mix(in srgb, var(--panel) 88%, #0f172a 12%);
   padding: 0.3rem 0.4rem;
+}
+
+.header-runtime .header-feedback {
+  border: 0;
+  background: transparent;
+  padding: 0;
 }
 
 .header-actions {
@@ -247,6 +266,24 @@ body,
 .header h1 {
   margin: 0;
   font-size: 1.6rem;
+}
+
+.header-runtime h1 {
+  font-size: 1.12rem;
+}
+
+.header-runtime .connection-status {
+  font-size: 0.72rem;
+  padding: 0.2rem 0.48rem;
+}
+
+.header-runtime .header-actions {
+  gap: 0.4rem;
+}
+
+.header-runtime .header-button {
+  padding: 0.34rem 0.68rem;
+  font-size: 0.78rem;
 }
 
 @media (max-width: 1080px) {
@@ -1595,22 +1632,87 @@ body,
 }
 
 .application-runtime-page {
-  padding-top: 0.45rem;
+  padding: 0.25rem 0.45rem 0.45rem;
 }
 
-.application-runtime-header {
-  margin-bottom: 0.75rem;
-  padding: 0.6rem 0.85rem;
+.application-runtime-canvas-zone {
+  position: relative;
 }
 
-.application-runtime-header h2 {
-  margin: 0 0 0.45rem;
-}
-
-.application-runtime-links {
+.application-runtime-screen-tabs {
+  position: absolute;
+  top: 0.4rem;
+  left: 0.5rem;
+  right: 0.5rem;
+  z-index: 8;
   display: flex;
-  gap: 0.45rem;
+  gap: 0.4rem;
   overflow-x: auto;
+  pointer-events: none;
+}
+
+.application-runtime-screen-tabs .tab-button {
+  flex: 0 0 auto;
+  pointer-events: auto;
+  background: color-mix(in srgb, var(--panel) 88%, #0f172a 12%);
+  font-size: 0.9rem;
+  font-weight: 700;
+  padding: 0.44rem 0.8rem;
+  box-shadow: 0 5px 12px color-mix(in srgb, #000 20%, transparent);
+}
+
+.application-runtime-page .controls-canvas-surface {
+  border-radius: 12px;
+  padding: 0.28rem;
+}
+
+.application-runtime-page .controls-mode-button-value {
+  font-size: 0.75rem;
+}
+
+.application-runtime-page .widget-topic-readout {
+  font-size: 0.7rem;
+}
+
+.application-runtime-page .controls-joystick-item .axis-label {
+  font-size: 0.62rem;
+}
+
+.application-runtime-page .controls-pose-button {
+  font-size: 0.84rem;
+}
+
+.application-runtime-page .controls-navigation-link {
+  font-size: 0.88rem;
+}
+
+.application-runtime-page .controls-navigation-empty {
+  font-size: 0.84rem;
+}
+
+.application-runtime-page .controls-rosbag-status {
+  font-size: 0.84rem;
+}
+
+.application-runtime-page .controls-rosbag-meta {
+  font-size: 0.8rem;
+}
+
+.application-runtime-page .controls-stream-source {
+  font-size: 0.74rem;
+}
+
+.application-runtime-page .controls-stream-status,
+.application-runtime-page .controls-stream-url {
+  font-size: 0.78rem;
+}
+
+.application-runtime-page .controls-curves-meta,
+.application-runtime-page .controls-logs-meta,
+.application-runtime-page .controls-log-entry,
+.application-runtime-page .controls-log-empty,
+.application-runtime-page .controls-logs-footer {
+  font-size: 0.78rem;
 }
 
 @media (min-width: 1201px) {

@@ -62,6 +62,7 @@ import {
   getCanvasPreset,
   resolveCanvasArtboardSize,
   resolveCanvasFitScale,
+  resolveCanvasPresetSize,
   type CanvasSettings,
   type RuntimeCanvasMode,
   upsertConfiguration,
@@ -391,10 +392,15 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
   const hasNameDiff = trimmedNameInput.length > 0 && trimmedNameInput !== savedBaseline.name;
   const isCanvasDirty = hasWidgetDiff || hasCanvasSettingsDiff || hasNameDiff;
 
-  const canvasSize = useMemo(
+  const editorCanvasSize = useMemo(
     () => resolveCanvasArtboardSize(widgets, canvasSettings),
     [canvasSettings, widgets]
   );
+  const runtimeCanvasSize = useMemo(
+    () => resolveCanvasPresetSize(canvasSettings),
+    [canvasSettings]
+  );
+  const canvasSize = focusOnly ? runtimeCanvasSize : editorCanvasSize;
   const targetCanvasPreset = useMemo(
     () => getCanvasPreset(canvasSettings.presetId),
     [canvasSettings.presetId]

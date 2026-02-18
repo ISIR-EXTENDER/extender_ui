@@ -9,6 +9,7 @@ type TopBarProps = {
   onHome: () => void;
   onOpenCanvasDesign: () => void;
   isCanvasDesign: boolean;
+  isRuntimeView?: boolean;
   pageTitle?: string;
 };
 
@@ -17,6 +18,7 @@ export function TopBar({
   onHome,
   onOpenCanvasDesign,
   isCanvasDesign,
+  isRuntimeView = false,
   pageTitle,
 }: TopBarProps) {
   const focusMode = useUiStore((s) => s.focusMode);
@@ -53,16 +55,19 @@ export function TopBar({
       label: "Screen Builder",
     };
   }, [focusMode, isCanvasDesign]);
+  const showRuntimeCompact = isRuntimeView && !isCanvasDesign;
 
   return (
-    <header className="header">
+    <header className={`header ${showRuntimeCompact ? "header-runtime" : ""}`.trim()}>
       <div className="header-main">
         <div className="header-title-area">
           <h1>{pageTitle || "Extender Tablet Interface"}</h1>
           <div className="header-feedback" role="status" aria-live="polite">
-            <div className={`mode-status mode-status-${modeIndicator.level}`}>
-              <span>{modeIndicator.label}</span>
-            </div>
+            {showRuntimeCompact ? null : (
+              <div className={`mode-status mode-status-${modeIndicator.level}`}>
+                <span>{modeIndicator.label}</span>
+              </div>
+            )}
             <div className={`connection-status connection-status-${connectionIndicator.level}`}>
               <span className="connection-led" aria-hidden />
               <span>{connectionIndicator.label}</span>
@@ -79,7 +84,7 @@ export function TopBar({
               {focusMode ? "Exit Preview" : "Enter Preview"}
             </Button>
           ) : null}
-          {!isCanvasDesign ? (
+          {!isCanvasDesign && !showRuntimeCompact ? (
             <Button className="focus" type="button" onClick={onOpenCanvasDesign}>
               Screen Builder
             </Button>
