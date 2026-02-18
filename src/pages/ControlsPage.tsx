@@ -114,8 +114,8 @@ const readDetectedDisplaySize = () => {
   if (typeof window === "undefined") {
     return { width: 0, height: 0 };
   }
-  const width = window.screen?.width ?? window.innerWidth;
-  const height = window.screen?.height ?? window.innerHeight;
+  const width = window.visualViewport?.width ?? window.innerWidth;
+  const height = window.visualViewport?.height ?? window.innerHeight;
   return {
     width: Math.max(0, Math.round(width)),
     height: Math.max(0, Math.round(height)),
@@ -279,7 +279,11 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
     };
     updateDisplaySize();
     window.addEventListener("resize", updateDisplaySize);
-    return () => window.removeEventListener("resize", updateDisplaySize);
+    window.visualViewport?.addEventListener("resize", updateDisplaySize);
+    return () => {
+      window.removeEventListener("resize", updateDisplaySize);
+      window.visualViewport?.removeEventListener("resize", updateDisplaySize);
+    };
   }, []);
 
   useEffect(() => {
@@ -409,41 +413,6 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
     () => pickClosestCanvasPreset(detectedDisplaySize.width, detectedDisplaySize.height),
     [detectedDisplaySize.height, detectedDisplaySize.width]
   );
-  const displayFitScaleForCanvas = useMemo(() => {
-    if (detectedDisplaySize.width <= 0 || detectedDisplaySize.height <= 0) return 1;
-    return Math.min(
-      detectedDisplaySize.width / targetCanvasPreset.width,
-      detectedDisplaySize.height / targetCanvasPreset.height
-    );
-  }, [detectedDisplaySize.height, detectedDisplaySize.width, targetCanvasPreset.height, targetCanvasPreset.width]);
-  const canvasResolutionHint = useMemo(() => {
-    const canvasLabel = `${targetCanvasPreset.width}x${targetCanvasPreset.height}`;
-    if (detectedDisplaySize.width <= 0 || detectedDisplaySize.height <= 0) {
-      return `Canvas ${canvasLabel}.`;
-    }
-    const displayLabel = `${detectedDisplaySize.width}x${detectedDisplaySize.height}`;
-    const scalePercent = Math.round(displayFitScaleForCanvas * 100);
-    if (Math.abs(displayFitScaleForCanvas - 1) <= 0.01) {
-      return `Display ${displayLabel}. Canvas ${canvasLabel} is pixel-perfect (1:1).`;
-    }
-    const scalingHint =
-      displayFitScaleForCanvas < 1
-        ? `Display ${displayLabel}. Canvas ${canvasLabel} scales down to ${scalePercent}% (can look blurry).`
-        : `Display ${displayLabel}. Canvas ${canvasLabel} scales up to ${scalePercent}%.`;
-    if (recommendedDisplayPreset.id === canvasSettings.presetId) {
-      return scalingHint;
-    }
-    return `${scalingHint} Recommended: ${recommendedDisplayPreset.label}.`;
-  }, [
-    canvasSettings.presetId,
-    detectedDisplaySize.height,
-    detectedDisplaySize.width,
-    displayFitScaleForCanvas,
-    recommendedDisplayPreset.id,
-    recommendedDisplayPreset.label,
-    targetCanvasPreset.height,
-    targetCanvasPreset.width,
-  ]);
   const runtimeCanvasMode: RuntimeCanvasMode = focusOnly ? "fit" : "left";
   const baseCanvasScale = useMemo(
     () => resolveCanvasFitScale(runtimeCanvasMode, canvasSize, canvasViewportSize),
@@ -1719,10 +1688,7 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
           Sync From Folder
         </button>
       </div>
-      <div className="controls-status-message">
-        {statusMessage ? <div>{statusMessage}</div> : null}
-        <div className="controls-status-hint">{canvasResolutionHint}</div>
-      </div>
+      {statusMessage ? <div className="controls-status-message">{statusMessage}</div> : null}
     </div>
   );
 
