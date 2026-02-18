@@ -45,8 +45,8 @@ const TOPIC_FRESHNESS_TICK_MS = 100;
 
 const clampSignedUnit = (value: number) => Math.max(-1, Math.min(1, value));
 
-const NOOP_RECT_CHANGE = (_next: CanvasRect) => {};
-const NOOP_TEXT_CHANGE = (_next: string) => {};
+const NOOP_RECT_CHANGE: (next: CanvasRect) => void = () => {};
+const NOOP_TEXT_CHANGE: (next: string) => void = () => {};
 
 export function ApplicationPage({
   applicationId,
@@ -170,10 +170,9 @@ export function ApplicationPage({
   );
 
   const markWidgetPulse = (widgetId: string) => {
-    const now = Date.now();
     setWidgetPulseMap((prev) => ({
       ...prev,
-      [widgetId]: now,
+      [widgetId]: Date.now(),
     }));
   };
 

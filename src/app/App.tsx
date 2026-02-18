@@ -34,12 +34,6 @@ export default function App() {
         : "Extender Tablet Interface";
 
   useEffect(() => {
-    if (route.kind !== "canvas-design") {
-      setHasUnsavedCanvasChanges(false);
-    }
-  }, [route.kind]);
-
-  useEffect(() => {
     setIsEditorMode(route.kind === "canvas-design" && !focusMode);
   }, [focusMode, route.kind, setIsEditorMode]);
 

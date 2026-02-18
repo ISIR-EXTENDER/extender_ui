@@ -15,8 +15,21 @@ export type ApplicationConfig = {
 
 const STORAGE_KEY = "extender.controls.applications.v1";
 
+type DirectoryPickerHandle = {
+  values: () => AsyncIterable<FileSystemHandle>;
+  getFileHandle: (
+    name: string,
+    options?: FileSystemGetFileOptions
+  ) => Promise<FileSystemFileHandle>;
+};
+
 type DirectoryPickerWindow = Window & {
-  showDirectoryPicker?: () => Promise<any>;
+  showDirectoryPicker?: () => Promise<DirectoryPickerHandle>;
+};
+
+type FileEntryHandle = FileSystemHandle & {
+  kind: "file";
+  name: string;
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -130,7 +143,9 @@ export function removeApplication(applications: ApplicationConfig[], application
 const sanitizeFileName = (name: string) =>
   `${name.trim().replace(/[^a-zA-Z0-9-_]+/g, "_").replace(/_+/g, "_") || "application"}.json`;
 
-const parseApplicationFile = async (entry: any): Promise<ApplicationConfig | null> => {
+const parseApplicationFile = async (
+  entry: FileSystemFileHandle
+): Promise<ApplicationConfig | null> => {
   try {
     const file = await entry.getFile();
     const content = await file.text();
@@ -173,8 +188,9 @@ export async function syncApplicationsFromFolder(
   const loaded: ApplicationConfig[] = [];
 
   for await (const entry of directoryHandle.values()) {
-    if (entry.kind !== "file" || !entry.name.endsWith(".json")) continue;
-    const application = await parseApplicationFile(entry);
+    const fileEntry = entry as FileEntryHandle;
+    if (fileEntry.kind !== "file" || !fileEntry.name.endsWith(".json")) continue;
+    const application = await parseApplicationFile(fileEntry as FileSystemFileHandle);
     if (application) loaded.push(application);
   }
 

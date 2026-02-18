@@ -613,8 +613,21 @@ export const getDefaultDemoConfigurationByName = (name: string): WidgetConfigura
   return match ? cloneConfiguration(match) : null;
 };
 
+type DirectoryPickerHandle = {
+  values: () => AsyncIterable<FileSystemHandle>;
+  getFileHandle: (
+    name: string,
+    options?: FileSystemGetFileOptions
+  ) => Promise<FileSystemFileHandle>;
+};
+
 type DirectoryPickerWindow = Window & {
-  showDirectoryPicker?: () => Promise<any>;
+  showDirectoryPicker?: () => Promise<DirectoryPickerHandle>;
+};
+
+type FileEntryHandle = FileSystemHandle & {
+  kind: "file";
+  name: string;
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -718,7 +731,9 @@ export function removeConfiguration(configurations: WidgetConfiguration[], name:
 const sanitizeFileName = (name: string) =>
   `${name.trim().replace(/[^a-zA-Z0-9-_]+/g, "_").replace(/_+/g, "_") || "configuration"}.json`;
 
-const parseConfigurationFile = async (entry: any): Promise<WidgetConfiguration | null> => {
+const parseConfigurationFile = async (
+  entry: FileSystemFileHandle
+): Promise<WidgetConfiguration | null> => {
   try {
     const file = await entry.getFile();
     const content = await file.text();
@@ -771,8 +786,9 @@ export async function syncConfigurationsFromFolder(
   const loaded: WidgetConfiguration[] = [];
 
   for await (const entry of directoryHandle.values()) {
-    if (entry.kind !== "file" || !entry.name.endsWith(".json")) continue;
-    const configuration = await parseConfigurationFile(entry);
+    const fileEntry = entry as FileEntryHandle;
+    if (fileEntry.kind !== "file" || !fileEntry.name.endsWith(".json")) continue;
+    const configuration = await parseConfigurationFile(fileEntry as FileSystemFileHandle);
     if (configuration) loaded.push(configuration);
   }
 

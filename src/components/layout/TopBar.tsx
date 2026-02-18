@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 
 import { Button } from "../ui/Button";
 import { useTeleopStore } from "../../store/teleopStore";
@@ -22,23 +22,16 @@ export function TopBar({
   const focusMode = useUiStore((s) => s.focusMode);
   const setFocusMode = useUiStore((s) => s.setFocusMode);
   const wsStatus = useTeleopStore((s) => s.wsStatus);
-  const [everConnected, setEverConnected] = useState(false);
-
-  useEffect(() => {
-    if (wsStatus === "connected") {
-      setEverConnected(true);
-    }
-  }, [wsStatus]);
 
   const connectionIndicator = useMemo(() => {
     if (wsStatus === "connected") {
       return { level: "ok", label: "Backend connected" };
     }
-    if (wsStatus === "connecting" || everConnected) {
+    if (wsStatus === "connecting") {
       return { level: "warn", label: "WebSocket issue" };
     }
     return { level: "error", label: "Backend off" };
-  }, [everConnected, wsStatus]);
+  }, [wsStatus]);
 
   const modeIndicator = useMemo(() => {
     if (!isCanvasDesign) {
