@@ -211,6 +211,7 @@ export function createWidgetFromCatalogType(
       label: "Action",
       topic: "/ui/button",
       payload: "pressed",
+      tone: "default",
       rect: { x, y, w: 140, h: 52 },
     };
     return widget;

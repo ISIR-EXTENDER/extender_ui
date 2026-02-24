@@ -47,6 +47,9 @@ const PETANQUE_TOTAL_DURATION_TOPIC = "/petanque_throw/total_duration";
 const PETANQUE_TOTAL_DURATION_MIN_S = 0.4;
 const PETANQUE_TOTAL_DURATION_MAX_S = 3.0;
 const PETANQUE_DEFAULT_TOTAL_DURATION_S = 1.0;
+const PETANQUE_COMMANDS = ["teleop", "activate_throw", "go_to_start", "throw", "stop"] as const;
+type PetanqueStateCommand = (typeof PETANQUE_COMMANDS)[number];
+type PetanqueFlowStage = "teleop" | "throw_mode" | "start_ready";
 
 const clampSignedUnit = (value: number) => Math.max(-1, Math.min(1, value));
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
@@ -92,6 +95,7 @@ export function ApplicationPage({
   const [freshnessClock, setFreshnessClock] = useState<number>(() => Date.now());
   const [rosbagRecording, setRosbagRecording] = useState(false);
   const [rosbagStatus, setRosbagStatus] = useState("idle");
+  const [petanqueFlowStage, setPetanqueFlowStage] = useState<PetanqueFlowStage>("teleop");
   const canvasViewportRef = useRef<HTMLDivElement | null>(null);
   const [canvasViewportSize, setCanvasViewportSize] = useState<{ width: number; height: number }>({
     width: 0,
@@ -191,6 +195,61 @@ export function ApplicationPage({
 
   const isWidgetFresh = (widgetId: string) =>
     freshnessClock - (widgetPulseMap[widgetId] ?? 0) <= TOPIC_FRESHNESS_MS;
+
+  const isPetanqueStateCommand = (value: string): value is PetanqueStateCommand =>
+    (PETANQUE_COMMANDS as readonly string[]).includes(value);
+
+  const getPetanqueButtonState = (command: PetanqueStateCommand) => {
+    if (command === "teleop") {
+      return {
+        disabled: false,
+        active: petanqueFlowStage === "teleop",
+        tone: "default" as const,
+      };
+    }
+    if (command === "activate_throw") {
+      return {
+        disabled: false,
+        active: petanqueFlowStage !== "teleop",
+        tone: "accent" as const,
+      };
+    }
+    if (command === "go_to_start") {
+      return {
+        disabled: petanqueFlowStage === "teleop",
+        active: petanqueFlowStage === "start_ready",
+        tone: "success" as const,
+      };
+    }
+    if (command === "throw") {
+      return {
+        disabled: petanqueFlowStage !== "start_ready",
+        active: false,
+        tone: "danger" as const,
+      };
+    }
+    return {
+      disabled: false,
+      active: false,
+      tone: "danger" as const,
+    };
+  };
+
+  const advancePetanqueFlow = (command: PetanqueStateCommand) => {
+    if (command === "teleop" || command === "stop") {
+      setPetanqueFlowStage("teleop");
+      return;
+    }
+    if (command === "activate_throw") {
+      setPetanqueFlowStage("throw_mode");
+      return;
+    }
+    if (command === "go_to_start") {
+      setPetanqueFlowStage("start_ready");
+      return;
+    }
+    setPetanqueFlowStage("throw_mode");
+  };
 
   const upsertPose = (poses: PoseSnapshot[], pose: PoseSnapshot) => {
     const index = poses.findIndex((item) => item.name === pose.name);
@@ -391,6 +450,13 @@ export function ApplicationPage({
     }
 
     if (widget.kind === "button") {
+      const petanqueCommand = isPetanqueStateCommand(widget.payload) ? widget.payload : null;
+      const isStateMachineButton =
+        widget.topic === PETANQUE_STATE_TOPIC && petanqueCommand !== null;
+      const petanqueButtonState = isStateMachineButton && petanqueCommand
+        ? getPetanqueButtonState(petanqueCommand)
+        : null;
+
       return (
         <ActionButtonWidget
           key={widget.id}
@@ -399,12 +465,17 @@ export function ApplicationPage({
           onSelect={() => {}}
           onRectChange={NOOP_RECT_CHANGE}
           onLabelChange={NOOP_TEXT_CHANGE}
+          disabled={petanqueButtonState?.disabled ?? false}
+          active={petanqueButtonState?.active ?? false}
+          tone={petanqueButtonState?.tone ?? widget.tone ?? "default"}
           onTrigger={() => {
-            if (widget.topic === PETANQUE_STATE_TOPIC) {
+            if (isStateMachineButton && petanqueCommand) {
+              if (petanqueButtonState?.disabled) return;
               wsClient.send({
                 type: "state_cmd",
-                command: widget.payload,
+                command: petanqueCommand,
               });
+              advancePetanqueFlow(petanqueCommand);
               markWidgetPulse(widget.id);
               return;
             }

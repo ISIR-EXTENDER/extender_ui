@@ -50,6 +50,9 @@ type ActionButtonWidgetProps = BaseWidgetProps & {
   widget: ButtonWidgetModel;
   onLabelChange: (nextLabel: string) => void;
   onTrigger: () => void;
+  disabled?: boolean;
+  active?: boolean;
+  tone?: "default" | "accent" | "success" | "danger";
 };
 
 type ModeButtonWidgetProps = BaseWidgetProps & {
@@ -201,7 +204,19 @@ export function ActionButtonWidget({
   onRectChange,
   onLabelChange,
   onTrigger,
+  disabled = false,
+  active = false,
+  tone = "default",
 }: ActionButtonWidgetProps) {
+  const className = [
+    "controls-action-button-widget",
+    `tone-${tone}`,
+    active ? "is-active" : "",
+    disabled ? "is-disabled" : "",
+  ]
+    .join(" ")
+    .trim();
+
   return (
     <CanvasItem
       x={widget.rect.x}
@@ -214,7 +229,13 @@ export function ActionButtonWidget({
       minSize={{ w: 92, h: 42 }}
       className="controls-action-button-item"
     >
-      <button type="button" className="controls-action-button-widget" onClick={onTrigger}>
+      <button
+        type="button"
+        className={className}
+        onClick={onTrigger}
+        disabled={disabled}
+        data-canvas-interactive="true"
+      >
         <InlineEditableText value={widget.label} onCommit={onLabelChange} className="controls-inline-label" />
       </button>
     </CanvasItem>
