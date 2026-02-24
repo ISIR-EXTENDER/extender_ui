@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
+import { loadApplicationsFromLocalStorage } from "./applications";
 import { TopBar } from "../components/layout/TopBar";
 import { ApplicationPage } from "../pages/ApplicationPage";
 import { CanvasDesignPage } from "../pages/CanvasDesignPage";
@@ -16,19 +17,25 @@ export default function App() {
   const { stopAndZero } = useTeleopPublisher();
   const { route, navigate } = useAppRouter();
   const focusMode = useUiStore((s) => s.focusMode);
+  const setIsEditorMode = useUiStore((s) => s.setIsEditorMode);
   const [hasUnsavedCanvasChanges, setHasUnsavedCanvasChanges] = useState(false);
+  const applicationTitle = useMemo(() => {
+    if (route.kind !== "application") return null;
+    const match = loadApplicationsFromLocalStorage().find(
+      (application) => application.id === route.appId
+    );
+    return match?.name ?? route.appId;
+  }, [route]);
   const pageTitle =
     route.kind === "canvas-design"
       ? "Canvas Design"
       : route.kind === "application"
-        ? `Application: ${route.appId}`
+        ? applicationTitle ?? route.appId
         : "Extender Tablet Interface";
 
   useEffect(() => {
-    if (route.kind !== "canvas-design") {
-      setHasUnsavedCanvasChanges(false);
-    }
-  }, [route.kind]);
+    setIsEditorMode(route.kind === "canvas-design" && !focusMode);
+  }, [focusMode, route.kind, setIsEditorMode]);
 
   const guardedNavigate = (nextRoute: AppRoute) => {
     const leavingCanvasDesign = route.kind === "canvas-design" && nextRoute.kind !== "canvas-design";
@@ -49,6 +56,7 @@ export default function App() {
         onHome={() => guardedNavigate({ kind: "home" })}
         onOpenCanvasDesign={() => guardedNavigate({ kind: "canvas-design" })}
         isCanvasDesign={route.kind === "canvas-design"}
+        isRuntimeView={route.kind === "application"}
         pageTitle={pageTitle}
       />
       {route.kind === "home" ? (

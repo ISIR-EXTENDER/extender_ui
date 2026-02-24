@@ -19,5 +19,12 @@ export default defineConfig([
       ecmaVersion: 2020,
       globals: globals.browser,
     },
+    rules: {
+      // Keep these checks visible but non-blocking while we incrementally
+      // migrate legacy effect-heavy code to stricter React Hooks patterns.
+      'react-hooks/set-state-in-effect': 'warn',
+      'react-hooks/purity': 'warn',
+      'react-hooks/refs': 'warn',
+    },
   },
 ])

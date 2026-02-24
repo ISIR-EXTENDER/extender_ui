@@ -1,9 +1,12 @@
 import type {
   ButtonWidget,
   CanvasWidget,
+  CurvesWidget,
   GripperControlWidget,
   JoystickWidget,
+  LogsWidget,
   LoadPoseButtonWidget,
+  ModeButtonWidget,
   MaxVelocityWidget,
   NavigationBarWidget,
   NavigationButtonWidget,
@@ -19,6 +22,7 @@ import { nextWidgetId } from "./widgetTypes";
 export type WidgetCatalogType =
   | "joystick"
   | "slider"
+  | "mode-button"
   | "save-pose-button"
   | "load-pose-button"
   | "navigation-button"
@@ -30,6 +34,8 @@ export type WidgetCatalogType =
   | "max-velocity"
   | "gripper-control"
   | "stream-display"
+  | "curves"
+  | "logs"
   | "linear-joystick"
   | "gauge"
   | "toggle"
@@ -46,6 +52,7 @@ export type WidgetCatalogEntry = {
 export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
   { type: "joystick", label: "Joystick", enabled: true, defaultSize: { w: 150, h: 150 } },
   { type: "slider", label: "Slider", enabled: true, defaultSize: { w: 60, h: 120 } },
+  { type: "mode-button", label: "Mode Button", enabled: true, defaultSize: { w: 170, h: 52 } },
   { type: "save-pose-button", label: "Save Pose Button", enabled: true, defaultSize: { w: 130, h: 52 } },
   { type: "load-pose-button", label: "Load Pose Button", enabled: true, defaultSize: { w: 130, h: 52 } },
   { type: "navigation-button", label: "Navigation Button", enabled: true, defaultSize: { w: 160, h: 52 } },
@@ -57,6 +64,8 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
   { type: "max-velocity", label: "Max Velocity", enabled: true, defaultSize: { w: 260, h: 90 } },
   { type: "gripper-control", label: "Gripper Control", enabled: true, defaultSize: { w: 300, h: 170 } },
   { type: "stream-display", label: "Stream Display", enabled: true, defaultSize: { w: 360, h: 260 } },
+  { type: "curves", label: "Curves", enabled: true, defaultSize: { w: 420, h: 240 } },
+  { type: "logs", label: "Logs", enabled: true, defaultSize: { w: 360, h: 220 } },
   { type: "linear-joystick", label: "Linear Joystick", enabled: false, defaultSize: { w: 250, h: 60 } },
   { type: "gauge", label: "Gauge", enabled: false, defaultSize: { w: 150, h: 150 } },
   { type: "toggle", label: "Toggle", enabled: false, defaultSize: { w: 120, h: 80 } },
@@ -116,6 +125,17 @@ export function createWidgetFromCatalogType(
       rect: { x, y, w: 130, h: 52 },
     };
     return saveButton;
+  }
+
+  if (type === "mode-button") {
+    const modeButton: ModeButtonWidget = {
+      id: nextWidgetId(),
+      kind: "mode-button",
+      label: "Mode",
+      topic: "/cmd/mode",
+      rect: { x, y, w: 170, h: 52 },
+    };
+    return modeButton;
   }
 
   if (type === "load-pose-button") {
@@ -229,6 +249,7 @@ export function createWidgetFromCatalogType(
       kind: "gripper-control",
       label: "Gripper Control",
       topic: "/cmd/gripper",
+      showAdvancedControls: true,
       rect: { x, y, w: 300, h: 170 },
     };
     return widget;
@@ -242,7 +263,41 @@ export function createWidgetFromCatalogType(
       topic: "/ui/stream",
       source: "camera",
       streamUrl: "webrtc://localhost:8001/stream",
+      fitMode: "contain",
+      showStatus: true,
+      showUrl: true,
+      overlayText: "stream preview",
       rect: { x, y, w: 360, h: 260 },
+    };
+    return widget;
+  }
+
+  if (type === "curves") {
+    const widget: CurvesWidget = {
+      id: nextWidgetId(),
+      kind: "curves",
+      label: "Control Curves",
+      topic: "/ui/curves",
+      sampleRateHz: 10,
+      historySeconds: 8,
+      showLegend: true,
+      showSpeed: true,
+      rect: { x, y, w: 420, h: 240 },
+    };
+    return widget;
+  }
+
+  if (type === "logs") {
+    const widget: LogsWidget = {
+      id: nextWidgetId(),
+      kind: "logs",
+      label: "Runtime Logs",
+      topic: "/ui/logs",
+      maxEntries: 120,
+      levelFilter: "all",
+      autoScroll: true,
+      showTimestamp: true,
+      rect: { x, y, w: 360, h: 220 },
     };
     return widget;
   }

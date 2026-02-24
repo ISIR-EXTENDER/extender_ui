@@ -2,7 +2,10 @@ export { JoystickWidget } from "./JoystickWidget";
 export { SliderWidget } from "./SliderWidget";
 export {
   ActionButtonWidget,
+  CurvesWidget,
   GripperControlWidget,
+  LogsWidget,
+  ModeButtonWidget,
   MaxVelocityWidget,
   NavigationBarWidget,
   NavigationButtonWidget,
@@ -28,11 +31,16 @@ export {
   type TextWidget as TextWidgetModel,
   type TextareaWidget as TextareaWidgetModel,
   type ButtonWidget as ButtonWidgetModel,
+  type ModeButtonWidget as ModeButtonWidgetModel,
   type RosbagControlWidget as RosbagControlWidgetModel,
   type MaxVelocityWidget as MaxVelocityWidgetModel,
   type GripperControlWidget as GripperControlWidgetModel,
   type StreamDisplayWidget as StreamDisplayWidgetModel,
+  type CurvesWidget as CurvesWidgetModel,
+  type LogsWidget as LogsWidgetModel,
   type NavigationOrientation,
+  type StreamFitMode,
+  type LogLevelFilter,
   type StreamSource,
   type TextAlign,
   type WidgetKind,
@@ -49,6 +57,8 @@ export {
 } from "./widgetCatalog";
 export {
   cloneWidgets,
+  DEFAULT_DEMO_CONFIGURATIONS,
+  getDefaultDemoConfigurationByName,
   loadConfigurationsFromLocalStorage,
   type PoseSnapshot,
   type PoseTopicValue,
@@ -65,3 +75,17 @@ export {
   type TsWidgetPreset,
   type TsPresetWidget,
 } from "./tsPresets";
+export {
+  CANVAS_PRESETS,
+  DEFAULT_CANVAS_SETTINGS,
+  cloneCanvasSettings,
+  getCanvasPreset,
+  normalizeCanvasSettings,
+  resolveCanvasArtboardSize,
+  resolveCanvasFitScale,
+  resolveCanvasPresetSize,
+  type CanvasPreset,
+  type CanvasPresetId,
+  type CanvasSettings,
+  type RuntimeCanvasMode,
+} from "./canvasSettings";

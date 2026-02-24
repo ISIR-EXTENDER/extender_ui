@@ -2,6 +2,10 @@
 
 This is a touch-first teleoperation UI for the Extender robot system. It is designed for a tablet, supports focus mode, and separates tasks across tabs so each answers a single operator question.
 
+## Project Docs
+- Architecture: `docs/ARCHITECTURE.md`
+- Contributing guide: `docs/CONTRIBUTING.md`
+
 ## Architecture Overview
 
 - Frontend: React + TypeScript (Vite) for fast UI iteration.
@@ -79,6 +83,5 @@ This is a touch-first teleoperation UI for the Extender robot system. It is desi
 
 - npm install
 - npm run dev
-
 
 

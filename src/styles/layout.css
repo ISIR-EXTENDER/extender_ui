@@ -90,11 +90,48 @@ body,
   padding: 1rem 1.5rem 0.35rem;
 }
 
+.header-runtime {
+  gap: 0.3rem;
+  padding: 0.45rem 0.65rem 0.2rem;
+}
+
 .header-main {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 0.75rem;
+}
+
+.header-runtime .header-main {
+  align-items: center;
+}
+
+.header-title-area {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.header-runtime .header-title-area {
+  gap: 0.2rem;
+}
+
+.header-feedback {
+  display: flex;
+  align-items: center;
+  gap: 0.42rem;
+  flex-wrap: wrap;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--panel) 88%, #0f172a 12%);
+  padding: 0.3rem 0.4rem;
+}
+
+.header-runtime .header-feedback {
+  border: 0;
+  background: transparent;
+  padding: 0;
 }
 
 .header-actions {
@@ -118,14 +155,15 @@ body,
   display: inline-flex;
   align-items: center;
   gap: 0.42rem;
-  border-radius: 999px;
+  border-radius: 8px;
   border: 1px solid var(--border);
-  background: var(--panel);
-  color: var(--text);
-  padding: 0.33rem 0.68rem;
-  font-size: 0.8rem;
-  font-weight: 700;
+  background: color-mix(in srgb, var(--panel) 82%, #020617 18%);
+  color: color-mix(in srgb, var(--text) 92%, #cbd5e1 8%);
+  padding: 0.26rem 0.56rem;
+  font-size: 0.76rem;
+  font-weight: 800;
   line-height: 1;
+  letter-spacing: 0.01em;
 }
 
 .connection-led {
@@ -194,9 +232,69 @@ body,
   color: #f8fafc;
 }
 
+.header-button.focus.is-active {
+  background: color-mix(in srgb, #0ea5e9 70%, #0f172a 30%);
+  border-color: #67e8f9;
+  box-shadow: 0 0 0 1px color-mix(in srgb, #67e8f9 40%, transparent);
+}
+
+.mode-status {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  padding: 0.26rem 0.56rem;
+  font-size: 0.76rem;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+  letter-spacing: 0.01em;
+}
+
+.mode-status-editor {
+  border-color: color-mix(in srgb, #38bdf8 60%, var(--border));
+  background: color-mix(in srgb, #0ea5e9 35%, var(--panel) 65%);
+  color: #e0f2fe;
+}
+
+.mode-status-runtime {
+  border-color: color-mix(in srgb, #334155 70%, var(--border));
+  background: color-mix(in srgb, #0f172a 28%, var(--panel) 72%);
+  color: color-mix(in srgb, var(--text) 92%, #cbd5e1 8%);
+}
+
 .header h1 {
   margin: 0;
   font-size: 1.6rem;
+}
+
+.header-runtime h1 {
+  font-size: 1.12rem;
+}
+
+.header-runtime .connection-status {
+  font-size: 0.72rem;
+  padding: 0.2rem 0.48rem;
+}
+
+.header-runtime .header-actions {
+  gap: 0.4rem;
+}
+
+.header-runtime .header-button {
+  padding: 0.34rem 0.68rem;
+  font-size: 0.78rem;
+}
+
+@media (max-width: 1080px) {
+  .header-main {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .header-actions {
+    justify-content: flex-start;
+  }
 }
 
 .status {
@@ -284,6 +382,8 @@ body,
   border: 1px solid var(--border);
   background: color-mix(in srgb, var(--panel) 85%, var(--accent) 15%);
   padding: 0.45rem 0.6rem;
+  backdrop-filter: blur(4px);
+  box-shadow: 0 10px 24px color-mix(in srgb, #000 16%, transparent);
 }
 
 .controls-config-row {
@@ -300,6 +400,21 @@ body,
   min-width: 170px;
   max-width: none;
   flex: 0 0 200px;
+}
+
+.controls-zoom-field {
+  flex: 0 0 260px;
+}
+
+.controls-zoom-controls {
+  display: grid;
+  grid-template-columns: 40px minmax(68px, 1fr) 40px 1fr;
+  gap: 0.35rem;
+}
+
+.controls-zoom-controls .tab-button {
+  width: 100%;
+  min-width: 0;
 }
 
 .controls-status-message {
@@ -325,6 +440,17 @@ body,
 .controls-workspace {
   flex: 1;
   min-height: 0;
+  position: relative;
+}
+
+.controls-workspace-editor {
+  overflow: hidden;
+}
+
+.controls-canvas-zone {
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
 }
 
 .controls-canvas-surface {
@@ -335,17 +461,109 @@ body,
   height: 100%;
   min-height: 0;
   overflow: auto;
-  background-color: color-mix(in srgb, var(--panel-2) 86%, var(--accent) 14%);
+  background-color: color-mix(in srgb, var(--panel-2) 84%, #020617 16%);
   background-image:
-    radial-gradient(circle at 15% 15%, color-mix(in srgb, var(--accent) 22%, transparent) 0%, transparent 34%),
-    radial-gradient(circle at 85% 82%, color-mix(in srgb, var(--accent-strong) 18%, transparent) 0%, transparent 30%),
-    linear-gradient(0deg, color-mix(in srgb, var(--panel) 86%, transparent), color-mix(in srgb, var(--panel) 86%, transparent)),
-    repeating-linear-gradient(0deg, color-mix(in srgb, var(--border) 55%, transparent) 0 1px, transparent 1px 24px),
-    repeating-linear-gradient(90deg, color-mix(in srgb, var(--border) 55%, transparent) 0 1px, transparent 1px 24px);
+    radial-gradient(circle at 12% 16%, color-mix(in srgb, var(--accent) 20%, transparent) 0%, transparent 36%),
+    radial-gradient(circle at 87% 81%, color-mix(in srgb, #38bdf8 16%, transparent) 0%, transparent 34%),
+    linear-gradient(
+      0deg,
+      color-mix(in srgb, #020617 50%, transparent),
+      color-mix(in srgb, #020617 50%, transparent)
+    );
+}
+
+.controls-design-page .controls-canvas-surface {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+  background-image:
+    radial-gradient(circle at 12% 16%, color-mix(in srgb, var(--accent) 26%, transparent) 0%, transparent 36%),
+    radial-gradient(circle at 87% 81%, color-mix(in srgb, #38bdf8 20%, transparent) 0%, transparent 34%),
+    linear-gradient(
+      0deg,
+      color-mix(in srgb, #020617 40%, transparent),
+      color-mix(in srgb, #020617 40%, transparent)
+    ),
+    repeating-linear-gradient(
+      0deg,
+      color-mix(in srgb, var(--accent-strong) 16%, transparent) 0 1px,
+      transparent 1px 24px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--accent-strong) 16%, transparent) 0 1px,
+      transparent 1px 24px
+    );
+}
+
+.controls-page-focus .controls-canvas-surface,
+.application-runtime-page .controls-canvas-surface {
+  border-color: color-mix(in srgb, #334155 45%, var(--border));
+  background-image:
+    radial-gradient(circle at 12% 16%, color-mix(in srgb, var(--accent) 17%, transparent) 0%, transparent 38%),
+    radial-gradient(circle at 87% 81%, color-mix(in srgb, #38bdf8 14%, transparent) 0%, transparent 36%),
+    linear-gradient(
+      0deg,
+      color-mix(in srgb, #020617 56%, transparent),
+      color-mix(in srgb, #020617 56%, transparent)
+    );
 }
 
 .controls-page-focus .controls-canvas-surface {
   min-height: 0;
+}
+
+.controls-mode-chip {
+  position: absolute;
+  top: 0.95rem;
+  left: 1rem;
+  z-index: 7;
+  pointer-events: none;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  padding: 0.24rem 0.62rem;
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  backdrop-filter: blur(4px);
+  box-shadow: 0 8px 18px color-mix(in srgb, #000 22%, transparent);
+}
+
+.controls-mode-chip-runtime {
+  border-color: color-mix(in srgb, #334155 72%, var(--border));
+  background: color-mix(in srgb, #020617 72%, var(--panel) 28%);
+  color: #cbd5e1;
+}
+
+.controls-canvas-viewport {
+  display: flex;
+  width: 100%;
+  min-height: 100%;
+}
+
+.controls-canvas-mode-left {
+  justify-content: flex-start;
+  align-items: flex-start;
+  min-width: max-content;
+}
+
+.controls-canvas-mode-center {
+  justify-content: center;
+  align-items: flex-start;
+  min-width: max-content;
+}
+
+.controls-canvas-mode-fit {
+  justify-content: center;
+  align-items: flex-start;
+  min-width: 100%;
+}
+
+.controls-canvas-frame {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.controls-canvas-transform {
+  position: relative;
 }
 
 .controls-canvas {
@@ -354,8 +572,64 @@ body,
   min-height: 420px;
 }
 
+.controls-canvas-target-zone {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  z-index: 0;
+  border-radius: 14px;
+  border: 2px solid color-mix(in srgb, var(--accent-strong) 70%, #f8fafc 30%);
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  box-shadow:
+    0 0 0 9999px color-mix(in srgb, #020617 42%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, #e2e8f0 18%, transparent),
+    inset 0 -40px 80px color-mix(in srgb, #0f172a 22%, transparent);
+}
+
+.controls-canvas-target-label {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent-strong) 55%, var(--border));
+  background: color-mix(in srgb, #0f172a 68%, var(--panel) 32%);
+  color: #e0f2fe;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  padding: 0.16rem 0.46rem;
+}
+
+.controls-canvas-snap-guide {
+  position: absolute;
+  pointer-events: none;
+  z-index: 1;
+  background: color-mix(in srgb, var(--accent-strong) 76%, #f8fafc 24%);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent-strong) 28%, transparent);
+}
+
+.controls-canvas-snap-guide-vertical {
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  transform: translateX(-1px);
+}
+
+.controls-canvas-snap-guide-horizontal {
+  left: 0;
+  right: 0;
+  height: 2px;
+  transform: translateY(-1px);
+}
+
 .controls-page-focus .controls-canvas {
-  margin: 0 auto;
+  margin: 0;
+}
+
+.controls-page-focus .controls-canvas-target-zone,
+.application-runtime-page .controls-canvas-target-zone {
+  display: none;
 }
 
 .controls-aside {
@@ -366,6 +640,23 @@ body,
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
+}
+
+.controls-aside-overlay {
+  position: absolute;
+  inset: 0 0 0 auto;
+  width: min(var(--design-aside-width, 360px), 42vw);
+  z-index: 6;
+  padding: 0.55rem 0.55rem 0.55rem 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, transparent 35%, var(--panel) 65%) 100%
+  );
+}
+
+.controls-aside-overlay .card {
+  backdrop-filter: blur(3px);
 }
 
 .controls-aside-menu {
@@ -606,6 +897,21 @@ body,
   border-style: solid;
 }
 
+.controls-design-page .canvas-item::after {
+  border-width: 2px;
+}
+
+.controls-design-page .canvas-item:hover::after {
+  opacity: 0.85;
+}
+
+.controls-design-page .canvas-item.is-selected::after {
+  border-color: color-mix(in srgb, var(--accent-strong) 78%, #fff 22%);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--accent-strong) 55%, transparent),
+    0 0 0 4px color-mix(in srgb, var(--accent-strong) 18%, transparent);
+}
+
 .canvas-item-drag-handle,
 .canvas-item-resize-handle {
   position: absolute;
@@ -625,6 +931,11 @@ body,
 .canvas-item.is-selected .canvas-item-resize-handle {
   opacity: 1;
   pointer-events: auto;
+}
+
+.controls-design-page .canvas-item.is-selected .canvas-item-drag-handle,
+.controls-design-page .canvas-item.is-selected .canvas-item-resize-handle {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-strong) 38%, transparent);
 }
 
 .canvas-item-drag-handle {
@@ -833,6 +1144,7 @@ body,
 .controls-text-item,
 .controls-textarea-item,
 .controls-action-button-item,
+.controls-mode-button-item,
 .controls-navigation-button-item,
 .controls-navigation-bar-item,
 .controls-rosbag-item {
@@ -888,6 +1200,33 @@ body,
   background: color-mix(in srgb, var(--panel) 74%, var(--accent) 26%);
   color: var(--text);
   font-weight: 700;
+}
+
+.controls-mode-button-widget {
+  width: 100%;
+  height: 100%;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, #38bdf8 40%, var(--border));
+  background: color-mix(in srgb, var(--panel) 72%, #0ea5e9 28%);
+  color: var(--text);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.36rem 0.55rem;
+  font-weight: 700;
+}
+
+.controls-mode-button-value {
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, #38bdf8 45%, var(--border));
+  background: color-mix(in srgb, #0b1220 64%, var(--panel) 36%);
+  color: #e0f2fe;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  padding: 0.14rem 0.42rem;
+  white-space: nowrap;
 }
 
 .controls-navigation-button-widget {
@@ -1021,13 +1360,17 @@ body,
 
 .controls-max-velocity-item,
 .controls-gripper-item,
-.controls-stream-item {
+.controls-stream-item,
+.controls-curves-item,
+.controls-logs-item {
   border-radius: 10px;
 }
 
 .controls-max-velocity-widget,
 .controls-gripper-widget,
-.controls-stream-widget {
+.controls-stream-widget,
+.controls-curves-widget,
+.controls-logs-widget {
   width: 100%;
   height: 100%;
   border-radius: 10px;
@@ -1060,6 +1403,10 @@ body,
   align-content: start;
 }
 
+.controls-gripper-widget.is-compact {
+  align-content: center;
+}
+
 .controls-gripper-title {
   font-weight: 800;
   font-size: 0.92rem;
@@ -1071,16 +1418,39 @@ body,
   gap: 0.45rem;
 }
 
+.controls-gripper-widget.is-compact .controls-gripper-actions {
+  margin: 0;
+}
+
 .controls-stream-widget {
   padding: 0.5rem 0.65rem;
   display: grid;
-  grid-template-rows: auto 1fr auto;
+  grid-template-rows: auto 1fr auto auto;
   gap: 0.45rem;
 }
 
 .controls-stream-title {
   font-weight: 800;
   font-size: 0.92rem;
+}
+
+.controls-stream-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.controls-stream-source {
+  font-size: 0.68rem;
+  font-weight: 700;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--border));
+  background: color-mix(in srgb, var(--panel) 75%, var(--accent) 25%);
+  color: var(--muted);
+  padding: 0.12rem 0.42rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 
 .controls-stream-view {
@@ -1093,12 +1463,139 @@ body,
   overflow: hidden;
 }
 
+.controls-stream-fit-contain .stream-placeholder {
+  width: calc(100% - 1rem);
+  height: calc(100% - 1rem);
+}
+
+.controls-stream-fit-cover .stream-placeholder {
+  width: calc(100% + 1rem);
+  height: calc(100% + 1rem);
+}
+
+.controls-stream-status {
+  font-size: 0.72rem;
+  color: color-mix(in srgb, var(--text) 70%, var(--muted));
+}
+
 .controls-stream-url {
   font-size: 0.72rem;
   color: var(--muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.controls-curves-widget {
+  padding: 0.5rem 0.65rem;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 0.45rem;
+}
+
+.controls-curves-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.controls-curves-title {
+  font-weight: 800;
+  font-size: 0.92rem;
+}
+
+.controls-curves-meta {
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.controls-curves-chart {
+  min-height: 120px;
+}
+
+.controls-logs-widget {
+  padding: 0.5rem 0.65rem;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 0.45rem;
+}
+
+.controls-logs-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.controls-logs-title {
+  font-weight: 800;
+  font-size: 0.92rem;
+}
+
+.controls-logs-meta {
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.controls-logs-list {
+  min-height: 80px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--panel) 90%, var(--accent) 10%);
+  padding: 0.35rem 0.45rem;
+  overflow: auto;
+  display: grid;
+  gap: 0.28rem;
+  align-content: start;
+}
+
+.controls-log-entry {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  gap: 0.38rem;
+  align-items: center;
+  font-size: 0.72rem;
+  color: var(--text);
+}
+
+.controls-log-entry.is-info .controls-log-level {
+  color: #60a5fa;
+}
+
+.controls-log-entry.is-warn .controls-log-level {
+  color: #f59e0b;
+}
+
+.controls-log-entry.is-error .controls-log-level {
+  color: #ef4444;
+}
+
+.controls-log-ts {
+  color: var(--muted);
+  font-family: "JetBrains Mono", "Fira Code", "SFMono-Regular", Consolas, monospace;
+}
+
+.controls-log-level {
+  font-weight: 800;
+}
+
+.controls-log-message {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.controls-log-empty {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.controls-logs-footer {
+  font-size: 0.72rem;
+  color: var(--muted);
+  text-transform: lowercase;
 }
 
 .builder-home-layout {
@@ -1137,22 +1634,216 @@ body,
 }
 
 .application-runtime-page {
-  padding-top: 0.45rem;
+  padding: 0.25rem 0.45rem 0.45rem;
 }
 
-.application-runtime-header {
-  margin-bottom: 0.75rem;
-  padding: 0.6rem 0.85rem;
+.application-runtime-canvas-zone {
+  position: relative;
 }
 
-.application-runtime-header h2 {
-  margin: 0 0 0.45rem;
-}
-
-.application-runtime-links {
+.application-runtime-screen-tabs {
+  position: absolute;
+  top: 0.4rem;
+  left: 0.5rem;
+  right: 0.5rem;
+  z-index: 8;
   display: flex;
-  gap: 0.45rem;
+  gap: 0.4rem;
   overflow-x: auto;
+  pointer-events: none;
+}
+
+.application-runtime-screen-tabs .tab-button {
+  flex: 0 0 auto;
+  pointer-events: auto;
+  background: color-mix(in srgb, var(--panel) 88%, #0f172a 12%);
+  font-size: 0.9rem;
+  font-weight: 700;
+  padding: 0.44rem 0.8rem;
+  box-shadow: 0 5px 12px color-mix(in srgb, #000 20%, transparent);
+}
+
+.application-runtime-page .controls-canvas-surface {
+  border-radius: 12px;
+  padding: 0.28rem;
+}
+
+.application-runtime-page .controls-mode-button-value {
+  font-size: 0.75rem;
+}
+
+.application-runtime-page .widget-topic-readout {
+  font-size: 0.7rem;
+}
+
+.application-runtime-page .controls-joystick-item .axis-label {
+  font-size: 0.62rem;
+}
+
+.application-runtime-page .controls-pose-button {
+  font-size: 0.84rem;
+}
+
+.application-runtime-page .controls-navigation-link {
+  font-size: 0.88rem;
+}
+
+.application-runtime-page .controls-navigation-empty {
+  font-size: 0.84rem;
+}
+
+.application-runtime-page .controls-rosbag-status {
+  font-size: 0.84rem;
+}
+
+.application-runtime-page .controls-rosbag-meta {
+  font-size: 0.8rem;
+}
+
+.application-runtime-page .controls-stream-source {
+  font-size: 0.74rem;
+}
+
+.application-runtime-page .controls-stream-status,
+.application-runtime-page .controls-stream-url {
+  font-size: 0.78rem;
+}
+
+.application-runtime-page .controls-curves-meta,
+.application-runtime-page .controls-logs-meta,
+.application-runtime-page .controls-log-entry,
+.application-runtime-page .controls-log-empty,
+.application-runtime-page .controls-logs-footer {
+  font-size: 0.78rem;
+}
+
+.application-runtime-screen-default-control,
+.controls-page-focus-screen-default-control {
+  --tablet-main-font-size: 1rem;
+}
+
+.controls-page-focus-screen-default-control {
+  padding: 0.28rem;
+}
+
+.application-runtime-screen-default-control .controls-canvas-surface,
+.controls-page-focus-screen-default-control .controls-canvas-surface {
+  padding: 0.2rem;
+  border-radius: 10px;
+}
+
+.application-runtime-screen-default-control .widget-topic-readout,
+.controls-page-focus-screen-default-control .widget-topic-readout {
+  display: none;
+}
+
+.application-runtime-screen-default-control .joystick-panel h3,
+.controls-page-focus-screen-default-control .joystick-panel h3 {
+  display: none;
+}
+
+.application-runtime-screen-default-control .joystick-wrap,
+.controls-page-focus-screen-default-control .joystick-wrap {
+  margin-top: 0;
+  padding: 10px;
+}
+
+.application-runtime-screen-default-control .axis-label,
+.controls-page-focus-screen-default-control .axis-label {
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.application-runtime-screen-default-control .slider,
+.controls-page-focus-screen-default-control .slider {
+  height: 38px;
+}
+
+.application-runtime-screen-default-control .slider-thumb,
+.controls-page-focus-screen-default-control .slider-thumb {
+  width: 34px;
+  height: 34px;
+}
+
+.application-runtime-screen-default-control .controls-mode-button-widget,
+.controls-page-focus-screen-default-control .controls-mode-button-widget {
+  font-size: var(--tablet-main-font-size);
+  padding: 0.5rem 0.72rem;
+}
+
+.application-runtime-screen-default-control .controls-mode-button-value,
+.controls-page-focus-screen-default-control .controls-mode-button-value {
+  font-size: 0.86rem;
+  padding: 0.2rem 0.5rem;
+}
+
+.application-runtime-screen-default-control .controls-max-velocity-widget,
+.controls-page-focus-screen-default-control .controls-max-velocity-widget {
+  padding: 0.62rem 0.8rem;
+  gap: 0.5rem;
+}
+
+.application-runtime-screen-default-control .controls-max-velocity-title,
+.controls-page-focus-screen-default-control .controls-max-velocity-title {
+  font-size: 1.02rem;
+  text-transform: capitalize;
+}
+
+.application-runtime-screen-default-control .controls-max-velocity-value,
+.controls-page-focus-screen-default-control .controls-max-velocity-value {
+  font-size: 0.95rem;
+}
+
+.application-runtime-screen-default-control .controls-gripper-widget,
+.controls-page-focus-screen-default-control .controls-gripper-widget {
+  padding: 0.56rem;
+}
+
+.application-runtime-screen-default-control .controls-gripper-widget.is-compact,
+.controls-page-focus-screen-default-control .controls-gripper-widget.is-compact {
+  gap: 0.5rem;
+}
+
+.application-runtime-screen-default-control .controls-gripper-widget.is-compact .action-button,
+.controls-page-focus-screen-default-control .controls-gripper-widget.is-compact .action-button {
+  font-size: 1.04rem;
+  padding: 0.9rem 0.82rem;
+}
+
+.application-runtime-screen-default-control .z-label,
+.controls-page-focus-screen-default-control .z-label {
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+@media (min-width: 1201px) {
+  .controls-design-page {
+    --design-aside-width: 360px;
+  }
+
+  .controls-design-page .controls-workspace {
+    overflow: hidden;
+  }
+
+  .controls-design-page .controls-canvas-zone {
+    width: 100%;
+  }
+
+  .controls-design-page .controls-canvas-surface {
+    width: 100%;
+  }
+
+  .application-runtime-page .controls-workspace {
+    overflow: auto;
+  }
+
+  .application-runtime-page .controls-canvas-zone {
+    width: 100%;
+  }
+
+  .application-runtime-page .controls-canvas-surface {
+    width: 100%;
+  }
 }
 
 @media (max-width: 1200px) {
@@ -1170,6 +1861,11 @@ body,
 
   .controls-aside-menu {
     position: static;
+  }
+
+  .controls-aside-overlay {
+    width: min(var(--design-aside-width, 360px), 92vw);
+    padding-right: 0.35rem;
   }
 
   .controls-field-row {

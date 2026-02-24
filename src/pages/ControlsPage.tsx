@@ -11,9 +11,12 @@ import type { CanvasRect } from "../components/layout/CanvasItem";
 import { wsClient } from "../services/wsClient";
 import {
   ActionButtonWidget,
+  CurvesWidget,
   GripperControlWidget,
   JoystickWidget,
   LoadPoseButtonWidget,
+  LogsWidget,
+  ModeButtonWidget,
   MaxVelocityWidget,
   NavigationBarWidget,
   NavigationButtonWidget,
@@ -27,6 +30,7 @@ import {
   cloneWidgets,
   createWidgetFromCatalogType,
   DEFAULT_WIDGETS,
+  getDefaultDemoConfigurationByName,
   loadConfigurationsFromLocalStorage,
   persistConfigurationsToLocalStorage,
   removeConfiguration,
@@ -34,8 +38,10 @@ import {
   syncConfigurationsToFolder,
   type ButtonWidgetModel,
   type CanvasWidget,
+  type CurvesWidgetModel,
   type JoystickWidgetModel,
   type LoadPoseButtonWidgetModel,
+  type LogsWidgetModel,
   type MaxVelocityWidgetModel,
   type NavigationBarWidgetModel,
   type NavigationButtonWidgetModel,
@@ -50,10 +56,24 @@ import {
   type WidgetIcon,
   type WidgetCatalogType,
   type WidgetConfiguration,
+  CANVAS_PRESETS,
+  DEFAULT_CANVAS_SETTINGS,
+  cloneCanvasSettings,
+  getCanvasPreset,
+  resolveCanvasArtboardSize,
+  resolveCanvasFitScale,
+  resolveCanvasPresetSize,
+  type CanvasSettings,
+  type RuntimeCanvasMode,
   upsertConfiguration,
 } from "../components/widgets";
 import { useTeleopStore } from "../store/teleopStore";
 import { useUiStore } from "../store/uiStore";
+import {
+  resizeWidgetsForPresetTransition,
+  resolvePendingResizeSourcePreset,
+} from "./controls/canvasPresetResizing";
+import { useCanvasHistory } from "./controls/useCanvasHistory";
 
 type ControlsPageProps = {
   focusOnly?: boolean;
@@ -67,11 +87,58 @@ type ContextMenuState = {
   canvasY: number;
 };
 
+type SnapGuides = {
+  vertical: number[];
+  horizontal: number[];
+};
+
+type SnapMode = "off" | "slide" | "smart";
+
 const ENABLED_WIDGETS = WIDGET_CATALOG.filter((entry) => entry.enabled);
 const DEFAULT_ADD_WIDGET_TYPE: WidgetCatalogType =
   (ENABLED_WIDGETS[0]?.type as WidgetCatalogType | undefined) ?? "joystick";
 const TOPIC_FRESHNESS_MS = 200;
 const TOPIC_FRESHNESS_TICK_MS = 100;
+const SNAP_THRESHOLD_PX = 10;
+const SNAP_GUIDE_HIDE_DELAY_MS = 130;
+const MIN_EDITOR_ZOOM = 0.2;
+const MAX_EDITOR_ZOOM = 2.5;
+const EDITOR_ZOOM_STEP = 0.1;
+const SNAP_MODE_LABEL: Record<SnapMode, string> = {
+  off: "Off",
+  slide: "Slide",
+  smart: "Smart",
+};
+
+const readDetectedDisplaySize = () => {
+  if (typeof window === "undefined") {
+    return { width: 0, height: 0 };
+  }
+  const width = window.visualViewport?.width ?? window.innerWidth;
+  const height = window.visualViewport?.height ?? window.innerHeight;
+  return {
+    width: Math.max(0, Math.round(width)),
+    height: Math.max(0, Math.round(height)),
+  };
+};
+
+const pickClosestCanvasPreset = (width: number, height: number) => {
+  if (width <= 0 || height <= 0) return CANVAS_PRESETS[0];
+  const targetAspect = width / height;
+  const targetArea = width * height;
+
+  return CANVAS_PRESETS.reduce((best, preset) => {
+    const bestAspectDiff = Math.abs(best.width / best.height - targetAspect);
+    const presetAspectDiff = Math.abs(preset.width / preset.height - targetAspect);
+    if (presetAspectDiff < bestAspectDiff - 0.00001) return preset;
+    if (Math.abs(presetAspectDiff - bestAspectDiff) <= 0.00001) {
+      const bestAreaDiff = Math.abs(best.width * best.height - targetArea);
+      const presetAreaDiff = Math.abs(preset.width * preset.height - targetArea);
+      if (presetAreaDiff < bestAreaDiff) return preset;
+    }
+    return best;
+  }, CANVAS_PRESETS[0]);
+};
 
 const readNumber = (raw: string, fallback: number) => {
   const parsed = Number(raw);
@@ -79,6 +146,8 @@ const readNumber = (raw: string, fallback: number) => {
 };
 
 const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
+const clampEditorZoom = (value: number) =>
+  Math.max(MIN_EDITOR_ZOOM, Math.min(MAX_EDITOR_ZOOM, Math.round(value * 100) / 100));
 const HEX_COLOR_PATTERN = /^#(?:[0-9a-fA-F]{3}){1,2}$/;
 const toColorInputValue = (value: string, fallback = "#4a9eff") =>
   HEX_COLOR_PATTERN.test(value.trim()) ? value : fallback;
@@ -94,6 +163,8 @@ const isTypingTarget = (target: EventTarget | null) => {
 };
 const nextNavigationItemId = () =>
   `nav-item-${Date.now()}-${Math.random().toString(16).slice(2, 7)}`;
+const toScreenClassToken = (screenId: string) =>
+  screenId.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-");
 
 export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageProps) {
   const joyX = useTeleopStore((s) => s.joyX);
@@ -116,6 +187,8 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
   const rvizStreamUrl = useUiStore((s) => s.rvizStreamUrl);
 
   const canvasSurfaceRef = useRef<HTMLDivElement | null>(null);
+  const canvasViewportRef = useRef<HTMLDivElement | null>(null);
+  const canvasFrameRef = useRef<HTMLDivElement | null>(null);
   const [topBarSlotElement, setTopBarSlotElement] = useState<HTMLElement | null>(null);
 
   const [widgets, setWidgets] = useState<CanvasWidget[]>([]);
@@ -123,9 +196,13 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
   const [quickAddType, setQuickAddType] = useState<WidgetCatalogType>(DEFAULT_ADD_WIDGET_TYPE);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [pendingNavBarScreenId, setPendingNavBarScreenId] = useState<string>("");
+  const [isInspectorOpen, setIsInspectorOpen] = useState(true);
 
   const [configurations, setConfigurations] = useState<WidgetConfiguration[]>(() =>
     loadConfigurationsFromLocalStorage()
+  );
+  const [canvasSettings, setCanvasSettings] = useState<CanvasSettings>(() =>
+    cloneCanvasSettings(DEFAULT_CANVAS_SETTINGS)
   );
   const [selectedConfigName, setSelectedConfigName] = useState<string>("");
   const [configNameInput, setConfigNameInput] = useState<string>("");
@@ -134,10 +211,25 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
   const [freshnessClock, setFreshnessClock] = useState<number>(() => Date.now());
   const [rosbagRecording, setRosbagRecording] = useState(false);
   const [rosbagStatus, setRosbagStatus] = useState("idle");
-  const [savedBaseline, setSavedBaseline] = useState<{ name: string; widgetSignature: string }>({
+  const [savedBaseline, setSavedBaseline] = useState<{
+    name: string;
+    widgetSignature: string;
+    canvasSignature: string;
+  }>({
     name: "",
     widgetSignature: JSON.stringify([]),
+    canvasSignature: JSON.stringify(DEFAULT_CANVAS_SETTINGS),
   });
+  const [canvasViewportSize, setCanvasViewportSize] = useState<{ width: number; height: number }>({
+    width: 0,
+    height: 0,
+  });
+  const [detectedDisplaySize, setDetectedDisplaySize] = useState(() => readDetectedDisplaySize());
+  const [pendingResizeSourcePresetId, setPendingResizeSourcePresetId] = useState<CanvasSettings["presetId"] | null>(null);
+  const [editorZoom, setEditorZoom] = useState<number>(1);
+  const [snapMode, setSnapMode] = useState<SnapMode>("smart");
+  const [snapGuides, setSnapGuides] = useState<SnapGuides>({ vertical: [], horizontal: [] });
+  const snapGuideTimeoutRef = useRef<number | null>(null);
 
   const magnitude = useMemo(() => Math.min(1, Math.hypot(joyX, joyY)), [joyX, joyY]);
 
@@ -165,11 +257,51 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
   }, [focusOnly]);
 
   useEffect(() => {
+    const viewport = canvasViewportRef.current;
+    if (!viewport) return;
+
+    const updateSize = () => {
+      setCanvasViewportSize({
+        width: viewport.clientWidth,
+        height: viewport.clientHeight,
+      });
+    };
+
+    updateSize();
+
+    const observer = new ResizeObserver(updateSize);
+    observer.observe(viewport);
+
+    return () => observer.disconnect();
+  }, [focusOnly]);
+
+  useEffect(() => {
+    const updateDisplaySize = () => {
+      setDetectedDisplaySize(readDetectedDisplaySize());
+    };
+    updateDisplaySize();
+    window.addEventListener("resize", updateDisplaySize);
+    window.visualViewport?.addEventListener("resize", updateDisplaySize);
+    return () => {
+      window.removeEventListener("resize", updateDisplaySize);
+      window.visualViewport?.removeEventListener("resize", updateDisplaySize);
+    };
+  }, []);
+
+  useEffect(() => {
     const timer = window.setInterval(() => {
       setFreshnessClock(Date.now());
     }, TOPIC_FRESHNESS_TICK_MS);
 
     return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (snapGuideTimeoutRef.current !== null) {
+        window.clearTimeout(snapGuideTimeoutRef.current);
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -234,6 +366,18 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [selectedWidgetId]);
 
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (isTypingTarget(event.target)) return;
+      if (!event.ctrlKey || event.key !== "\\") return;
+      event.preventDefault();
+      setIsInspectorOpen((prev) => !prev);
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
   const selectedWidget = useMemo(
     () => widgets.find((widget) => widget.id === selectedWidgetId) ?? null,
     [selectedWidgetId, widgets]
@@ -247,19 +391,71 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
     [configurations]
   );
   const widgetSignature = useMemo(() => JSON.stringify(widgets), [widgets]);
+  const canvasSettingsSignature = useMemo(() => JSON.stringify(canvasSettings), [canvasSettings]);
   const trimmedNameInput = configNameInput.trim();
   const hasWidgetDiff = widgetSignature !== savedBaseline.widgetSignature;
+  const hasCanvasSettingsDiff = canvasSettingsSignature !== savedBaseline.canvasSignature;
   const hasNameDiff = trimmedNameInput.length > 0 && trimmedNameInput !== savedBaseline.name;
-  const isCanvasDirty = hasWidgetDiff || hasNameDiff;
+  const isCanvasDirty = hasWidgetDiff || hasCanvasSettingsDiff || hasNameDiff;
 
-  const canvasSize = useMemo(() => {
-    const maxRight = widgets.reduce((acc, widget) => Math.max(acc, widget.rect.x + widget.rect.w), 220);
-    const maxBottom = widgets.reduce((acc, widget) => Math.max(acc, widget.rect.y + widget.rect.h), 220);
-    return {
-      width: maxRight + 24,
-      height: maxBottom + 24,
-    };
-  }, [widgets]);
+  const editorCanvasSize = useMemo(
+    () => resolveCanvasArtboardSize(widgets, canvasSettings),
+    [canvasSettings, widgets]
+  );
+  const runtimeCanvasSize = useMemo(
+    () => resolveCanvasPresetSize(canvasSettings),
+    [canvasSettings]
+  );
+  const canvasSize = focusOnly ? runtimeCanvasSize : editorCanvasSize;
+  const targetCanvasPreset = useMemo(
+    () => getCanvasPreset(canvasSettings.presetId),
+    [canvasSettings.presetId]
+  );
+  const recommendedDisplayPreset = useMemo(
+    () => pickClosestCanvasPreset(detectedDisplaySize.width, detectedDisplaySize.height),
+    [detectedDisplaySize.height, detectedDisplaySize.width]
+  );
+  const runtimeCanvasMode: RuntimeCanvasMode = focusOnly ? "fit" : "left";
+  const baseCanvasScale = useMemo(
+    () => resolveCanvasFitScale(runtimeCanvasMode, canvasSize, canvasViewportSize),
+    [canvasSize, canvasViewportSize, runtimeCanvasMode]
+  );
+  const canvasScale = useMemo(
+    () => baseCanvasScale * (focusOnly ? 1 : editorZoom),
+    [baseCanvasScale, editorZoom, focusOnly]
+  );
+  const scaledCanvasSize = useMemo(
+    () => ({
+      width: Math.round(canvasSize.width * canvasScale),
+      height: Math.round(canvasSize.height * canvasScale),
+    }),
+    [canvasScale, canvasSize]
+  );
+  const fitZoomForTarget = useMemo(() => {
+    if (canvasViewportSize.width <= 0 || canvasViewportSize.height <= 0) {
+      return 1;
+    }
+    const viewportPadding = 28;
+    const availableWidth = Math.max(120, canvasViewportSize.width - viewportPadding);
+    const availableHeight = Math.max(120, canvasViewportSize.height - viewportPadding);
+    const fitScale = Math.min(
+      availableWidth / targetCanvasPreset.width,
+      availableHeight / targetCanvasPreset.height
+    );
+    return clampEditorZoom(fitScale);
+  }, [canvasViewportSize, targetCanvasPreset.height, targetCanvasPreset.width]);
+  const editorZoomPercent = Math.round(editorZoom * 100);
+
+  useCanvasHistory({
+    widgets,
+    canvasSettings,
+    setWidgets,
+    setCanvasSettings,
+    setSelectedWidgetId,
+    isTypingTarget,
+    setStatusMessage,
+    onSnapshotApplied: () => setPendingResizeSourcePresetId(null),
+  });
 
   useEffect(() => {
     onDirtyChange?.(isCanvasDirty);
@@ -301,6 +497,172 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
 
   const updateWidget = (id: string, updater: (widget: CanvasWidget) => CanvasWidget) => {
     setWidgets((prev) => prev.map((widget) => (widget.id === id ? updater(widget) : widget)));
+  };
+
+  const handleWidgetRectChange = (widgetId: string, nextRect: CanvasRect) => {
+    const currentWidget = widgets.find((widget) => widget.id === widgetId);
+    if (!currentWidget) return;
+
+    const roundedRect: CanvasRect = {
+      x: Math.round(nextRect.x),
+      y: Math.round(nextRect.y),
+      w: Math.round(nextRect.w),
+      h: Math.round(nextRect.h),
+    };
+
+    if (snapMode === "off") {
+      updateWidget(widgetId, (widget) => ({ ...widget, rect: roundedRect }));
+      setSnapGuides((prev) =>
+        prev.vertical.length || prev.horizontal.length ? { vertical: [], horizontal: [] } : prev
+      );
+      return;
+    }
+
+    const isResizeOnly =
+      nextRect.x === currentWidget.rect.x &&
+      nextRect.y === currentWidget.rect.y &&
+      (nextRect.w !== currentWidget.rect.w || nextRect.h !== currentWidget.rect.h);
+
+    const candidateVertical = [0, targetCanvasPreset.width / 2, targetCanvasPreset.width];
+    const candidateHorizontal = [0, targetCanvasPreset.height / 2, targetCanvasPreset.height];
+
+    if (snapMode === "smart") {
+      for (const widget of widgets) {
+        if (widget.id === widgetId) continue;
+        candidateVertical.push(
+          widget.rect.x,
+          widget.rect.x + widget.rect.w / 2,
+          widget.rect.x + widget.rect.w
+        );
+        candidateHorizontal.push(
+          widget.rect.y,
+          widget.rect.y + widget.rect.h / 2,
+          widget.rect.y + widget.rect.h
+        );
+      }
+    }
+
+    let snappedRect: CanvasRect = roundedRect;
+
+    const guides: SnapGuides = { vertical: [], horizontal: [] };
+
+    if (isResizeOnly) {
+      const right = snappedRect.x + snappedRect.w;
+      const bottom = snappedRect.y + snappedRect.h;
+
+      let bestVerticalDiff = Number.POSITIVE_INFINITY;
+      let verticalGuide: number | null = null;
+      for (const line of candidateVertical) {
+        const diff = line - right;
+        const distance = Math.abs(diff);
+        if (distance <= SNAP_THRESHOLD_PX && distance < bestVerticalDiff) {
+          bestVerticalDiff = distance;
+          verticalGuide = line;
+        }
+      }
+
+      if (verticalGuide !== null) {
+        snappedRect = {
+          ...snappedRect,
+          w: Math.max(24, Math.round(verticalGuide - snappedRect.x)),
+        };
+        guides.vertical = [Math.round(verticalGuide)];
+      }
+
+      let bestHorizontalDiff = Number.POSITIVE_INFINITY;
+      let horizontalGuide: number | null = null;
+      for (const line of candidateHorizontal) {
+        const diff = line - bottom;
+        const distance = Math.abs(diff);
+        if (distance <= SNAP_THRESHOLD_PX && distance < bestHorizontalDiff) {
+          bestHorizontalDiff = distance;
+          horizontalGuide = line;
+        }
+      }
+
+      if (horizontalGuide !== null) {
+        snappedRect = {
+          ...snappedRect,
+          h: Math.max(24, Math.round(horizontalGuide - snappedRect.y)),
+        };
+        guides.horizontal = [Math.round(horizontalGuide)];
+      }
+    } else {
+      const verticalAnchors = [
+        { value: snappedRect.x },
+        { value: snappedRect.x + snappedRect.w / 2 },
+        { value: snappedRect.x + snappedRect.w },
+      ];
+      const horizontalAnchors = [
+        { value: snappedRect.y },
+        { value: snappedRect.y + snappedRect.h / 2 },
+        { value: snappedRect.y + snappedRect.h },
+      ];
+
+      let bestVerticalDiff = Number.POSITIVE_INFINITY;
+      let verticalDelta = 0;
+      let verticalGuide: number | null = null;
+      for (const anchor of verticalAnchors) {
+        for (const line of candidateVertical) {
+          const diff = line - anchor.value;
+          const distance = Math.abs(diff);
+          if (distance <= SNAP_THRESHOLD_PX && distance < bestVerticalDiff) {
+            bestVerticalDiff = distance;
+            verticalDelta = diff;
+            verticalGuide = line;
+          }
+        }
+      }
+
+      if (verticalGuide !== null) {
+        snappedRect = {
+          ...snappedRect,
+          x: Math.max(0, Math.round(snappedRect.x + verticalDelta)),
+        };
+        guides.vertical = [Math.round(verticalGuide)];
+      }
+
+      let bestHorizontalDiff = Number.POSITIVE_INFINITY;
+      let horizontalDelta = 0;
+      let horizontalGuide: number | null = null;
+      for (const anchor of horizontalAnchors) {
+        for (const line of candidateHorizontal) {
+          const diff = line - anchor.value;
+          const distance = Math.abs(diff);
+          if (distance <= SNAP_THRESHOLD_PX && distance < bestHorizontalDiff) {
+            bestHorizontalDiff = distance;
+            horizontalDelta = diff;
+            horizontalGuide = line;
+          }
+        }
+      }
+
+      if (horizontalGuide !== null) {
+        snappedRect = {
+          ...snappedRect,
+          y: Math.max(0, Math.round(snappedRect.y + horizontalDelta)),
+        };
+        guides.horizontal = [Math.round(horizontalGuide)];
+      }
+    }
+
+    updateWidget(widgetId, (widget) => ({ ...widget, rect: snappedRect }));
+
+    const hasGuides = guides.vertical.length > 0 || guides.horizontal.length > 0;
+    if (hasGuides) {
+      setSnapGuides(guides);
+      if (snapGuideTimeoutRef.current !== null) {
+        window.clearTimeout(snapGuideTimeoutRef.current);
+      }
+      snapGuideTimeoutRef.current = window.setTimeout(() => {
+        setSnapGuides({ vertical: [], horizontal: [] });
+      }, SNAP_GUIDE_HIDE_DELAY_MS);
+      return;
+    }
+
+    setSnapGuides((prev) =>
+      prev.vertical.length || prev.horizontal.length ? { vertical: [], horizontal: [] } : prev
+    );
   };
 
   const updateSelectedWidget = (updater: (widget: CanvasWidget) => CanvasWidget) => {
@@ -380,12 +742,17 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
   ) => {
     updateSelectedWidget((widget) => (widget.kind === "stream-display" ? updater(widget) : widget));
   };
+  const updateSelectedCurves = (updater: (widget: CurvesWidgetModel) => CurvesWidgetModel) => {
+    updateSelectedWidget((widget) => (widget.kind === "curves" ? updater(widget) : widget));
+  };
+  const updateSelectedLogs = (updater: (widget: LogsWidgetModel) => LogsWidgetModel) => {
+    updateSelectedWidget((widget) => (widget.kind === "logs" ? updater(widget) : widget));
+  };
 
   const markWidgetPulse = (widgetId: string) => {
-    const now = Date.now();
     setWidgetPulseMap((prev) => ({
       ...prev,
-      [widgetId]: now,
+      [widgetId]: Date.now(),
     }));
   };
 
@@ -399,7 +766,7 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
 
     const widget = createWidgetFromCatalogType(type, x, y);
     if (!widget) {
-      setStatusMessage(`Widget type \"${type}\" is not implemented yet.`);
+      setStatusMessage(`Widget type "${type}" is not implemented yet.`);
       return;
     }
 
@@ -412,6 +779,8 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
     if (!name) {
       setSelectedConfigName("");
       setConfigNameInput("");
+      setCanvasSettings(cloneCanvasSettings(DEFAULT_CANVAS_SETTINGS));
+      setPendingResizeSourcePresetId(null);
       setStatusMessage("No screen selected.");
       return;
     }
@@ -436,6 +805,7 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
     if (!confirmDiscardUnsavedChanges("Clear the canvas")) return;
     setWidgets([]);
     setSelectedWidgetId(null);
+    setPendingResizeSourcePresetId(null);
     setStatusMessage("Canvas cleared.");
   };
 
@@ -450,14 +820,17 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
     }
     const loadedWidgets = cloneWidgets(configuration.widgets);
     setWidgets(loadedWidgets);
+    setCanvasSettings(cloneCanvasSettings(configuration.canvas));
+    setPendingResizeSourcePresetId(null);
     setSelectedWidgetId(null);
     setSelectedConfigName(name);
     setConfigNameInput(name);
     setSavedBaseline({
       name,
       widgetSignature: JSON.stringify(loadedWidgets),
+      canvasSignature: JSON.stringify(configuration.canvas),
     });
-    setStatusMessage(`Loaded \"${name}\".`);
+    setStatusMessage(`Loaded "${name}".`);
   };
 
   const saveCurrentConfiguration = () => {
@@ -467,14 +840,15 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
       return;
     }
 
-    setConfigurations((prev) => upsertConfiguration(prev, name, widgets));
+    setConfigurations((prev) => upsertConfiguration(prev, name, widgets, undefined, canvasSettings));
     setSelectedConfigName(name);
     setConfigNameInput(name);
     setSavedBaseline({
       name,
       widgetSignature,
+      canvasSignature: canvasSettingsSignature,
     });
-    setStatusMessage(`Saved \"${name}\".`);
+    setStatusMessage(`Saved "${name}".`);
   };
 
   const deleteSelectedConfiguration = () => {
@@ -484,11 +858,12 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
     }
 
     setConfigurations((prev) => removeConfiguration(prev, selectedConfigName));
-    setStatusMessage(`Deleted \"${selectedConfigName}\".`);
+    setStatusMessage(`Deleted "${selectedConfigName}".`);
     if (savedBaseline.name === selectedConfigName) {
       setSavedBaseline({
         name: "",
         widgetSignature: JSON.stringify([]),
+        canvasSignature: JSON.stringify(DEFAULT_CANVAS_SETTINGS),
       });
     }
     setSelectedConfigName("");
@@ -497,9 +872,25 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
 
   const loadDemoConfiguration = () => {
     if (!confirmDiscardUnsavedChanges("Load demo widgets")) return;
+    const requestedName = (selectedConfigName || configNameInput || "default_control").trim();
+    const demoConfiguration =
+      getDefaultDemoConfigurationByName(requestedName) ??
+      getDefaultDemoConfigurationByName("default_control");
+
+    if (demoConfiguration) {
+      setWidgets(cloneWidgets(demoConfiguration.widgets));
+      setCanvasSettings(cloneCanvasSettings(demoConfiguration.canvas));
+      setPendingResizeSourcePresetId(null);
+      setSelectedWidgetId(null);
+      setStatusMessage(`Loaded demo layout for "${demoConfiguration.name}".`);
+      return;
+    }
+
     setWidgets(cloneWidgets(DEFAULT_WIDGETS));
+    setCanvasSettings(cloneCanvasSettings(DEFAULT_CANVAS_SETTINGS));
+    setPendingResizeSourcePresetId(null);
     setSelectedWidgetId(null);
-    setStatusMessage("Loaded default demo widgets.");
+    setStatusMessage("Loaded fallback demo widgets.");
   };
 
   const upsertPose = (poses: PoseSnapshot[], pose: PoseSnapshot) => {
@@ -562,7 +953,7 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
             }
       )
     );
-    setStatusMessage(`Pose \"${poseName}\" saved for screen \"${selectedConfigName}\".`);
+    setStatusMessage(`Pose "${poseName}" saved for screen "${selectedConfigName}".`);
   };
 
   const loadPoseByName = (poseName: string) => {
@@ -578,7 +969,7 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
 
     const pose = configuration.poses.find((item) => item.name === poseName);
     if (!pose) {
-      setStatusMessage(`Pose \"${poseName}\" not found.`);
+      setStatusMessage(`Pose "${poseName}" not found.`);
       return;
     }
 
@@ -612,8 +1003,8 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
     }
 
     if (touchedWidgetIds.length) {
-      const now = Date.now();
       setWidgetPulseMap((prev) => {
+        const now = Date.now();
         const next = { ...prev };
         for (const widgetId of touchedWidgetIds) {
           next[widgetId] = now;
@@ -622,7 +1013,7 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
       });
     }
 
-    setStatusMessage(`Pose \"${pose.name}\" loaded.`);
+    setStatusMessage(`Pose "${pose.name}" loaded.`);
   };
 
   const addSelectedScreenToNavigationBar = () => {
@@ -679,18 +1070,110 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
     }
   };
 
+  const zoomOutEditorCanvas = () => {
+    setEditorZoom((prev) => clampEditorZoom(prev - EDITOR_ZOOM_STEP));
+  };
+
+  const zoomInEditorCanvas = () => {
+    setEditorZoom((prev) => clampEditorZoom(prev + EDITOR_ZOOM_STEP));
+  };
+
+  const resetEditorCanvasZoom = () => {
+    setEditorZoom(1);
+  };
+
+  const fitEditorCanvasToTarget = () => {
+    setEditorZoom(fitZoomForTarget);
+  };
+
+  const applyCanvasPreset = (nextPresetId: CanvasSettings["presetId"]) => {
+    const previousPreset = getCanvasPreset(canvasSettings.presetId);
+    const nextPreset = getCanvasPreset(nextPresetId);
+    if (previousPreset.id === nextPreset.id) {
+      return {
+        changed: false,
+        widgetCount: widgets.length,
+        previousPreset,
+        nextPreset,
+      };
+    }
+
+    const widgetCount = widgets.length;
+    setCanvasSettings((prev) => ({
+      ...prev,
+      presetId: nextPreset.id,
+    }));
+    setPendingResizeSourcePresetId((current) =>
+      resolvePendingResizeSourcePreset(
+        current,
+        previousPreset.id,
+        nextPreset.id,
+        widgetCount > 0
+      )
+    );
+
+    return {
+      changed: true,
+      widgetCount,
+      previousPreset,
+      nextPreset,
+    };
+  };
+
+  const resizeWidgetsToCurrentPreset = () => {
+    if (!widgets.length) {
+      setPendingResizeSourcePresetId(null);
+      setStatusMessage("No widgets to resize.");
+      return;
+    }
+    const sourcePresetId = pendingResizeSourcePresetId;
+    if (!sourcePresetId || sourcePresetId === canvasSettings.presetId) {
+      setStatusMessage("No pending canvas preset change to resize from.");
+      return;
+    }
+
+    const { resizedWidgets, resizedCount, fromPreset, toPreset } = resizeWidgetsForPresetTransition(
+      widgets,
+      sourcePresetId,
+      canvasSettings.presetId
+    );
+    setWidgets(resizedWidgets);
+    setPendingResizeSourcePresetId(null);
+    setStatusMessage(
+      `Resized ${resizedCount} widget(s) from ${fromPreset.label} to ${toPreset.label}.`
+    );
+  };
+
+  const matchCanvasToDetectedDisplay = () => {
+    if (recommendedDisplayPreset.id === canvasSettings.presetId) {
+      setStatusMessage(
+        `Canvas already matches ${recommendedDisplayPreset.label} for display ${detectedDisplaySize.width}x${detectedDisplaySize.height}.`
+      );
+      return;
+    }
+    const result = applyCanvasPreset(recommendedDisplayPreset.id);
+    const resizeHint = result.widgetCount > 0 ? ' Use "Resize Widgets" to scale layout.' : "";
+    setStatusMessage(
+      `Canvas set to ${recommendedDisplayPreset.label} for display ${detectedDisplaySize.width}x${detectedDisplaySize.height}.${resizeHint}`
+    );
+  };
+
   const handleCanvasContextMenu = (event: ReactMouseEvent<HTMLDivElement>) => {
     event.preventDefault();
 
-    const surface = canvasSurfaceRef.current;
-    if (!surface) return;
+    const frame = canvasFrameRef.current;
+    if (!frame) return;
 
-    const rect = surface.getBoundingClientRect();
+    const rect = frame.getBoundingClientRect();
+    const safeScale = canvasScale > 0 ? canvasScale : 1;
+    const rawX = (event.clientX - rect.left) / safeScale;
+    const rawY = (event.clientY - rect.top) / safeScale;
+
     setContextMenu({
       clientX: event.clientX,
       clientY: event.clientY,
-      canvasX: Math.max(0, Math.round(event.clientX - rect.left + surface.scrollLeft)),
-      canvasY: Math.max(0, Math.round(event.clientY - rect.top + surface.scrollTop)),
+      canvasX: Math.max(0, Math.min(canvasSize.width, Math.round(rawX))),
+      canvasY: Math.max(0, Math.min(canvasSize.height, Math.round(rawY))),
     });
   };
 
@@ -704,7 +1187,7 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
           widget={widget}
           selected={selected}
           onSelect={() => setSelectedWidgetId(widget.id)}
-          onRectChange={(next) => updateWidget(widget.id, (current) => ({ ...current, rect: next }))}
+          onRectChange={(next) => handleWidgetRectChange(widget.id, next)}
           onLabelChange={(nextLabel) =>
             updateWidget(widget.id, (current) =>
               current.kind === "save-pose-button" ? { ...current, label: nextLabel } : current
@@ -725,7 +1208,7 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
           widget={widget}
           selected={selected}
           onSelect={() => setSelectedWidgetId(widget.id)}
-          onRectChange={(next) => updateWidget(widget.id, (current) => ({ ...current, rect: next }))}
+          onRectChange={(next) => handleWidgetRectChange(widget.id, next)}
           onLabelChange={(nextLabel) =>
             updateWidget(widget.id, (current) =>
               current.kind === "load-pose-button"
@@ -741,6 +1224,23 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
       );
     }
 
+    if (widget.kind === "mode-button") {
+      return (
+        <ModeButtonWidget
+          key={widget.id}
+          widget={widget}
+          selected={selected}
+          onSelect={() => setSelectedWidgetId(widget.id)}
+          onRectChange={(next) => handleWidgetRectChange(widget.id, next)}
+          onLabelChange={(nextLabel) =>
+            updateWidget(widget.id, (current) =>
+              current.kind === "mode-button" ? { ...current, label: nextLabel } : current
+            )
+          }
+        />
+      );
+    }
+
     if (widget.kind === "navigation-button") {
       const canNavigate = availableScreenIds.includes(widget.targetScreenId);
       return (
@@ -749,7 +1249,7 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
           widget={widget}
           selected={selected}
           onSelect={() => setSelectedWidgetId(widget.id)}
-          onRectChange={(next) => updateWidget(widget.id, (current) => ({ ...current, rect: next }))}
+          onRectChange={(next) => handleWidgetRectChange(widget.id, next)}
           onLabelChange={(nextLabel) =>
             updateWidget(widget.id, (current) =>
               current.kind === "navigation-button" ? { ...current, label: nextLabel } : current
@@ -768,7 +1268,7 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
           widget={widget}
           selected={selected}
           onSelect={() => setSelectedWidgetId(widget.id)}
-          onRectChange={(next) => updateWidget(widget.id, (current) => ({ ...current, rect: next }))}
+          onRectChange={(next) => handleWidgetRectChange(widget.id, next)}
           onNavigate={(screenId) => setStatusMessage(`Navigation target selected: ${screenId}`)}
         />
       );
@@ -781,7 +1281,7 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
           widget={widget}
           selected={selected}
           onSelect={() => setSelectedWidgetId(widget.id)}
-          onRectChange={(next) => updateWidget(widget.id, (current) => ({ ...current, rect: next }))}
+          onRectChange={(next) => handleWidgetRectChange(widget.id, next)}
           onTextChange={(nextText) =>
             updateWidget(widget.id, (current) =>
               current.kind === "text" ? { ...current, text: nextText } : current
@@ -798,7 +1298,7 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
           widget={widget}
           selected={selected}
           onSelect={() => setSelectedWidgetId(widget.id)}
-          onRectChange={(next) => updateWidget(widget.id, (current) => ({ ...current, rect: next }))}
+          onRectChange={(next) => handleWidgetRectChange(widget.id, next)}
           onTextChange={(nextText) =>
             updateWidget(widget.id, (current) =>
               current.kind === "textarea" ? { ...current, text: nextText } : current
@@ -815,7 +1315,7 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
           widget={widget}
           selected={selected}
           onSelect={() => setSelectedWidgetId(widget.id)}
-          onRectChange={(next) => updateWidget(widget.id, (current) => ({ ...current, rect: next }))}
+          onRectChange={(next) => handleWidgetRectChange(widget.id, next)}
           onLabelChange={(nextLabel) =>
             updateWidget(widget.id, (current) =>
               current.kind === "button" ? { ...current, label: nextLabel } : current
@@ -841,7 +1341,7 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
           widget={widget}
           selected={selected}
           onSelect={() => setSelectedWidgetId(widget.id)}
-          onRectChange={(next) => updateWidget(widget.id, (current) => ({ ...current, rect: next }))}
+          onRectChange={(next) => handleWidgetRectChange(widget.id, next)}
           onLabelChange={(nextLabel) =>
             updateWidget(widget.id, (current) =>
               current.kind === "rosbag-control" ? { ...current, label: nextLabel } : current
@@ -861,7 +1361,7 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
           widget={widget}
           selected={selected}
           onSelect={() => setSelectedWidgetId(widget.id)}
-          onRectChange={(next) => updateWidget(widget.id, (current) => ({ ...current, rect: next }))}
+          onRectChange={(next) => handleWidgetRectChange(widget.id, next)}
           onLabelChange={(nextLabel) =>
             updateWidget(widget.id, (current) =>
               current.kind === "max-velocity" ? { ...current, label: nextLabel } : current
@@ -880,7 +1380,7 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
           widget={widget}
           selected={selected}
           onSelect={() => setSelectedWidgetId(widget.id)}
-          onRectChange={(next) => updateWidget(widget.id, (current) => ({ ...current, rect: next }))}
+          onRectChange={(next) => handleWidgetRectChange(widget.id, next)}
           onLabelChange={(nextLabel) =>
             updateWidget(widget.id, (current) =>
               current.kind === "gripper-control" ? { ...current, label: nextLabel } : current
@@ -903,20 +1403,67 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
     }
 
     if (widget.kind === "stream-display") {
-      const url = widget.source === "rviz" ? rvizStreamUrl : cameraStreamUrl;
+      const url = widget.source === "camera" ? cameraStreamUrl : rvizStreamUrl;
+      const sourceStatus =
+        widget.source === "rviz"
+          ? "RViz stream"
+          : widget.source === "visualization"
+            ? "Visualization stream"
+            : "Camera stream";
       return (
         <StreamDisplayWidget
           key={widget.id}
-          widget={{ ...widget, streamUrl: url || widget.streamUrl }}
+          widget={{
+            ...widget,
+            streamUrl: url || widget.streamUrl,
+            fitMode: widget.fitMode ?? "contain",
+            showStatus: widget.showStatus ?? true,
+            showUrl: widget.showUrl ?? true,
+            overlayText: widget.overlayText ?? "stream preview",
+          }}
           selected={selected}
           onSelect={() => setSelectedWidgetId(widget.id)}
-          onRectChange={(next) => updateWidget(widget.id, (current) => ({ ...current, rect: next }))}
+          onRectChange={(next) => handleWidgetRectChange(widget.id, next)}
           onLabelChange={(nextLabel) =>
             updateWidget(widget.id, (current) =>
               current.kind === "stream-display" ? { ...current, label: nextLabel } : current
             )
           }
-          statusText={widget.source === "rviz" ? "RViz stream" : "Camera stream"}
+          statusText={sourceStatus}
+        />
+      );
+    }
+
+    if (widget.kind === "curves") {
+      return (
+        <CurvesWidget
+          key={widget.id}
+          widget={widget}
+          selected={selected}
+          onSelect={() => setSelectedWidgetId(widget.id)}
+          onRectChange={(next) => handleWidgetRectChange(widget.id, next)}
+          onLabelChange={(nextLabel) =>
+            updateWidget(widget.id, (current) =>
+              current.kind === "curves" ? { ...current, label: nextLabel } : current
+            )
+          }
+        />
+      );
+    }
+
+    if (widget.kind === "logs") {
+      return (
+        <LogsWidget
+          key={widget.id}
+          widget={widget}
+          selected={selected}
+          onSelect={() => setSelectedWidgetId(widget.id)}
+          onRectChange={(next) => handleWidgetRectChange(widget.id, next)}
+          onLabelChange={(nextLabel) =>
+            updateWidget(widget.id, (current) =>
+              current.kind === "logs" ? { ...current, label: nextLabel } : current
+            )
+          }
         />
       );
     }
@@ -940,7 +1487,7 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
           isTopicFresh={isTopicFresh}
           selected={selected}
           onSelect={() => setSelectedWidgetId(widget.id)}
-          onRectChange={(next) => updateWidget(widget.id, (current) => ({ ...current, rect: next }))}
+          onRectChange={(next) => handleWidgetRectChange(widget.id, next)}
         />
       );
     }
@@ -955,7 +1502,7 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
         widget={widget}
         selected={selected}
         onSelect={() => setSelectedWidgetId(widget.id)}
-        onRectChange={(next) => updateWidget(widget.id, (current) => ({ ...current, rect: next }))}
+        onRectChange={(next) => handleWidgetRectChange(widget.id, next)}
         onLabelChange={(nextLabel) =>
           updateWidget(widget.id, (current) =>
             current.kind === "joystick" ? { ...current, label: nextLabel } : current
@@ -975,6 +1522,21 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
       />
     );
   };
+
+  const canvasViewportClassName = `controls-canvas-viewport controls-canvas-mode-${runtimeCanvasMode}`;
+  const canvasFrameStyle = {
+    width: `${scaledCanvasSize.width}px`,
+    height: `${scaledCanvasSize.height}px`,
+  };
+  const canvasTransformStyle = {
+    width: `${canvasSize.width}px`,
+    height: `${canvasSize.height}px`,
+    transform: `scale(${canvasScale})`,
+    transformOrigin: "top left",
+  };
+  const focusScreenClassName = selectedConfigName
+    ? `controls-page-focus-screen-${toScreenClassToken(selectedConfigName)}`
+    : "";
 
   const configToolbar = (
     <div className="controls-header-inline">
@@ -1005,6 +1567,103 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
           />
         </label>
 
+        <label className="controls-field controls-config-field">
+          <span>Canvas Size</span>
+          <select
+            className="editor-input"
+            value={canvasSettings.presetId}
+            onChange={(event) => {
+              const nextPresetId = event.target.value as CanvasSettings["presetId"];
+              const result = applyCanvasPreset(nextPresetId);
+              if (!result.changed) return;
+              const resizeHint = result.widgetCount > 0 ? ' Use "Resize Widgets" to scale layout.' : "";
+              setStatusMessage(
+                `Canvas size changed to ${result.nextPreset.label}.${resizeHint}`
+              );
+            }}
+          >
+            {CANVAS_PRESETS.map((preset) => (
+              <option key={preset.id} value={preset.id}>
+                {preset.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button
+          type="button"
+          className="tab-button"
+          onClick={resizeWidgetsToCurrentPreset}
+          disabled={
+            !pendingResizeSourcePresetId ||
+            pendingResizeSourcePresetId === canvasSettings.presetId ||
+            !widgets.length
+          }
+          title={
+            pendingResizeSourcePresetId
+              ? `Resize from ${getCanvasPreset(pendingResizeSourcePresetId).label} to ${targetCanvasPreset.label}`
+              : "Resize widgets after changing canvas size"
+          }
+        >
+          Resize Widgets
+        </button>
+        <button
+          type="button"
+          className="tab-button"
+          onClick={matchCanvasToDetectedDisplay}
+          title={`Detected display: ${detectedDisplaySize.width}x${detectedDisplaySize.height}`}
+        >
+          Match Display
+        </button>
+
+        <label className="controls-field controls-config-field">
+          <span>Runtime Layout</span>
+          <select
+            className="editor-input"
+            value={canvasSettings.runtimeMode}
+            onChange={(event) =>
+              setCanvasSettings((prev) => ({
+                ...prev,
+                runtimeMode: event.target.value as RuntimeCanvasMode,
+              }))
+            }
+          >
+            <option value="left">left</option>
+            <option value="center">center</option>
+            <option value="fit">fit (uniform)</option>
+          </select>
+        </label>
+
+        <label className="controls-field controls-config-field">
+          <span>Snap</span>
+          <select
+            className="editor-input"
+            value={snapMode}
+            onChange={(event) => setSnapMode(event.target.value as SnapMode)}
+          >
+            <option value="off">off</option>
+            <option value="slide">slide</option>
+            <option value="smart">smart</option>
+          </select>
+        </label>
+
+        <div className="controls-field controls-config-field controls-zoom-field">
+          <span>Zoom</span>
+          <div className="controls-zoom-controls">
+            <button type="button" className="tab-button" onClick={zoomOutEditorCanvas} aria-label="Zoom out canvas">
+              -
+            </button>
+            <button type="button" className="tab-button" onClick={resetEditorCanvasZoom} title="Reset zoom to 100%">
+              {editorZoomPercent}%
+            </button>
+            <button type="button" className="tab-button" onClick={zoomInEditorCanvas} aria-label="Zoom in canvas">
+              +
+            </button>
+            <button type="button" className="tab-button" onClick={fitEditorCanvasToTarget} title="Fit target slide">
+              Fit
+            </button>
+          </div>
+        </div>
+
         <button type="button" className="tab-button" onClick={() => selectedConfigName && loadConfigurationByName(selectedConfigName)}>
           Load
         </button>
@@ -1024,6 +1683,9 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
         <button type="button" className="tab-button" onClick={loadDemoConfiguration}>
           Load Demo
         </button>
+        <button type="button" className="tab-button" onClick={() => setIsInspectorOpen((prev) => !prev)}>
+          {isInspectorOpen ? "Hide Panel" : "Show Panel"}
+        </button>
         <button type="button" className="tab-button" onClick={handleSyncToFolder}>
           Sync To Folder
         </button>
@@ -1037,11 +1699,19 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
 
   if (focusOnly) {
     return (
-      <main className="controls-page controls-page-focus tab-accent tab-controls">
+      <main
+        className={`controls-page controls-page-focus tab-accent tab-controls ${focusScreenClassName}`.trim()}
+      >
         <section className="controls-workspace">
           <div className="controls-canvas-surface" ref={canvasSurfaceRef} onContextMenu={handleCanvasContextMenu}>
-            <div className="controls-canvas" style={{ width: `${canvasSize.width}px`, height: `${canvasSize.height}px` }}>
-              {widgets.map(renderCanvasWidget)}
+            <div className={canvasViewportClassName} ref={canvasViewportRef}>
+              <div className="controls-canvas-frame" ref={canvasFrameRef} style={canvasFrameStyle}>
+                <div className="controls-canvas-transform" style={canvasTransformStyle}>
+                  <div className="controls-canvas" style={{ width: `${canvasSize.width}px`, height: `${canvasSize.height}px` }}>
+                    {widgets.map(renderCanvasWidget)}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </section>
@@ -1078,17 +1748,53 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
   return (
     <>
       {topBarSlotElement ? createPortal(configToolbar, topBarSlotElement) : null}
-      <main className="controls-page tab-accent tab-controls">
-        <section className="controls-workspace">
-        <div className="controls-shell">
-          <div className="controls-canvas-surface" ref={canvasSurfaceRef} onContextMenu={handleCanvasContextMenu}>
-            <div className="controls-canvas" style={{ width: `${canvasSize.width}px`, height: `${canvasSize.height}px` }}>
-              {widgets.map(renderCanvasWidget)}
+      <main className="controls-page controls-design-page tab-accent tab-controls">
+        <section className="controls-workspace controls-workspace-editor">
+          <div className="controls-canvas-zone">
+            <div className="controls-canvas-surface" ref={canvasSurfaceRef} onContextMenu={handleCanvasContextMenu}>
+              <div className={canvasViewportClassName} ref={canvasViewportRef}>
+                <div className="controls-canvas-frame" ref={canvasFrameRef} style={canvasFrameStyle}>
+                  <div className="controls-canvas-transform" style={canvasTransformStyle}>
+                    <div className="controls-canvas" style={{ width: `${canvasSize.width}px`, height: `${canvasSize.height}px` }}>
+                      <div
+                        className="controls-canvas-target-zone"
+                        style={{
+                          width: `${targetCanvasPreset.width}px`,
+                          height: `${targetCanvasPreset.height}px`,
+                        }}
+                        aria-hidden
+                      >
+                        <div className="controls-canvas-target-label">
+                          {targetCanvasPreset.label}
+                        </div>
+                      </div>
+                      {snapGuides.vertical.map((x) => (
+                        <div
+                          key={`snap-v-${x}`}
+                          className="controls-canvas-snap-guide controls-canvas-snap-guide-vertical"
+                          style={{ left: `${x}px` }}
+                          aria-hidden
+                        />
+                      ))}
+                      {snapGuides.horizontal.map((y) => (
+                        <div
+                          key={`snap-h-${y}`}
+                          className="controls-canvas-snap-guide controls-canvas-snap-guide-horizontal"
+                          style={{ top: `${y}px` }}
+                          aria-hidden
+                        />
+                      ))}
+                      {widgets.map(renderCanvasWidget)}
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
-          <aside className="controls-aside">
-            <section className="card controls-aside-menu">
+          {isInspectorOpen ? (
+            <aside className="controls-aside controls-aside-overlay">
+              <section className="card controls-aside-menu">
               <h2>Widgets</h2>
 
               <div className="controls-widget-actions">
@@ -1112,7 +1818,7 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
               </div>
 
               <div className="controls-hint">
-                Drag widgets on the canvas to move. Right click to add at cursor.
+                Drag widgets to move. Right click to add at cursor. Snap: {SNAP_MODE_LABEL[snapMode]}. Use Zoom +/- or Fit to frame the slide.
               </div>
 
               <div className="controls-menu-list">
@@ -1130,7 +1836,7 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
               </div>
             </section>
 
-            <section className="card controls-inspector-card">
+              <section className="card controls-inspector-card">
               <h2>Properties</h2>
               {!selectedWidget ? (
                 <div className="placeholder">Select a widget to edit properties.</div>
@@ -1917,6 +2623,23 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
                   ) : selectedWidget.kind === "gripper-control" ? (
                     <>
                       <div className="controls-property-title">Gripper Control</div>
+                      <label className="controls-field">
+                        <span>Layout</span>
+                        <select
+                          className="editor-input"
+                          value={(selectedWidget.showAdvancedControls ?? true) ? "full" : "compact"}
+                          onChange={(event) =>
+                            updateSelectedWidget((widget) =>
+                              widget.kind === "gripper-control"
+                                ? { ...widget, showAdvancedControls: event.target.value === "full" }
+                                : widget
+                            )
+                          }
+                        >
+                          <option value="compact">buttons only</option>
+                          <option value="full">buttons + tuning</option>
+                        </select>
+                      </label>
                       <div className="controls-hint">
                         Uses runtime speed/force values from the control state.
                       </div>
@@ -1928,17 +2651,86 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
                         <span>Source</span>
                         <select
                           className="editor-input"
-                          value={selectedWidget.source}
+                          value={selectedWidget.source ?? "camera"}
                           onChange={(event) =>
                             updateSelectedStreamDisplay((widget) => ({
                               ...widget,
-                              source: event.target.value === "rviz" ? "rviz" : "camera",
+                              source:
+                                event.target.value === "rviz"
+                                  ? "rviz"
+                                  : event.target.value === "visualization"
+                                    ? "visualization"
+                                    : "camera",
                             }))
                           }
                         >
                           <option value="camera">camera</option>
                           <option value="rviz">rviz</option>
+                          <option value="visualization">visualization</option>
                         </select>
+                      </label>
+                      <label className="controls-field">
+                        <span>Fit Mode</span>
+                        <select
+                          className="editor-input"
+                          value={selectedWidget.fitMode ?? "contain"}
+                          onChange={(event) =>
+                            updateSelectedStreamDisplay((widget) => ({
+                              ...widget,
+                              fitMode: event.target.value === "cover" ? "cover" : "contain",
+                            }))
+                          }
+                        >
+                          <option value="contain">contain</option>
+                          <option value="cover">cover</option>
+                        </select>
+                      </label>
+                      <div className="controls-field-row">
+                        <label className="controls-field">
+                          <span>Status Label</span>
+                          <select
+                            className="editor-input"
+                            value={(selectedWidget.showStatus ?? true) ? "visible" : "hidden"}
+                            onChange={(event) =>
+                              updateSelectedStreamDisplay((widget) => ({
+                                ...widget,
+                                showStatus: event.target.value === "visible",
+                              }))
+                            }
+                          >
+                            <option value="visible">visible</option>
+                            <option value="hidden">hidden</option>
+                          </select>
+                        </label>
+                        <label className="controls-field">
+                          <span>Stream URL Row</span>
+                          <select
+                            className="editor-input"
+                            value={(selectedWidget.showUrl ?? true) ? "visible" : "hidden"}
+                            onChange={(event) =>
+                              updateSelectedStreamDisplay((widget) => ({
+                                ...widget,
+                                showUrl: event.target.value === "visible",
+                              }))
+                            }
+                          >
+                            <option value="visible">visible</option>
+                            <option value="hidden">hidden</option>
+                          </select>
+                        </label>
+                      </div>
+                      <label className="controls-field">
+                        <span>Overlay Text</span>
+                        <input
+                          className="editor-input"
+                          value={selectedWidget.overlayText ?? "stream preview"}
+                          onChange={(event) =>
+                            updateSelectedStreamDisplay((widget) => ({
+                              ...widget,
+                              overlayText: event.target.value,
+                            }))
+                          }
+                        />
                       </label>
                       <label className="controls-field">
                         <span>Fallback Stream URL</span>
@@ -1954,6 +2746,165 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
                         />
                       </label>
                     </>
+                  ) : selectedWidget.kind === "curves" ? (
+                    <>
+                      <div className="controls-property-title">Curves</div>
+                      <div className="controls-field-row">
+                        <label className="controls-field">
+                          <span>Sample Rate (Hz)</span>
+                          <input
+                            type="number"
+                            min={1}
+                            max={60}
+                            step={1}
+                            className="editor-input"
+                            value={selectedWidget.sampleRateHz}
+                            onChange={(event) =>
+                              updateSelectedCurves((widget) => ({
+                                ...widget,
+                                sampleRateHz: Math.max(1, Math.min(60, Math.round(readNumber(event.target.value, widget.sampleRateHz)))),
+                              }))
+                            }
+                          />
+                        </label>
+                        <label className="controls-field">
+                          <span>History (s)</span>
+                          <input
+                            type="number"
+                            min={2}
+                            max={60}
+                            step={1}
+                            className="editor-input"
+                            value={selectedWidget.historySeconds}
+                            onChange={(event) =>
+                              updateSelectedCurves((widget) => ({
+                                ...widget,
+                                historySeconds: Math.max(2, Math.min(60, Math.round(readNumber(event.target.value, widget.historySeconds)))),
+                              }))
+                            }
+                          />
+                        </label>
+                        <label className="controls-field">
+                          <span>Legend</span>
+                          <select
+                            className="editor-input"
+                            value={selectedWidget.showLegend ? "visible" : "hidden"}
+                            onChange={(event) =>
+                              updateSelectedCurves((widget) => ({
+                                ...widget,
+                                showLegend: event.target.value === "visible",
+                              }))
+                            }
+                          >
+                            <option value="visible">visible</option>
+                            <option value="hidden">hidden</option>
+                          </select>
+                        </label>
+                        <label className="controls-field">
+                          <span>TCP Speed Line</span>
+                          <select
+                            className="editor-input"
+                            value={selectedWidget.showSpeed ? "visible" : "hidden"}
+                            onChange={(event) =>
+                              updateSelectedCurves((widget) => ({
+                                ...widget,
+                                showSpeed: event.target.value === "visible",
+                              }))
+                            }
+                          >
+                            <option value="visible">visible</option>
+                            <option value="hidden">hidden</option>
+                          </select>
+                        </label>
+                      </div>
+                    </>
+                  ) : selectedWidget.kind === "logs" ? (
+                    <>
+                      <div className="controls-property-title">Logs</div>
+                      <div className="controls-field-row">
+                        <label className="controls-field">
+                          <span>Max Entries</span>
+                          <input
+                            type="number"
+                            min={10}
+                            max={1000}
+                            step={1}
+                            className="editor-input"
+                            value={selectedWidget.maxEntries}
+                            onChange={(event) =>
+                              updateSelectedLogs((widget) => ({
+                                ...widget,
+                                maxEntries: Math.max(10, Math.min(1000, Math.round(readNumber(event.target.value, widget.maxEntries)))),
+                              }))
+                            }
+                          />
+                        </label>
+                        <label className="controls-field">
+                          <span>Level Filter</span>
+                          <select
+                            className="editor-input"
+                            value={selectedWidget.levelFilter}
+                            onChange={(event) =>
+                              updateSelectedLogs((widget) => ({
+                                ...widget,
+                                levelFilter:
+                                  event.target.value === "info"
+                                    ? "info"
+                                    : event.target.value === "warn"
+                                      ? "warn"
+                                      : event.target.value === "error"
+                                        ? "error"
+                                        : "all",
+                              }))
+                            }
+                          >
+                            <option value="all">all</option>
+                            <option value="info">info</option>
+                            <option value="warn">warn</option>
+                            <option value="error">error</option>
+                          </select>
+                        </label>
+                        <label className="controls-field">
+                          <span>Auto Scroll</span>
+                          <select
+                            className="editor-input"
+                            value={selectedWidget.autoScroll ? "on" : "off"}
+                            onChange={(event) =>
+                              updateSelectedLogs((widget) => ({
+                                ...widget,
+                                autoScroll: event.target.value === "on",
+                              }))
+                            }
+                          >
+                            <option value="on">on</option>
+                            <option value="off">off</option>
+                          </select>
+                        </label>
+                        <label className="controls-field">
+                          <span>Timestamps</span>
+                          <select
+                            className="editor-input"
+                            value={selectedWidget.showTimestamp ? "on" : "off"}
+                            onChange={(event) =>
+                              updateSelectedLogs((widget) => ({
+                                ...widget,
+                                showTimestamp: event.target.value === "on",
+                              }))
+                            }
+                          >
+                            <option value="on">on</option>
+                            <option value="off">off</option>
+                          </select>
+                        </label>
+                      </div>
+                    </>
+                  ) : selectedWidget.kind === "mode-button" ? (
+                    <>
+                      <div className="controls-property-title">Mode Button</div>
+                      <div className="controls-hint">
+                        Cycles teleop mode on click and updates <code>teleop_cmd.mode</code> (0..3).
+                      </div>
+                    </>
                   ) : (
                     <>
                       <div className="controls-property-title">Save Pose Button</div>
@@ -1964,10 +2915,9 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
                   )}
                 </div>
               )}
-            </section>
-
-          </aside>
-        </div>
+              </section>
+            </aside>
+          ) : null}
         </section>
 
         {contextMenu ? (

@@ -1,12 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { loadApplicationsFromLocalStorage } from "../app/applications";
 import type { CanvasRect } from "../components/layout/CanvasItem";
 import {
   ActionButtonWidget,
+  CurvesWidget,
   GripperControlWidget,
   JoystickWidget,
   LoadPoseButtonWidget,
+  LogsWidget,
+  ModeButtonWidget,
   MaxVelocityWidget,
   NavigationBarWidget,
   NavigationButtonWidget,
@@ -16,6 +19,9 @@ import {
   StreamDisplayWidget,
   TextareaWidget,
   TextWidget,
+  DEFAULT_CANVAS_SETTINGS,
+  resolveCanvasFitScale,
+  resolveCanvasPresetSize,
   cloneWidgets,
   loadConfigurationsFromLocalStorage,
   persistConfigurationsToLocalStorage,
@@ -39,8 +45,10 @@ const TOPIC_FRESHNESS_TICK_MS = 100;
 
 const clampSignedUnit = (value: number) => Math.max(-1, Math.min(1, value));
 
-const NOOP_RECT_CHANGE = (_next: CanvasRect) => {};
-const NOOP_TEXT_CHANGE = (_next: string) => {};
+const NOOP_RECT_CHANGE: (next: CanvasRect) => void = () => {};
+const NOOP_TEXT_CHANGE: (next: string) => void = () => {};
+const toScreenClassToken = (screenId: string) =>
+  screenId.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-");
 
 export function ApplicationPage({
   applicationId,
@@ -73,6 +81,11 @@ export function ApplicationPage({
   const [freshnessClock, setFreshnessClock] = useState<number>(() => Date.now());
   const [rosbagRecording, setRosbagRecording] = useState(false);
   const [rosbagStatus, setRosbagStatus] = useState("idle");
+  const canvasViewportRef = useRef<HTMLDivElement | null>(null);
+  const [canvasViewportSize, setCanvasViewportSize] = useState<{ width: number; height: number }>({
+    width: 0,
+    height: 0,
+  });
 
   const applications = useMemo(() => loadApplicationsFromLocalStorage(), []);
   const activeApplication = useMemo(
@@ -109,6 +122,24 @@ export function ApplicationPage({
   }, []);
 
   useEffect(() => {
+    const viewport = canvasViewportRef.current;
+    if (!viewport) return;
+
+    const updateSize = () => {
+      setCanvasViewportSize({
+        width: viewport.clientWidth,
+        height: viewport.clientHeight,
+      });
+    };
+
+    updateSize();
+    const observer = new ResizeObserver(updateSize);
+    observer.observe(viewport);
+
+    return () => observer.disconnect();
+  }, [activeScreenId]);
+
+  useEffect(() => {
     persistConfigurationsToLocalStorage(configurations);
   }, [configurations]);
 
@@ -123,20 +154,27 @@ export function ApplicationPage({
     [activeApplication]
   );
 
-  const canvasSize = useMemo(() => {
-    const maxRight = widgets.reduce((acc, widget) => Math.max(acc, widget.rect.x + widget.rect.w), 520);
-    const maxBottom = widgets.reduce((acc, widget) => Math.max(acc, widget.rect.y + widget.rect.h), 420);
-    return {
-      width: maxRight + 24,
-      height: maxBottom + 24,
-    };
-  }, [widgets]);
+  const canvasSettings = activeConfiguration?.canvas ?? DEFAULT_CANVAS_SETTINGS;
+  const canvasSize = useMemo(
+    () => resolveCanvasPresetSize(canvasSettings),
+    [canvasSettings]
+  );
+  const canvasScale = useMemo(
+    () => resolveCanvasFitScale(canvasSettings.runtimeMode, canvasSize, canvasViewportSize),
+    [canvasSettings.runtimeMode, canvasSize, canvasViewportSize]
+  );
+  const scaledCanvasSize = useMemo(
+    () => ({
+      width: Math.round(canvasSize.width * canvasScale),
+      height: Math.round(canvasSize.height * canvasScale),
+    }),
+    [canvasScale, canvasSize]
+  );
 
   const markWidgetPulse = (widgetId: string) => {
-    const now = Date.now();
     setWidgetPulseMap((prev) => ({
       ...prev,
-      [widgetId]: now,
+      [widgetId]: Date.now(),
     }));
   };
 
@@ -268,6 +306,19 @@ export function ApplicationPage({
           onLabelChange={NOOP_TEXT_CHANGE}
           onTrigger={() => loadPoseByName(widget.poseName)}
           poseAvailable={poseAvailable}
+        />
+      );
+    }
+
+    if (widget.kind === "mode-button") {
+      return (
+        <ModeButtonWidget
+          key={widget.id}
+          widget={widget}
+          selected={false}
+          onSelect={() => {}}
+          onRectChange={NOOP_RECT_CHANGE}
+          onLabelChange={NOOP_TEXT_CHANGE}
         />
       );
     }
@@ -404,16 +455,55 @@ export function ApplicationPage({
     }
 
     if (widget.kind === "stream-display") {
-      const url = widget.source === "rviz" ? rvizStreamUrl : cameraStreamUrl;
+      const url = widget.source === "camera" ? cameraStreamUrl : rvizStreamUrl;
+      const sourceStatus =
+        widget.source === "rviz"
+          ? "RViz stream"
+          : widget.source === "visualization"
+            ? "Visualization stream"
+            : "Camera stream";
       return (
         <StreamDisplayWidget
           key={widget.id}
-          widget={{ ...widget, streamUrl: url || widget.streamUrl }}
+          widget={{
+            ...widget,
+            streamUrl: url || widget.streamUrl,
+            fitMode: widget.fitMode ?? "contain",
+            showStatus: widget.showStatus ?? true,
+            showUrl: widget.showUrl ?? true,
+            overlayText: widget.overlayText ?? "stream preview",
+          }}
           selected={false}
           onSelect={() => {}}
           onRectChange={NOOP_RECT_CHANGE}
           onLabelChange={NOOP_TEXT_CHANGE}
-          statusText={widget.source === "rviz" ? "RViz stream" : "Camera stream"}
+          statusText={sourceStatus}
+        />
+      );
+    }
+
+    if (widget.kind === "curves") {
+      return (
+        <CurvesWidget
+          key={widget.id}
+          widget={widget}
+          selected={false}
+          onSelect={() => {}}
+          onRectChange={NOOP_RECT_CHANGE}
+          onLabelChange={NOOP_TEXT_CHANGE}
+        />
+      );
+    }
+
+    if (widget.kind === "logs") {
+      return (
+        <LogsWidget
+          key={widget.id}
+          widget={widget}
+          selected={false}
+          onSelect={() => {}}
+          onRectChange={NOOP_RECT_CHANGE}
+          onLabelChange={NOOP_TEXT_CHANGE}
         />
       );
     }
@@ -467,6 +557,22 @@ export function ApplicationPage({
     );
   };
 
+  const canvasViewportClassName = `controls-canvas-viewport controls-canvas-mode-${canvasSettings.runtimeMode}`;
+  const canvasFrameStyle = {
+    width: `${scaledCanvasSize.width}px`,
+    height: `${scaledCanvasSize.height}px`,
+  };
+  const canvasTransformStyle = {
+    width: `${canvasSize.width}px`,
+    height: `${canvasSize.height}px`,
+    transform: `scale(${canvasScale})`,
+    transformOrigin: "top left",
+  };
+  const showRuntimeScreenTabs = (activeApplication?.screenIds.length ?? 0) > 1;
+  const activeScreenClassName = activeScreenId
+    ? `application-runtime-screen-${toScreenClassToken(activeScreenId)}`
+    : "";
+
   if (!activeApplication) {
     return (
       <main className="layout tab-accent tab-controls">
@@ -492,27 +598,35 @@ export function ApplicationPage({
   }
 
   return (
-    <main className="controls-page tab-accent tab-controls application-runtime-page">
-      <section className="card application-runtime-header">
-        <h2>{activeApplication.name}</h2>
-        <div className="application-runtime-links">
-          {activeApplication.screenIds.map((screenId) => (
-            <button
-              key={screenId}
-              type="button"
-              className={`tab-button ${screenId === activeScreenId ? "active" : ""}`}
-              onClick={() => onNavigateToScreen(screenId)}
-            >
-              {screenId}
-            </button>
-          ))}
-        </div>
-      </section>
-
+    <main
+      className={`controls-page tab-accent tab-controls application-runtime-page ${activeScreenClassName}`.trim()}
+    >
       <section className="controls-workspace">
-        <div className="controls-canvas-surface">
-          <div className="controls-canvas" style={{ width: `${canvasSize.width}px`, height: `${canvasSize.height}px` }}>
-            {widgets.map(renderWidget)}
+        <div className="controls-canvas-zone application-runtime-canvas-zone">
+          {showRuntimeScreenTabs ? (
+            <div className="application-runtime-screen-tabs">
+              {activeApplication.screenIds.map((screenId) => (
+                <button
+                  key={screenId}
+                  type="button"
+                  className={`tab-button ${screenId === activeScreenId ? "active" : ""}`}
+                  onClick={() => onNavigateToScreen(screenId)}
+                >
+                  {screenId}
+                </button>
+              ))}
+            </div>
+          ) : null}
+          <div className="controls-canvas-surface">
+            <div className={canvasViewportClassName} ref={canvasViewportRef}>
+              <div className="controls-canvas-frame" style={canvasFrameStyle}>
+                <div className="controls-canvas-transform" style={canvasTransformStyle}>
+                  <div className="controls-canvas" style={{ width: `${canvasSize.width}px`, height: `${canvasSize.height}px` }}>
+                    {widgets.map(renderWidget)}
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
