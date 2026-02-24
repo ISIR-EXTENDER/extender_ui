@@ -27,7 +27,7 @@ export type WidgetConfiguration = {
 };
 
 const STORAGE_KEY = "extender.controls.widget-configurations.v1";
-const DEMO_UPDATED_AT = "2026-02-18T00:00:00.000Z";
+const DEMO_UPDATED_AT = "2026-02-24T00:00:00.000Z";
 const DEMO_CANVAS_SETTINGS: CanvasSettings = {
   presetId: "hd",
   runtimeMode: "fit",
@@ -404,55 +404,71 @@ export const DEFAULT_DEMO_CONFIGURATIONS: WidgetConfiguration[] = [
 
   createDemoConfiguration("petanque", [
     createDemoWidget("pet-title", "text", 20, 20, {
-      text: "Pétanque Operations",
+      text: "Pétanque Control",
       fontSize: 26,
       rect: { w: 360, h: 56 },
     }),
-    createDemoWidget("pet-vision", "stream-display", 20, 90, {
-      label: "Field Vision",
-      source: "camera",
-      topic: "/petanque/camera",
-      fitMode: "cover",
+    createDemoWidget("pet-state-teleop", "button", 20, 90, {
+      label: "Teleop",
+      topic: "/petanque_state_machine/change_state",
+      payload: "teleop",
+      rect: { w: 170, h: 58 },
+    }),
+    createDemoWidget("pet-state-activate", "button", 202, 90, {
+      label: "Activate Throw",
+      topic: "/petanque_state_machine/change_state",
+      payload: "activate_throw",
+      rect: { w: 210, h: 58 },
+    }),
+    createDemoWidget("pet-state-go-start", "button", 424, 90, {
+      label: "Go To Start",
+      topic: "/petanque_state_machine/change_state",
+      payload: "go_to_start",
+      rect: { w: 190, h: 58 },
+    }),
+    createDemoWidget("pet-state-throw", "button", 626, 90, {
+      label: "Throw",
+      topic: "/petanque_state_machine/change_state",
+      payload: "throw",
+      rect: { w: 150, h: 58 },
+    }),
+    createDemoWidget("pet-state-stop", "button", 788, 90, {
+      label: "Stop",
+      topic: "/petanque_state_machine/change_state",
+      payload: "stop",
+      rect: { w: 150, h: 58 },
+    }),
+    createDemoWidget("pet-speed", "max-velocity", 20, 166, {
+      label: "Throw Speed",
+      topic: "/petanque_throw/total_duration",
+      min: 0.4,
+      max: 2.0,
+      step: 0.01,
+      rect: { w: 500, h: 92 },
+    }),
+    createDemoWidget("pet-notes", "textarea", 20, 272, {
+      label: "Runbook",
+      topic: "/petanque/runbook",
+      text: "1) Activate Throw\n2) Go To Start\n3) Throw\n\nUse Throw Speed to tune trajectory duration (mapped to /petanque_throw total_duration).",
+      fontSize: 14,
+      rect: { w: 500, h: 220 },
+    }),
+    createDemoWidget("pet-rviz", "stream-display", 540, 166, {
+      label: "RViz",
+      source: "rviz",
+      topic: "/petanque/rviz",
+      fitMode: "contain",
       showStatus: true,
       showUrl: false,
-      overlayText: "ball detection",
-      rect: { w: 760, h: 500 },
+      overlayText: "petanque trajectory",
+      rect: { w: 720, h: 420 },
     }),
-    createDemoWidget("pet-state", "logs", 800, 90, {
-      label: "Match Events",
-      topic: "/petanque/events",
-      levelFilter: "info",
-      maxEntries: 120,
-      autoScroll: true,
-      showTimestamp: true,
-      rect: { w: 460, h: 250 },
-    }),
-    createDemoWidget("pet-detect", "button", 800, 360, {
-      label: "Detect Balls",
-      topic: "/petanque/action",
-      payload: "detect",
-      rect: { w: 220, h: 58 },
-    }),
-    createDemoWidget("pet-plan", "button", 1040, 360, {
-      label: "Plan Shot",
-      topic: "/petanque/action",
-      payload: "plan",
-      rect: { w: 220, h: 58 },
-    }),
-    createDemoWidget("pet-execute", "button", 800, 440, {
-      label: "Execute",
-      topic: "/petanque/action",
-      payload: "execute",
-      rect: { w: 460, h: 58 },
-    }),
-    createDemoWidget("pet-curves", "curves", 800, 520, {
-      label: "Shot Metrics",
-      topic: "/petanque/metrics",
-      sampleRateHz: 8,
-      historySeconds: 12,
-      showLegend: true,
-      showSpeed: false,
-      rect: { w: 460, h: 240 },
+    createDemoWidget("pet-nav-default", "navigation-button", 20, 506, {
+      label: "Open Default Control",
+      topic: "/ui/navigation",
+      icon: "arrow-right",
+      targetScreenId: "default_control",
+      rect: { w: 260, h: 58 },
     }),
   ]),
 
@@ -620,6 +636,31 @@ const migrateLegacyDefaultControl = (
   });
 };
 
+const migrateLegacyPetanque = (
+  configurations: WidgetConfiguration[]
+): WidgetConfiguration[] => {
+  const latestPetanque = DEFAULT_DEMO_CONFIGURATIONS.find(
+    (configuration) => configuration.name === "petanque"
+  );
+  if (!latestPetanque) return configurations;
+
+  return configurations.map((configuration) => {
+    if (configuration.name !== "petanque") return configuration;
+
+    const hasLegacySignature =
+      configuration.widgets.some((widget) => widget.id === "pet-detect") ||
+      configuration.widgets.some((widget) => widget.id === "pet-plan") ||
+      configuration.widgets.some((widget) => widget.id === "pet-execute");
+
+    if (!hasLegacySignature) return configuration;
+
+    return {
+      ...cloneConfiguration(latestPetanque),
+      poses: clonePoses(configuration.poses),
+    };
+  });
+};
+
 const cloneDefaultConfigurations = () => DEFAULT_DEMO_CONFIGURATIONS.map(cloneConfiguration);
 
 const mergeMissingDemoConfigurations = (
@@ -715,7 +756,7 @@ export function loadConfigurationsFromLocalStorage(): WidgetConfiguration[] {
         canvas: normalizeCanvasSettings(item.canvas),
         updatedAt: typeof item.updatedAt === "string" ? item.updatedAt : new Date().toISOString(),
       }));
-    return migrateLegacyDefaultControl(mergeMissingDemoConfigurations(sanitized));
+    return migrateLegacyPetanque(migrateLegacyDefaultControl(mergeMissingDemoConfigurations(sanitized)));
   } catch {
     return cloneDefaultConfigurations();
   }

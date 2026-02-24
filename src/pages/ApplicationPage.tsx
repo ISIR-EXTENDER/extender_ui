@@ -42,8 +42,19 @@ type ApplicationPageProps = {
 
 const TOPIC_FRESHNESS_MS = 200;
 const TOPIC_FRESHNESS_TICK_MS = 100;
+const PETANQUE_STATE_TOPIC = "/petanque_state_machine/change_state";
+const PETANQUE_TOTAL_DURATION_TOPIC = "/petanque_throw/total_duration";
+const PETANQUE_TOTAL_DURATION_MIN_S = 0.4;
+const PETANQUE_TOTAL_DURATION_MAX_S = 3.0;
+const PETANQUE_DEFAULT_TOTAL_DURATION_S = 1.0;
 
 const clampSignedUnit = (value: number) => Math.max(-1, Math.min(1, value));
+const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
+const mapGainToPetanqueDuration = (gain: number) => {
+  if (gain <= 0) return PETANQUE_TOTAL_DURATION_MAX_S;
+  const duration = PETANQUE_DEFAULT_TOTAL_DURATION_S / gain;
+  return clamp(duration, PETANQUE_TOTAL_DURATION_MIN_S, PETANQUE_TOTAL_DURATION_MAX_S);
+};
 
 const NOOP_RECT_CHANGE: (next: CanvasRect) => void = () => {};
 const NOOP_TEXT_CHANGE: (next: string) => void = () => {};
@@ -388,14 +399,24 @@ export function ApplicationPage({
           onSelect={() => {}}
           onRectChange={NOOP_RECT_CHANGE}
           onLabelChange={NOOP_TEXT_CHANGE}
-          onTrigger={() =>
+          onTrigger={() => {
+            if (widget.topic === PETANQUE_STATE_TOPIC) {
+              wsClient.send({
+                type: "state_cmd",
+                command: widget.payload,
+              });
+              markWidgetPulse(widget.id);
+              return;
+            }
+
             wsClient.send({
               type: "ui_button",
               topic: widget.topic,
               payload: widget.payload,
               widget_id: widget.id,
-            })
-          }
+            });
+            markWidgetPulse(widget.id);
+          }}
         />
       );
     }
@@ -426,7 +447,16 @@ export function ApplicationPage({
           onRectChange={NOOP_RECT_CHANGE}
           onLabelChange={NOOP_TEXT_CHANGE}
           value={maxVelocity}
-          onValueChange={setMaxVelocity}
+          onValueChange={(nextValue) => {
+            setMaxVelocity(nextValue);
+            if (widget.topic === PETANQUE_TOTAL_DURATION_TOPIC) {
+              wsClient.send({
+                type: "petanque_cfg",
+                total_duration: mapGainToPetanqueDuration(nextValue),
+              });
+            }
+            markWidgetPulse(widget.id);
+          }}
         />
       );
     }
