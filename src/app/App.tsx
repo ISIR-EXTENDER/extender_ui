@@ -7,11 +7,13 @@ import { CanvasDesignPage } from "../pages/CanvasDesignPage";
 import { HomePage } from "../pages/HomePage";
 import { useUiStore } from "../store/uiStore";
 import { useWsConnection } from "../hooks/useWsConnection";
+import { useTeleopPublisher } from "../hooks/useTeleopPublisher";
 import { useThemeMode } from "../hooks/useThemeMode";
 import { type AppRoute, useAppRouter } from "./router";
 
 export default function App() {
   useWsConnection();
+  useTeleopPublisher();
   useThemeMode();
   const { route, navigate } = useAppRouter();
   const focusMode = useUiStore((s) => s.focusMode);

@@ -473,7 +473,18 @@ export const DEFAULT_DEMO_CONFIGURATIONS: WidgetConfiguration[] = [
       showStatus: true,
       showUrl: false,
       overlayText: "petanque trajectory",
-      rect: { w: 720, h: 420 },
+      rect: { w: 350, h: 420 },
+    }),
+    createDemoWidget("pet-state-machine", "stream-display", 910, 166, {
+      label: "State Machine",
+      source: "visualization",
+      topic: "/petanque/fsm_viewer",
+      streamUrl: "http://127.0.0.1:5000",
+      fitMode: "contain",
+      showStatus: true,
+      showUrl: true,
+      overlayText: "PETANQUE_SM",
+      rect: { w: 350, h: 420 },
     }),
     createDemoWidget("pet-nav-default", "navigation-button", 20, 506, {
       label: "Open Default Control",
@@ -673,6 +684,63 @@ const migrateLegacyPetanque = (
   });
 };
 
+const ensurePetanqueViewerWidget = (
+  configurations: WidgetConfiguration[]
+): WidgetConfiguration[] => {
+  const latestPetanque = DEFAULT_DEMO_CONFIGURATIONS.find(
+    (configuration) => configuration.name === "petanque"
+  );
+  if (!latestPetanque) return configurations;
+
+  const rvizTemplate = latestPetanque.widgets.find(
+    (widget) => widget.id === "pet-rviz"
+  );
+  const viewerTemplate = latestPetanque.widgets.find(
+    (widget) => widget.id === "pet-state-machine"
+  );
+
+  if (!rvizTemplate || !viewerTemplate) return configurations;
+
+  return configurations.map((configuration) => {
+    if (configuration.name !== "petanque") return configuration;
+
+    const hasViewerWidget = configuration.widgets.some(
+      (widget) => widget.id === viewerTemplate.id
+    );
+    const hasResizedRvizWidget = configuration.widgets.some(
+      (widget) =>
+        widget.id === rvizTemplate.id &&
+        widget.rect.w === rvizTemplate.rect.w &&
+        widget.rect.h === rvizTemplate.rect.h
+    );
+
+    if (hasViewerWidget && hasResizedRvizWidget) return configuration;
+
+    const nextWidgets = cloneWidgets(configuration.widgets).map((widget) =>
+      widget.id === rvizTemplate.id
+        ? {
+            ...widget,
+            rect: {
+              ...widget.rect,
+              w: rvizTemplate.rect.w,
+              h: rvizTemplate.rect.h,
+            },
+          }
+        : widget
+    );
+
+    if (!hasViewerWidget) {
+      nextWidgets.push(cloneWidgets([viewerTemplate])[0]);
+    }
+
+    return {
+      ...configuration,
+      widgets: nextWidgets,
+      updatedAt: new Date().toISOString(),
+    };
+  });
+};
+
 const cloneDefaultConfigurations = () => DEFAULT_DEMO_CONFIGURATIONS.map(cloneConfiguration);
 
 const mergeMissingDemoConfigurations = (
@@ -768,7 +836,9 @@ export function loadConfigurationsFromLocalStorage(): WidgetConfiguration[] {
         canvas: normalizeCanvasSettings(item.canvas),
         updatedAt: typeof item.updatedAt === "string" ? item.updatedAt : new Date().toISOString(),
       }));
-    return migrateLegacyPetanque(migrateLegacyDefaultControl(mergeMissingDemoConfigurations(sanitized)));
+    return ensurePetanqueViewerWidget(
+      migrateLegacyPetanque(migrateLegacyDefaultControl(mergeMissingDemoConfigurations(sanitized)))
+    );
   } catch {
     return cloneDefaultConfigurations();
   }

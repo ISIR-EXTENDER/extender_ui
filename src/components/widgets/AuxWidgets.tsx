@@ -544,6 +544,8 @@ export function StreamDisplayWidget({
   onLabelChange,
   statusText,
 }: StreamDisplayWidgetProps) {
+  const canEmbedVisualization =
+    widget.source === "visualization" && /^https?:\/\//i.test(widget.streamUrl);
   const sourceLabel =
     widget.source === "rviz"
       ? "RViz"
@@ -571,10 +573,18 @@ export function StreamDisplayWidget({
           <span className="controls-stream-source">{sourceLabel}</span>
         </div>
         <div className={`controls-stream-view controls-stream-fit-${widget.fitMode}`}>
-          {/* TODO: Replace placeholder with backend-driven media (WebRTC/MJPEG/topic bridge). */}
-          <div className="stream-placeholder">
-            {widget.overlayText?.trim() || statusText}
-          </div>
+          {canEmbedVisualization ? (
+            <iframe
+              className="controls-stream-iframe"
+              src={widget.streamUrl}
+              title={`${widget.label} visualization`}
+              loading="lazy"
+            />
+          ) : (
+            <div className="stream-placeholder">
+              {widget.overlayText?.trim() || statusText}
+            </div>
+          )}
         </div>
         {widget.showStatus ? <div className="controls-stream-status">{statusText}</div> : null}
         {widget.showUrl ? <div className="controls-stream-url">{widget.streamUrl || "no stream url"}</div> : null}

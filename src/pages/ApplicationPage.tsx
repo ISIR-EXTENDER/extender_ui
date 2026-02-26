@@ -70,6 +70,19 @@ const NOOP_RECT_CHANGE: (next: CanvasRect) => void = () => {};
 const NOOP_TEXT_CHANGE: (next: string) => void = () => {};
 const toScreenClassToken = (screenId: string) =>
   screenId.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-");
+const resolveVisualizationUrlForRuntime = (rawUrl: string) => {
+  if (!rawUrl || typeof window === "undefined") return rawUrl;
+  try {
+    const parsed = new URL(rawUrl);
+    if (parsed.hostname === "127.0.0.1" || parsed.hostname === "localhost") {
+      parsed.hostname = window.location.hostname;
+      return parsed.toString();
+    }
+    return rawUrl;
+  } catch {
+    return rawUrl;
+  }
+};
 
 export function ApplicationPage({
   applicationId,
@@ -588,7 +601,12 @@ export function ApplicationPage({
     }
 
     if (widget.kind === "stream-display") {
-      const url = widget.source === "camera" ? cameraStreamUrl : rvizStreamUrl;
+      const url =
+        widget.source === "camera"
+          ? cameraStreamUrl
+          : widget.source === "rviz"
+            ? rvizStreamUrl
+            : resolveVisualizationUrlForRuntime(widget.streamUrl);
       const sourceStatus =
         widget.source === "rviz"
           ? "RViz stream"
