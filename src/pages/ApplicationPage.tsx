@@ -47,9 +47,16 @@ const PETANQUE_TOTAL_DURATION_TOPIC = "/petanque_throw/total_duration";
 const PETANQUE_TOTAL_DURATION_MIN_S = 0.4;
 const PETANQUE_TOTAL_DURATION_MAX_S = 3.0;
 const PETANQUE_DEFAULT_TOTAL_DURATION_S = 1.0;
-const PETANQUE_COMMANDS = ["teleop", "activate_throw", "go_to_start", "throw", "stop"] as const;
+const PETANQUE_COMMANDS = [
+  "teleop",
+  "activate_throw",
+  "go_to_start",
+  "throw",
+  "pick_up",
+  "stop",
+] as const;
 type PetanqueStateCommand = (typeof PETANQUE_COMMANDS)[number];
-type PetanqueFlowStage = "teleop" | "throw_mode" | "start_ready";
+type PetanqueFlowStage = "teleop" | "start_ready";
 
 const clampSignedUnit = (value: number) => Math.max(-1, Math.min(1, value));
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
@@ -210,7 +217,7 @@ export function ApplicationPage({
     if (command === "activate_throw") {
       return {
         disabled: false,
-        active: petanqueFlowStage !== "teleop",
+        active: petanqueFlowStage === "start_ready",
         tone: "accent" as const,
       };
     }
@@ -222,6 +229,20 @@ export function ApplicationPage({
       };
     }
     if (command === "throw") {
+      return {
+        disabled: petanqueFlowStage !== "start_ready",
+        active: false,
+        tone: "danger" as const,
+      };
+    }
+    if (command === "pick_up") {
+      return {
+        disabled: petanqueFlowStage !== "start_ready",
+        active: false,
+        tone: "accent" as const,
+      };
+    }
+    if (command === "stop") {
       return {
         disabled: petanqueFlowStage !== "start_ready",
         active: false,
@@ -241,14 +262,25 @@ export function ApplicationPage({
       return;
     }
     if (command === "activate_throw") {
-      setPetanqueFlowStage("throw_mode");
+      // Current state machine flow auto-transitions activate_throw -> go_to_start.
+      // Mark UI as "start ready" immediately so START + HOME are both lit
+      // and the next action is directly THROW.
+      setPetanqueFlowStage("start_ready");
       return;
     }
     if (command === "go_to_start") {
       setPetanqueFlowStage("start_ready");
       return;
     }
-    setPetanqueFlowStage("throw_mode");
+    if (command === "pick_up") {
+      // pick_up sequence returns to teleop mode in current state machine.
+      setPetanqueFlowStage("teleop");
+      return;
+    }
+    if (command === "throw") {
+      // Throwing controller remains active after throw; keep throw-ready state.
+      setPetanqueFlowStage("start_ready");
+    }
   };
 
   const upsertPose = (poses: PoseSnapshot[], pose: PoseSnapshot) => {

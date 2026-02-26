@@ -1,0 +1,65 @@
+digraph PetanqueFlow {
+  rankdir=LR;
+  fontname="Helvetica";
+  fontsize=12;
+  labelloc="t";
+  label="Explorer Petanque - State Machine Flow (from code) and UI Gating";
+  node [shape=box, style="rounded,filled", fontname="Helvetica", fillcolor="#eef3ff", color="#3a5a98"];
+  edge [fontname="Helvetica", color="#4b5563"];
+
+  subgraph cluster_sm {
+    label="A) Actual state-machine flow (petanque_state_machine.py)";
+    color="#6b7280";
+    style="rounded,dashed";
+
+    INITIAL_START [fillcolor="#f9fafb", label="INITIAL_START\nDeactivate [petanque_throw, teleop_controller]"];
+    IDLE [fillcolor="#dbeafe", label="IDLE\nlisten ~/change_state"];
+    ACTIVATE_TELEOP [label="ACTIVATE_TELEOP\nactivate teleop / deactivate throwing"];
+    ACTIVATE_THROWING [label="ACTIVATE_THROWING\nactivate throwing / deactivate teleop"];
+    GO_TO_START [label="GO_TO_START_POSE\ncall /petanque_throw/go_to_start"];
+    THROWING [label="THROWING_PROCESS\ncall /petanque_throw/start_throw"];
+    RAMASSAGE [label="RAMASSAGE_PROCESS"];
+    RAM_GO_START [label="GO_TO_RAMASSAGE_POSE\ncall /petanque_throw/go_to_start"];
+    RAM_TELEOP [label="RAMASSAGE_TELEOP\nswitch to teleop"];
+
+    INITIAL_START -> IDLE [label="success|failure"];
+
+    IDLE -> ACTIVATE_TELEOP [label="teleop"];
+    IDLE -> ACTIVATE_THROWING [label="activate_throw"];
+    IDLE -> GO_TO_START [label="go_to_start"];
+    IDLE -> THROWING [label="throw"];
+    IDLE -> RAMASSAGE [label="pick_up"];
+    IDLE -> INITIAL_START [label="stop"];
+
+    ACTIVATE_TELEOP -> IDLE [label="success"];
+    ACTIVATE_TELEOP -> INITIAL_START [label="failure"];
+
+    ACTIVATE_THROWING -> GO_TO_START [label="success"];
+    ACTIVATE_THROWING -> INITIAL_START [label="failure"];
+
+    GO_TO_START -> IDLE [label="success"];
+    GO_TO_START -> INITIAL_START [label="failure"];
+
+    THROWING -> IDLE [label="success"];
+    THROWING -> INITIAL_START [label="failure"];
+
+    RAMASSAGE -> RAM_GO_START [label="enter"];
+    RAM_GO_START -> RAM_TELEOP [label="success"];
+    RAM_GO_START -> INITIAL_START [label="failure"];
+    RAM_TELEOP -> IDLE [label="success"];
+    RAM_TELEOP -> INITIAL_START [label="failure"];
+  }
+
+  subgraph cluster_ui {
+    label="B) UI-gated flow (ApplicationPage logic)";
+    color="#6b7280";
+    style="rounded,dashed";
+
+    UI_TELEOP [fillcolor="#dcfce7", label="UI Stage: TELEOP\nEnabled: Teleop, Start\nDisabled: Home, Throw, Pick Up, Stop"];
+    UI_THROW_READY [fillcolor="#fde68a", label="UI Stage: THROW_READY\nEnabled: Teleop, Start, Home, Throw, Pick Up, Stop"];
+
+    UI_TELEOP -> UI_THROW_READY [label="Start (activate_throw)"];
+    UI_THROW_READY -> UI_THROW_READY [label="Home | Throw | Start"];
+    UI_THROW_READY -> UI_TELEOP [label="Teleop | Pick Up | Stop"];
+  }
+}

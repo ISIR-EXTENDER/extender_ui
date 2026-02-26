@@ -416,14 +416,14 @@ export const DEFAULT_DEMO_CONFIGURATIONS: WidgetConfiguration[] = [
       rect: { w: 170, h: 58 },
     }),
     createDemoWidget("pet-state-activate", "button", 202, 90, {
-      label: "Activate Throw",
+      label: "Start",
       topic: "/petanque_state_machine/change_state",
       payload: "activate_throw",
       tone: "accent",
       rect: { w: 210, h: 58 },
     }),
     createDemoWidget("pet-state-go-start", "button", 424, 90, {
-      label: "Go To Start",
+      label: "Home",
       topic: "/petanque_state_machine/change_state",
       payload: "go_to_start",
       tone: "success",
@@ -436,7 +436,14 @@ export const DEFAULT_DEMO_CONFIGURATIONS: WidgetConfiguration[] = [
       tone: "danger",
       rect: { w: 150, h: 58 },
     }),
-    createDemoWidget("pet-state-stop", "button", 788, 90, {
+    createDemoWidget("pet-state-pick-up", "button", 788, 90, {
+      label: "Pick Up Ball",
+      topic: "/petanque_state_machine/change_state",
+      payload: "pick_up",
+      tone: "accent",
+      rect: { w: 150, h: 58 },
+    }),
+    createDemoWidget("pet-state-stop", "button", 950, 90, {
       label: "Stop",
       topic: "/petanque_state_machine/change_state",
       payload: "stop",
@@ -454,7 +461,7 @@ export const DEFAULT_DEMO_CONFIGURATIONS: WidgetConfiguration[] = [
     createDemoWidget("pet-notes", "textarea", 20, 272, {
       label: "Runbook",
       topic: "/petanque/runbook",
-      text: "Recommended flow:\n1) Activate Throw\n2) Go To Start\n3) Throw\n\nTeleop returns manual control.\nUse Throw Speed to tune trajectory duration (mapped to /petanque_throw total_duration).",
+      text: "Recommended flow:\n1) Teleop\n2) Start\n3) Throw (or Pick Up Ball)\n\nStart triggers activate_throw and the state machine transitions to go_to_start.\nHome can be used to resend go_to_start if needed.\nStop is only enabled after Start (petanque mode active).\nTeleop returns manual control.\nUse Throw Speed to tune trajectory duration (mapped to /petanque_throw total_duration).",
       fontSize: 14,
       rect: { w: 500, h: 220 },
     }),
