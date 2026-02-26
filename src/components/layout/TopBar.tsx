@@ -5,7 +5,6 @@ import { useTeleopStore } from "../../store/teleopStore";
 import { useUiStore } from "../../store/uiStore";
 
 type TopBarProps = {
-  onStop: () => void;
   onHome: () => void;
   onOpenCanvasDesign: () => void;
   isCanvasDesign: boolean;
@@ -14,7 +13,6 @@ type TopBarProps = {
 };
 
 export function TopBar({
-  onStop,
   onHome,
   onOpenCanvasDesign,
   isCanvasDesign,
@@ -91,9 +89,6 @@ export function TopBar({
           ) : null}
           <Button className="home" type="button" onClick={onHome}>
             Home
-          </Button>
-          <Button className="stop" type="button" onClick={onStop}>
-            STOP
           </Button>
         </div>
       </div>
