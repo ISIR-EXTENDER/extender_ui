@@ -1408,6 +1408,7 @@ body,
 
 .controls-max-velocity-item,
 .controls-gripper-item,
+.controls-magnet-item,
 .controls-stream-item,
 .controls-curves-item,
 .controls-logs-item {
@@ -1416,6 +1417,7 @@ body,
 
 .controls-max-velocity-widget,
 .controls-gripper-widget,
+.controls-magnet-widget,
 .controls-stream-widget,
 .controls-curves-widget,
 .controls-logs-widget {
@@ -1451,6 +1453,13 @@ body,
   align-content: start;
 }
 
+.controls-magnet-widget {
+  padding: 0.5rem 0.65rem;
+  display: grid;
+  gap: 0.4rem;
+  align-content: start;
+}
+
 .controls-gripper-widget.is-compact {
   align-content: center;
 }
@@ -1460,10 +1469,46 @@ body,
   font-size: 0.92rem;
 }
 
+.controls-magnet-title {
+  font-weight: 800;
+  font-size: 0.92rem;
+}
+
 .controls-gripper-actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.45rem;
+}
+
+.controls-magnet-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.45rem;
+}
+
+.controls-magnet-actions .action-button {
+  opacity: 0.72;
+  transition:
+    opacity 140ms ease,
+    transform 120ms ease,
+    box-shadow 160ms ease,
+    filter 160ms ease;
+}
+
+.controls-magnet-actions .action-button.is-active {
+  opacity: 1;
+  filter: saturate(1.1);
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--accent) 55%, transparent),
+    0 10px 20px rgba(0, 0, 0, 0.35);
+}
+
+.controls-magnet-actions .action-button.on.is-active {
+  background: #16a34a;
+}
+
+.controls-magnet-actions .action-button.off.is-active {
+  background: #dc2626;
 }
 
 .controls-gripper-widget.is-compact .controls-gripper-actions {
@@ -2647,8 +2692,17 @@ body,
   background: #22c55e;
 }
 
+.action-button.on {
+  background: #22c55e;
+}
+
 .action-button.close {
   background: #f97316;
+}
+
+.action-button.off {
+  background: #ef4444;
+  color: #f8fafc;
 }
 
 .action-button:active {

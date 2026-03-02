@@ -9,6 +9,7 @@ import {
   JoystickWidget,
   LoadPoseButtonWidget,
   LogsWidget,
+  MagnetControlWidget,
   ModeButtonWidget,
   MaxVelocityWidget,
   NavigationBarWidget,
@@ -673,6 +674,37 @@ export function ApplicationPage({
           onClose={() =>
             wsClient.send({ type: "gripper_cmd", action: "close", speed: gripperSpeed, force: gripperForce })
           }
+        />
+      );
+    }
+
+    if (widget.kind === "magnet-control") {
+      return (
+        <MagnetControlWidget
+          key={widget.id}
+          widget={widget}
+          selected={false}
+          onSelect={() => {}}
+          onRectChange={NOOP_RECT_CHANGE}
+          onLabelChange={NOOP_TEXT_CHANGE}
+          onActivate={() => {
+            wsClient.send({
+              type: "ui_button",
+              topic: widget.topic,
+              payload: widget.onPayload,
+              widget_id: widget.id,
+            });
+            markWidgetPulse(widget.id);
+          }}
+          onDeactivate={() => {
+            wsClient.send({
+              type: "ui_button",
+              topic: widget.topic,
+              payload: widget.offPayload,
+              widget_id: widget.id,
+            });
+            markWidgetPulse(widget.id);
+          }}
         />
       );
     }

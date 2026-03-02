@@ -3,6 +3,7 @@ import type {
   CanvasWidget,
   CurvesWidget,
   GripperControlWidget,
+  MagnetControlWidget,
   JoystickWidget,
   LogsWidget,
   LoadPoseButtonWidget,
@@ -33,6 +34,7 @@ export type WidgetCatalogType =
   | "rosbag-control"
   | "max-velocity"
   | "gripper-control"
+  | "magnet-control"
   | "stream-display"
   | "curves"
   | "logs"
@@ -63,6 +65,7 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
   { type: "rosbag-control", label: "Rosbag Control", enabled: true, defaultSize: { w: 300, h: 180 } },
   { type: "max-velocity", label: "Max Velocity", enabled: true, defaultSize: { w: 260, h: 90 } },
   { type: "gripper-control", label: "Gripper Control", enabled: true, defaultSize: { w: 300, h: 170 } },
+  { type: "magnet-control", label: "Magnet Control", enabled: true, defaultSize: { w: 240, h: 120 } },
   { type: "stream-display", label: "Stream Display", enabled: true, defaultSize: { w: 360, h: 260 } },
   { type: "curves", label: "Curves", enabled: true, defaultSize: { w: 420, h: 240 } },
   { type: "logs", label: "Logs", enabled: true, defaultSize: { w: 360, h: 220 } },
@@ -252,6 +255,19 @@ export function createWidgetFromCatalogType(
       topic: "/cmd/gripper",
       showAdvancedControls: true,
       rect: { x, y, w: 300, h: 170 },
+    };
+    return widget;
+  }
+
+  if (type === "magnet-control") {
+    const widget: MagnetControlWidget = {
+      id: nextWidgetId(),
+      kind: "magnet-control",
+      label: "Magnet",
+      topic: "/hub/digital_output",
+      onPayload: "electromagnet_on",
+      offPayload: "electromagnet_off",
+      rect: { x, y, w: 240, h: 120 },
     };
     return widget;
   }

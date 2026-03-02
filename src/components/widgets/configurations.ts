@@ -450,6 +450,13 @@ export const DEFAULT_DEMO_CONFIGURATIONS: WidgetConfiguration[] = [
       tone: "danger",
       rect: { w: 150, h: 58 },
     }),
+    createDemoWidget("pet-magnet", "magnet-control", 1112, 90, {
+      label: "Magnet",
+      topic: "/hub/digital_output",
+      onPayload: "electromagnet_on",
+      offPayload: "electromagnet_off",
+      rect: { w: 146, h: 92 },
+    }),
     createDemoWidget("pet-speed", "max-velocity", 20, 166, {
       label: "Throw Speed",
       topic: "/petanque_throw/total_duration",
@@ -780,6 +787,45 @@ const normalizePetanqueSliderRanges = (
   });
 };
 
+const ensurePetanqueElectromagnetControl = (
+  configurations: WidgetConfiguration[]
+): WidgetConfiguration[] => {
+  const latestPetanque = DEFAULT_DEMO_CONFIGURATIONS.find(
+    (configuration) => configuration.name === "petanque"
+  );
+  if (!latestPetanque) return configurations;
+
+  const magnetTemplate = latestPetanque.widgets.find(
+    (widget) => widget.id === "pet-magnet"
+  );
+  if (!magnetTemplate) return configurations;
+
+  return configurations.map((configuration) => {
+    if (configuration.name !== "petanque") return configuration;
+
+    const hasMagnetControl = configuration.widgets.some(
+      (widget) => widget.id === "pet-magnet"
+    );
+    const hasLegacyMagnetButtons = configuration.widgets.some(
+      (widget) => widget.id === "pet-magnet-on" || widget.id === "pet-magnet-off"
+    );
+    if (hasMagnetControl && !hasLegacyMagnetButtons) return configuration;
+
+    const withoutLegacy = configuration.widgets.filter(
+      (widget) => widget.id !== "pet-magnet-on" && widget.id !== "pet-magnet-off"
+    );
+    const nextWidgets = hasMagnetControl
+      ? withoutLegacy
+      : [...withoutLegacy, cloneWidgets([magnetTemplate])[0]];
+
+    return {
+      ...configuration,
+      widgets: nextWidgets,
+      updatedAt: new Date().toISOString(),
+    };
+  });
+};
+
 const cloneDefaultConfigurations = () => DEFAULT_DEMO_CONFIGURATIONS.map(cloneConfiguration);
 
 const mergeMissingDemoConfigurations = (
@@ -876,8 +922,10 @@ export function loadConfigurationsFromLocalStorage(): WidgetConfiguration[] {
         updatedAt: typeof item.updatedAt === "string" ? item.updatedAt : new Date().toISOString(),
       }));
     return normalizePetanqueSliderRanges(
-      disablePetanqueViewerWidget(
-        migrateLegacyPetanque(migrateLegacyDefaultControl(mergeMissingDemoConfigurations(sanitized)))
+      ensurePetanqueElectromagnetControl(
+        disablePetanqueViewerWidget(
+          migrateLegacyPetanque(migrateLegacyDefaultControl(mergeMissingDemoConfigurations(sanitized)))
+        )
       )
     );
   } catch {

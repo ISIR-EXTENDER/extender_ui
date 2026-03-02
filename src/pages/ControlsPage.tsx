@@ -16,6 +16,7 @@ import {
   JoystickWidget,
   LoadPoseButtonWidget,
   LogsWidget,
+  MagnetControlWidget,
   ModeButtonWidget,
   MaxVelocityWidget,
   NavigationBarWidget,
@@ -1397,6 +1398,41 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
           onClose={() => {
             wsClient.send({ type: "gripper_cmd", action: "close", speed: gripperSpeed, force: gripperForce });
             setStatusMessage("Gripper close command sent.");
+          }}
+        />
+      );
+    }
+
+    if (widget.kind === "magnet-control") {
+      return (
+        <MagnetControlWidget
+          key={widget.id}
+          widget={widget}
+          selected={selected}
+          onSelect={() => setSelectedWidgetId(widget.id)}
+          onRectChange={(next) => handleWidgetRectChange(widget.id, next)}
+          onLabelChange={(nextLabel) =>
+            updateWidget(widget.id, (current) =>
+              current.kind === "magnet-control" ? { ...current, label: nextLabel } : current
+            )
+          }
+          onActivate={() => {
+            wsClient.send({
+              type: "ui_button",
+              topic: widget.topic,
+              payload: widget.onPayload,
+              widget_id: widget.id,
+            });
+            markWidgetPulse(widget.id);
+          }}
+          onDeactivate={() => {
+            wsClient.send({
+              type: "ui_button",
+              topic: widget.topic,
+              payload: widget.offPayload,
+              widget_id: widget.id,
+            });
+            markWidgetPulse(widget.id);
           }}
         />
       );
