@@ -450,6 +450,20 @@ export const DEFAULT_DEMO_CONFIGURATIONS: WidgetConfiguration[] = [
       tone: "danger",
       rect: { w: 150, h: 58 },
     }),
+    createDemoWidget("pet-magnet-on", "button", 1112, 90, {
+      label: "Mag ON",
+      topic: "/hub/digital_output",
+      payload: "electromagnet_on",
+      tone: "success",
+      rect: { w: 70, h: 58 },
+    }),
+    createDemoWidget("pet-magnet-off", "button", 1188, 90, {
+      label: "Mag OFF",
+      topic: "/hub/digital_output",
+      payload: "electromagnet_off",
+      tone: "danger",
+      rect: { w: 70, h: 58 },
+    }),
     createDemoWidget("pet-speed", "max-velocity", 20, 166, {
       label: "Throw Speed",
       topic: "/petanque_throw/total_duration",
@@ -780,6 +794,48 @@ const normalizePetanqueSliderRanges = (
   });
 };
 
+const ensurePetanqueElectromagnetButtons = (
+  configurations: WidgetConfiguration[]
+): WidgetConfiguration[] => {
+  const latestPetanque = DEFAULT_DEMO_CONFIGURATIONS.find(
+    (configuration) => configuration.name === "petanque"
+  );
+  if (!latestPetanque) return configurations;
+
+  const magnetButtons = latestPetanque.widgets.filter(
+    (widget) =>
+      widget.id === "pet-magnet-on" || widget.id === "pet-magnet-off"
+  );
+  if (magnetButtons.length !== 2) return configurations;
+
+  return configurations.map((configuration) => {
+    if (configuration.name !== "petanque") return configuration;
+
+    const hasMagnetOn = configuration.widgets.some(
+      (widget) => widget.id === "pet-magnet-on"
+    );
+    const hasMagnetOff = configuration.widgets.some(
+      (widget) => widget.id === "pet-magnet-off"
+    );
+    if (hasMagnetOn && hasMagnetOff) return configuration;
+
+    const toAdd = magnetButtons
+      .filter(
+        (widget) =>
+          widget.id === "pet-magnet-on"
+            ? !hasMagnetOn
+            : !hasMagnetOff
+      )
+      .map((widget) => cloneWidgets([widget])[0]);
+
+    return {
+      ...configuration,
+      widgets: [...configuration.widgets, ...toAdd],
+      updatedAt: new Date().toISOString(),
+    };
+  });
+};
+
 const cloneDefaultConfigurations = () => DEFAULT_DEMO_CONFIGURATIONS.map(cloneConfiguration);
 
 const mergeMissingDemoConfigurations = (
@@ -876,8 +932,10 @@ export function loadConfigurationsFromLocalStorage(): WidgetConfiguration[] {
         updatedAt: typeof item.updatedAt === "string" ? item.updatedAt : new Date().toISOString(),
       }));
     return normalizePetanqueSliderRanges(
-      disablePetanqueViewerWidget(
-        migrateLegacyPetanque(migrateLegacyDefaultControl(mergeMissingDemoConfigurations(sanitized)))
+      ensurePetanqueElectromagnetButtons(
+        disablePetanqueViewerWidget(
+          migrateLegacyPetanque(migrateLegacyDefaultControl(mergeMissingDemoConfigurations(sanitized)))
+        )
       )
     );
   } catch {
