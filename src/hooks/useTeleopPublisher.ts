@@ -7,6 +7,7 @@ export function useTeleopPublisher() {
   const mode = useTeleopStore((s) => s.mode);
   const z = useTeleopStore((s) => s.z);
   const rz = useTeleopStore((s) => s.rz);
+  const wsStatus = useTeleopStore((s) => s.wsStatus);
 
   // Read from store imperatively at call time to keep callbacks stable
   // and avoid re-render cascades from nextSeq() state mutations.
@@ -57,6 +58,12 @@ export function useTeleopPublisher() {
     const interval = setInterval(sendTeleop, 33);
     return () => clearInterval(interval);
   }, [sendTeleop]);
+
+  // Enforce safe defaults on startup/reconnect.
+  useEffect(() => {
+    if (wsStatus !== "connected") return;
+    stopAndZero();
+  }, [stopAndZero, wsStatus]);
 
   return { stopAndZero };
 }

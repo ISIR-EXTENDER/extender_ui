@@ -453,8 +453,8 @@ export const DEFAULT_DEMO_CONFIGURATIONS: WidgetConfiguration[] = [
     createDemoWidget("pet-speed", "max-velocity", 20, 166, {
       label: "Throw Speed",
       topic: "/petanque_throw/total_duration",
-      min: 0.4,
-      max: 2.0,
+      min: 0.37,
+      max: 1.1,
       step: 0.01,
       rect: { w: 500, h: 92 },
     }),
@@ -724,6 +724,62 @@ const disablePetanqueViewerWidget = (
   });
 };
 
+const normalizePetanqueSliderRanges = (
+  configurations: WidgetConfiguration[]
+): WidgetConfiguration[] => {
+  return configurations.map((configuration) => {
+    if (configuration.name !== "petanque") return configuration;
+
+    let changed = false;
+    const nextWidgets = configuration.widgets.map((widget) => {
+      if (widget.kind !== "max-velocity") return widget;
+
+      if (widget.topic === "/petanque_throw/total_duration") {
+        const normalized = {
+          ...widget,
+          min: 0.37,
+          max: 1.1,
+          step: 0.01,
+        };
+        if (
+          widget.min !== normalized.min ||
+          widget.max !== normalized.max ||
+          widget.step !== normalized.step
+        ) {
+          changed = true;
+        }
+        return normalized;
+      }
+
+      if (widget.topic === "/petanque_throw/angle_between_start_and_finish") {
+        const normalized = {
+          ...widget,
+          min: -0.17,
+          max: 0.17,
+          step: 0.005,
+        };
+        if (
+          widget.min !== normalized.min ||
+          widget.max !== normalized.max ||
+          widget.step !== normalized.step
+        ) {
+          changed = true;
+        }
+        return normalized;
+      }
+
+      return widget;
+    });
+
+    if (!changed) return configuration;
+    return {
+      ...configuration,
+      widgets: nextWidgets,
+      updatedAt: new Date().toISOString(),
+    };
+  });
+};
+
 const cloneDefaultConfigurations = () => DEFAULT_DEMO_CONFIGURATIONS.map(cloneConfiguration);
 
 const mergeMissingDemoConfigurations = (
@@ -819,8 +875,10 @@ export function loadConfigurationsFromLocalStorage(): WidgetConfiguration[] {
         canvas: normalizeCanvasSettings(item.canvas),
         updatedAt: typeof item.updatedAt === "string" ? item.updatedAt : new Date().toISOString(),
       }));
-    return disablePetanqueViewerWidget(
-      migrateLegacyPetanque(migrateLegacyDefaultControl(mergeMissingDemoConfigurations(sanitized)))
+    return normalizePetanqueSliderRanges(
+      disablePetanqueViewerWidget(
+        migrateLegacyPetanque(migrateLegacyDefaultControl(mergeMissingDemoConfigurations(sanitized)))
+      )
     );
   } catch {
     return cloneDefaultConfigurations();
