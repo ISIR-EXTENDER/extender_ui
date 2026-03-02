@@ -45,9 +45,9 @@ const TOPIC_FRESHNESS_TICK_MS = 100;
 const PETANQUE_STATE_TOPIC = "/petanque_state_machine/change_state";
 const PETANQUE_TOTAL_DURATION_TOPIC = "/petanque_throw/total_duration";
 const PETANQUE_ANGLE_TOPIC = "/petanque_throw/angle_between_start_and_finish";
-const PETANQUE_TOTAL_DURATION_MIN_S = 0.4;
+const PETANQUE_TOTAL_DURATION_MIN_S = 1.0;
 const PETANQUE_TOTAL_DURATION_MAX_S = 3.0;
-const PETANQUE_DEFAULT_TOTAL_DURATION_S = 1.0;
+const PETANQUE_DEFAULT_TOTAL_DURATION_S = 1.1;
 const PETANQUE_COMMANDS = [
   "teleop",
   "activate_throw",
@@ -66,6 +66,10 @@ const mapGainToPetanqueDuration = (gain: number) => {
   if (gain <= 0) return PETANQUE_TOTAL_DURATION_MAX_S;
   const duration = PETANQUE_DEFAULT_TOTAL_DURATION_S / gain;
   return clamp(duration, PETANQUE_TOTAL_DURATION_MIN_S, PETANQUE_TOTAL_DURATION_MAX_S);
+};
+const mapDurationToPetanqueGain = (durationSeconds: number) => {
+  if (durationSeconds <= 0) return 1;
+  return PETANQUE_DEFAULT_TOTAL_DURATION_S / durationSeconds;
 };
 
 const NOOP_RECT_CHANGE: (next: CanvasRect) => void = () => {};
@@ -103,6 +107,7 @@ export function ApplicationPage({
   const setRz = useTeleopStore((s) => s.setRz);
   const maxVelocity = useTeleopStore((s) => s.maxVelocity);
   const setMaxVelocity = useTeleopStore((s) => s.setMaxVelocity);
+  const wsStatus = useTeleopStore((s) => s.wsStatus);
   const gripperSpeed = useUiStore((s) => s.gripperSpeed);
   const gripperForce = useUiStore((s) => s.gripperForce);
   const setGripperSpeed = useUiStore((s) => s.setGripperSpeed);
@@ -119,6 +124,7 @@ export function ApplicationPage({
   const [rosbagStatus, setRosbagStatus] = useState("idle");
   const [petanqueFlowStage, setPetanqueFlowStage] = useState<PetanqueFlowStage>("teleop");
   const [maxVelocityWidgetValues, setMaxVelocityWidgetValues] = useState<Record<string, number>>({});
+  const hasSentPetanqueDurationDefaultRef = useRef(false);
   const canvasViewportRef = useRef<HTMLDivElement | null>(null);
   const [canvasViewportSize, setCanvasViewportSize] = useState<{ width: number; height: number }>({
     width: 0,
@@ -180,6 +186,29 @@ export function ApplicationPage({
   useEffect(() => {
     persistConfigurationsToLocalStorage(configurations);
   }, [configurations]);
+
+  useEffect(() => {
+    if (wsStatus !== "connected") {
+      hasSentPetanqueDurationDefaultRef.current = false;
+      return;
+    }
+
+    if (activeScreenId !== "petanque") return;
+    if (hasSentPetanqueDurationDefaultRef.current) return;
+
+    const hasDurationWidget = widgets.some(
+      (widget) =>
+        widget.kind === "max-velocity" &&
+        widget.topic === PETANQUE_TOTAL_DURATION_TOPIC
+    );
+    if (!hasDurationWidget) return;
+
+    wsClient.send({
+      type: "petanque_cfg",
+      total_duration: PETANQUE_DEFAULT_TOTAL_DURATION_S,
+    });
+    hasSentPetanqueDurationDefaultRef.current = true;
+  }, [activeScreenId, widgets, wsStatus]);
 
   useEffect(() => {
     if (!activeScreenId) return;
@@ -581,6 +610,10 @@ export function ApplicationPage({
       const widgetValue =
         typeof maxVelocityWidgetValues[widget.id] === "number"
           ? maxVelocityWidgetValues[widget.id]
+          : widget.topic === PETANQUE_TOTAL_DURATION_TOPIC
+            ? mapDurationToPetanqueGain(PETANQUE_DEFAULT_TOTAL_DURATION_S)
+            : widget.topic === PETANQUE_ANGLE_TOPIC
+              ? 0
           : widget.topic === "/cmd/max_velocity"
             ? maxVelocity
             : 1;
