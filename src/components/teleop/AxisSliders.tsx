@@ -12,6 +12,7 @@ type ZSliderProps = {
   labelAlign?: LabelAlign;
   showLabel?: boolean;
   showReadout?: boolean;
+  autoCenter?: boolean;
 };
 
 type RzSliderProps = {
@@ -24,6 +25,7 @@ type RzSliderProps = {
   labelAlign?: LabelAlign;
   showLabel?: boolean;
   showReadout?: boolean;
+  autoCenter?: boolean;
 };
 
 export function ZSlider({
@@ -36,7 +38,14 @@ export function ZSlider({
   labelAlign = "center",
   showLabel = true,
   showReadout = true,
+  autoCenter = false,
 }: ZSliderProps) {
+  const releaseToCenter = () => {
+    if (!autoCenter) return;
+    if (Math.abs(value) <= 1e-6) return;
+    onChange(0);
+  };
+
   return (
     <div className={`z-vertical ${showLabel ? "has-label" : ""}`.trim()}>
       {showLabel ? (
@@ -53,6 +62,7 @@ export function ZSlider({
           step={step}
           value={[value]}
           onValueChange={(v) => onChange(v[0] ?? 0)}
+          onValueCommit={releaseToCenter}
           onPointerDown={(event) => event.stopPropagation()}
         >
           <Slider.Track className="slider-track">
@@ -76,7 +86,14 @@ export function RzSlider({
   labelAlign = "center",
   showLabel = true,
   showReadout = true,
+  autoCenter = false,
 }: RzSliderProps) {
+  const releaseToCenter = () => {
+    if (!autoCenter) return;
+    if (Math.abs(value) <= 1e-6) return;
+    onChange(0);
+  };
+
   return (
     <div className="rz-top">
       {showLabel && (
@@ -91,6 +108,7 @@ export function RzSlider({
         step={step}
         value={[value]}
         onValueChange={(v) => onChange(v[0] ?? 0)}
+        onValueCommit={releaseToCenter}
         onPointerDown={(event) => event.stopPropagation()}
       >
         <Slider.Track className="slider-track">

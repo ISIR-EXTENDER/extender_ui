@@ -28,6 +28,9 @@ export function SliderWidget({
   const showLabel = widget.showLabel ?? true;
   const showTopicInfo = widget.showTopicInfo ?? true;
   const labelAlign = widget.labelAlign ?? "center";
+  const normalizedTopic = widget.topic.toLowerCase();
+  const autoCenter =
+    normalizedTopic.includes("joystick_z") || normalizedTopic.includes("joystick_rz");
 
   return (
     <CanvasItem
@@ -53,6 +56,7 @@ export function SliderWidget({
             labelAlign={labelAlign}
             showLabel={showLabel}
             showReadout={false}
+            autoCenter={autoCenter}
           />
         ) : (
           <RzSlider
@@ -65,6 +69,7 @@ export function SliderWidget({
             labelAlign={labelAlign}
             showLabel={showLabel}
             showReadout={false}
+            autoCenter={autoCenter}
           />
         )}
       </div>
