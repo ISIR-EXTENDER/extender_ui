@@ -553,6 +553,8 @@ export function MagnetControlWidget({
   onActivate,
   onDeactivate,
 }: MagnetControlWidgetProps) {
+  const [activeSide, setActiveSide] = useState<"on" | "off" | null>(null);
+
   return (
     <CanvasItem
       x={widget.rect.x}
@@ -570,10 +572,26 @@ export function MagnetControlWidget({
           <InlineEditableText value={widget.label} onCommit={onLabelChange} className="controls-inline-label" />
         </div>
         <div className="controls-magnet-actions">
-          <button type="button" className="action-button on" onClick={onActivate}>
+          <button
+            type="button"
+            className={`action-button on ${activeSide === "on" ? "is-active" : ""}`.trim()}
+            aria-pressed={activeSide === "on"}
+            onClick={() => {
+              setActiveSide("on");
+              onActivate();
+            }}
+          >
             ON
           </button>
-          <button type="button" className="action-button off" onClick={onDeactivate}>
+          <button
+            type="button"
+            className={`action-button off ${activeSide === "off" ? "is-active" : ""}`.trim()}
+            aria-pressed={activeSide === "off"}
+            onClick={() => {
+              setActiveSide("off");
+              onDeactivate();
+            }}
+          >
             OFF
           </button>
         </div>
