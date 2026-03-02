@@ -4,6 +4,7 @@ export type JoystickBinding = "joy" | "rot";
 export type SliderBinding = "z" | "rz";
 export type SliderDirection = "vertical" | "horizontal";
 export type WidgetIcon = "home" | "save" | "arrow-right";
+export type ButtonTone = "default" | "accent" | "success" | "danger";
 export type NavigationOrientation = "horizontal" | "vertical";
 export type TextAlign = "left" | "center" | "right";
 export type StreamSource = "camera" | "rviz" | "visualization";
@@ -109,6 +110,7 @@ export type TextareaWidget = WidgetBase & {
 export type ButtonWidget = WidgetBase & {
   kind: "button";
   payload: string;
+  tone?: ButtonTone;
 };
 
 export type RosbagControlWidget = WidgetBase & {

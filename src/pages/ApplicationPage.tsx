@@ -42,13 +42,49 @@ type ApplicationPageProps = {
 
 const TOPIC_FRESHNESS_MS = 200;
 const TOPIC_FRESHNESS_TICK_MS = 100;
+const PETANQUE_STATE_TOPIC = "/petanque_state_machine/change_state";
+const PETANQUE_TOTAL_DURATION_TOPIC = "/petanque_throw/total_duration";
+const PETANQUE_ANGLE_TOPIC = "/petanque_throw/angle_between_start_and_finish";
+const PETANQUE_TOTAL_DURATION_MIN_S = 0.4;
+const PETANQUE_TOTAL_DURATION_MAX_S = 3.0;
+const PETANQUE_DEFAULT_TOTAL_DURATION_S = 1.0;
+const PETANQUE_COMMANDS = [
+  "teleop",
+  "activate_throw",
+  "go_to_start",
+  "throw",
+  "pick_up",
+  "stop",
+] as const;
+type PetanqueStateCommand = (typeof PETANQUE_COMMANDS)[number];
+type PetanqueFlowStage = "teleop" | "start_ready";
+type SliderChannel = "z" | "rz";
 
 const clampSignedUnit = (value: number) => Math.max(-1, Math.min(1, value));
+const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
+const mapGainToPetanqueDuration = (gain: number) => {
+  if (gain <= 0) return PETANQUE_TOTAL_DURATION_MAX_S;
+  const duration = PETANQUE_DEFAULT_TOTAL_DURATION_S / gain;
+  return clamp(duration, PETANQUE_TOTAL_DURATION_MIN_S, PETANQUE_TOTAL_DURATION_MAX_S);
+};
 
 const NOOP_RECT_CHANGE: (next: CanvasRect) => void = () => {};
 const NOOP_TEXT_CHANGE: (next: string) => void = () => {};
 const toScreenClassToken = (screenId: string) =>
   screenId.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-");
+const resolveVisualizationUrlForRuntime = (rawUrl: string) => {
+  if (!rawUrl || typeof window === "undefined") return rawUrl;
+  try {
+    const parsed = new URL(rawUrl);
+    if (parsed.hostname === "127.0.0.1" || parsed.hostname === "localhost") {
+      parsed.hostname = window.location.hostname;
+      return parsed.toString();
+    }
+    return rawUrl;
+  } catch {
+    return rawUrl;
+  }
+};
 
 export function ApplicationPage({
   applicationId,
@@ -81,6 +117,8 @@ export function ApplicationPage({
   const [freshnessClock, setFreshnessClock] = useState<number>(() => Date.now());
   const [rosbagRecording, setRosbagRecording] = useState(false);
   const [rosbagStatus, setRosbagStatus] = useState("idle");
+  const [petanqueFlowStage, setPetanqueFlowStage] = useState<PetanqueFlowStage>("teleop");
+  const [maxVelocityWidgetValues, setMaxVelocityWidgetValues] = useState<Record<string, number>>({});
   const canvasViewportRef = useRef<HTMLDivElement | null>(null);
   const [canvasViewportSize, setCanvasViewportSize] = useState<{ width: number; height: number }>({
     width: 0,
@@ -181,6 +219,105 @@ export function ApplicationPage({
   const isWidgetFresh = (widgetId: string) =>
     freshnessClock - (widgetPulseMap[widgetId] ?? 0) <= TOPIC_FRESHNESS_MS;
 
+  const resolveSliderChannel = (
+    widget: Extract<CanvasWidget, { kind: "slider" }>
+  ): SliderChannel => {
+    const topic = widget.topic.toLowerCase();
+    const looksLikeRotationZ =
+      topic.includes("joystick_rz") ||
+      topic.includes("angular_z") ||
+      topic.endsWith("/rz");
+    if (looksLikeRotationZ) return "rz";
+
+    const looksLikeTranslationZ =
+      topic.includes("joystick_z") ||
+      topic.includes("linear_z") ||
+      topic.endsWith("/z");
+    if (looksLikeTranslationZ) return "z";
+
+    return widget.binding === "z" ? "z" : "rz";
+  };
+
+  const isPetanqueStateCommand = (value: string): value is PetanqueStateCommand =>
+    (PETANQUE_COMMANDS as readonly string[]).includes(value);
+
+  const getPetanqueButtonState = (command: PetanqueStateCommand) => {
+    if (command === "teleop") {
+      return {
+        disabled: false,
+        active: petanqueFlowStage === "teleop",
+        tone: "default" as const,
+      };
+    }
+    if (command === "activate_throw") {
+      return {
+        disabled: false,
+        active: petanqueFlowStage === "start_ready",
+        tone: "accent" as const,
+      };
+    }
+    if (command === "go_to_start") {
+      return {
+        disabled: petanqueFlowStage === "teleop",
+        active: petanqueFlowStage === "start_ready",
+        tone: "success" as const,
+      };
+    }
+    if (command === "throw") {
+      return {
+        disabled: petanqueFlowStage !== "start_ready",
+        active: false,
+        tone: "danger" as const,
+      };
+    }
+    if (command === "pick_up") {
+      return {
+        disabled: petanqueFlowStage !== "start_ready",
+        active: false,
+        tone: "accent" as const,
+      };
+    }
+    if (command === "stop") {
+      return {
+        disabled: petanqueFlowStage !== "start_ready",
+        active: false,
+        tone: "danger" as const,
+      };
+    }
+    return {
+      disabled: false,
+      active: false,
+      tone: "danger" as const,
+    };
+  };
+
+  const advancePetanqueFlow = (command: PetanqueStateCommand) => {
+    if (command === "teleop" || command === "stop") {
+      setPetanqueFlowStage("teleop");
+      return;
+    }
+    if (command === "activate_throw") {
+      // Current state machine flow auto-transitions activate_throw -> go_to_start.
+      // Mark UI as "start ready" immediately so START + HOME are both lit
+      // and the next action is directly THROW.
+      setPetanqueFlowStage("start_ready");
+      return;
+    }
+    if (command === "go_to_start") {
+      setPetanqueFlowStage("start_ready");
+      return;
+    }
+    if (command === "pick_up") {
+      // pick_up sequence returns to teleop mode in current state machine.
+      setPetanqueFlowStage("teleop");
+      return;
+    }
+    if (command === "throw") {
+      // Throwing controller remains active after throw; keep throw-ready state.
+      setPetanqueFlowStage("start_ready");
+    }
+  };
+
   const upsertPose = (poses: PoseSnapshot[], pose: PoseSnapshot) => {
     const index = poses.findIndex((item) => item.name === pose.name);
     if (index === -1) return [...poses, pose].sort((a, b) => a.name.localeCompare(b.name));
@@ -192,7 +329,8 @@ export function ApplicationPage({
 
     for (const widget of widgets) {
       if (widget.kind === "slider") {
-        const value = widget.binding === "z" ? z : rz;
+        const channel = resolveSliderChannel(widget);
+        const value = channel === "z" ? z : rz;
         topics[widget.topic] = { kind: "scalar", value };
         continue;
       }
@@ -243,7 +381,8 @@ export function ApplicationPage({
 
       if (widget.kind === "slider" && topicValue.kind === "scalar") {
         const clamped = Math.min(widget.max, Math.max(widget.min, topicValue.value));
-        if (widget.binding === "z") {
+        const channel = resolveSliderChannel(widget);
+        if (channel === "z") {
           setZ(clamped);
         } else {
           setRz(clamped);
@@ -380,6 +519,13 @@ export function ApplicationPage({
     }
 
     if (widget.kind === "button") {
+      const petanqueCommand = isPetanqueStateCommand(widget.payload) ? widget.payload : null;
+      const isStateMachineButton =
+        widget.topic === PETANQUE_STATE_TOPIC && petanqueCommand !== null;
+      const petanqueButtonState = isStateMachineButton && petanqueCommand
+        ? getPetanqueButtonState(petanqueCommand)
+        : null;
+
       return (
         <ActionButtonWidget
           key={widget.id}
@@ -388,14 +534,29 @@ export function ApplicationPage({
           onSelect={() => {}}
           onRectChange={NOOP_RECT_CHANGE}
           onLabelChange={NOOP_TEXT_CHANGE}
-          onTrigger={() =>
+          disabled={petanqueButtonState?.disabled ?? false}
+          active={petanqueButtonState?.active ?? false}
+          tone={petanqueButtonState?.tone ?? widget.tone ?? "default"}
+          onTrigger={() => {
+            if (isStateMachineButton && petanqueCommand) {
+              if (petanqueButtonState?.disabled) return;
+              wsClient.send({
+                type: "state_cmd",
+                command: petanqueCommand,
+              });
+              advancePetanqueFlow(petanqueCommand);
+              markWidgetPulse(widget.id);
+              return;
+            }
+
             wsClient.send({
               type: "ui_button",
               topic: widget.topic,
               payload: widget.payload,
               widget_id: widget.id,
-            })
-          }
+            });
+            markWidgetPulse(widget.id);
+          }}
         />
       );
     }
@@ -417,6 +578,12 @@ export function ApplicationPage({
     }
 
     if (widget.kind === "max-velocity") {
+      const widgetValue =
+        typeof maxVelocityWidgetValues[widget.id] === "number"
+          ? maxVelocityWidgetValues[widget.id]
+          : widget.topic === "/cmd/max_velocity"
+            ? maxVelocity
+            : 1;
       return (
         <MaxVelocityWidget
           key={widget.id}
@@ -425,8 +592,29 @@ export function ApplicationPage({
           onSelect={() => {}}
           onRectChange={NOOP_RECT_CHANGE}
           onLabelChange={NOOP_TEXT_CHANGE}
-          value={maxVelocity}
-          onValueChange={setMaxVelocity}
+          value={widgetValue}
+          onValueChange={(nextValue) => {
+            setMaxVelocityWidgetValues((prev) => ({
+              ...prev,
+              [widget.id]: nextValue,
+            }));
+            if (widget.topic === "/cmd/max_velocity") {
+              setMaxVelocity(nextValue);
+            }
+            if (widget.topic === PETANQUE_TOTAL_DURATION_TOPIC) {
+              wsClient.send({
+                type: "petanque_cfg",
+                total_duration: mapGainToPetanqueDuration(nextValue),
+              });
+            }
+            if (widget.topic === PETANQUE_ANGLE_TOPIC) {
+              wsClient.send({
+                type: "petanque_cfg",
+                angle_between_start_and_finish: nextValue,
+              });
+            }
+            markWidgetPulse(widget.id);
+          }}
         />
       );
     }
@@ -455,7 +643,12 @@ export function ApplicationPage({
     }
 
     if (widget.kind === "stream-display") {
-      const url = widget.source === "camera" ? cameraStreamUrl : rvizStreamUrl;
+      const url =
+        widget.source === "camera"
+          ? cameraStreamUrl
+          : widget.source === "rviz"
+            ? rvizStreamUrl
+            : resolveVisualizationUrlForRuntime(widget.streamUrl);
       const sourceStatus =
         widget.source === "rviz"
           ? "RViz stream"
@@ -509,8 +702,9 @@ export function ApplicationPage({
     }
 
     if (widget.kind === "slider") {
-      const value = widget.binding === "z" ? z : rz;
-      const onChange = widget.binding === "z" ? setZ : setRz;
+      const channel = resolveSliderChannel(widget);
+      const value = channel === "z" ? z : rz;
+      const onChange = channel === "z" ? setZ : setRz;
       const topicPreview = `${widget.topic}: ${value.toFixed(2)}`;
       return (
         <SliderWidget

@@ -13,8 +13,8 @@ import { type AppRoute, useAppRouter } from "./router";
 
 export default function App() {
   useWsConnection();
+  useTeleopPublisher();
   useThemeMode();
-  const { stopAndZero } = useTeleopPublisher();
   const { route, navigate } = useAppRouter();
   const focusMode = useUiStore((s) => s.focusMode);
   const setIsEditorMode = useUiStore((s) => s.setIsEditorMode);
@@ -52,7 +52,6 @@ export default function App() {
   return (
     <div className="app">
       <TopBar
-        onStop={stopAndZero}
         onHome={() => guardedNavigate({ kind: "home" })}
         onOpenCanvasDesign={() => guardedNavigate({ kind: "canvas-design" })}
         isCanvasDesign={route.kind === "canvas-design"}

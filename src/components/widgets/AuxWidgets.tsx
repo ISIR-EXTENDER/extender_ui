@@ -50,6 +50,9 @@ type ActionButtonWidgetProps = BaseWidgetProps & {
   widget: ButtonWidgetModel;
   onLabelChange: (nextLabel: string) => void;
   onTrigger: () => void;
+  disabled?: boolean;
+  active?: boolean;
+  tone?: "default" | "accent" | "success" | "danger";
 };
 
 type ModeButtonWidgetProps = BaseWidgetProps & {
@@ -201,7 +204,19 @@ export function ActionButtonWidget({
   onRectChange,
   onLabelChange,
   onTrigger,
+  disabled = false,
+  active = false,
+  tone = "default",
 }: ActionButtonWidgetProps) {
+  const className = [
+    "controls-action-button-widget",
+    `tone-${tone}`,
+    active ? "is-active" : "",
+    disabled ? "is-disabled" : "",
+  ]
+    .join(" ")
+    .trim();
+
   return (
     <CanvasItem
       x={widget.rect.x}
@@ -214,7 +229,13 @@ export function ActionButtonWidget({
       minSize={{ w: 92, h: 42 }}
       className="controls-action-button-item"
     >
-      <button type="button" className="controls-action-button-widget" onClick={onTrigger}>
+      <button
+        type="button"
+        className={className}
+        onClick={onTrigger}
+        disabled={disabled}
+        data-canvas-interactive="true"
+      >
         <InlineEditableText value={widget.label} onCommit={onLabelChange} className="controls-inline-label" />
       </button>
     </CanvasItem>
@@ -523,6 +544,8 @@ export function StreamDisplayWidget({
   onLabelChange,
   statusText,
 }: StreamDisplayWidgetProps) {
+  const canEmbedVisualization =
+    widget.source === "visualization" && /^https?:\/\//i.test(widget.streamUrl);
   const sourceLabel =
     widget.source === "rviz"
       ? "RViz"
@@ -550,10 +573,18 @@ export function StreamDisplayWidget({
           <span className="controls-stream-source">{sourceLabel}</span>
         </div>
         <div className={`controls-stream-view controls-stream-fit-${widget.fitMode}`}>
-          {/* TODO: Replace placeholder with backend-driven media (WebRTC/MJPEG/topic bridge). */}
-          <div className="stream-placeholder">
-            {widget.overlayText?.trim() || statusText}
-          </div>
+          {canEmbedVisualization ? (
+            <iframe
+              className="controls-stream-iframe"
+              src={widget.streamUrl}
+              title={`${widget.label} visualization`}
+              loading="lazy"
+            />
+          ) : (
+            <div className="stream-placeholder">
+              {widget.overlayText?.trim() || statusText}
+            </div>
+          )}
         </div>
         {widget.showStatus ? <div className="controls-stream-status">{statusText}</div> : null}
         {widget.showUrl ? <div className="controls-stream-url">{widget.streamUrl || "no stream url"}</div> : null}
