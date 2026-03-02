@@ -206,6 +206,7 @@ export function ApplicationPage({
     wsClient.send({
       type: "petanque_cfg",
       total_duration: PETANQUE_DEFAULT_TOTAL_DURATION_S,
+      speed_gain: mapDurationToPetanqueGain(PETANQUE_DEFAULT_TOTAL_DURATION_S),
     });
     hasSentPetanqueDurationDefaultRef.current = true;
   }, [activeScreenId, widgets, wsStatus]);
@@ -638,6 +639,7 @@ export function ApplicationPage({
               wsClient.send({
                 type: "petanque_cfg",
                 total_duration: mapGainToPetanqueDuration(nextValue),
+                speed_gain: nextValue,
               });
             }
             if (widget.topic === PETANQUE_ANGLE_TOPIC) {
