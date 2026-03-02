@@ -25,6 +25,7 @@ export type WidgetKind =
   | "rosbag-control"
   | "max-velocity"
   | "gripper-control"
+  | "magnet-control"
   | "stream-display"
   | "curves"
   | "logs";
@@ -131,6 +132,12 @@ export type GripperControlWidget = WidgetBase & {
   showAdvancedControls?: boolean;
 };
 
+export type MagnetControlWidget = WidgetBase & {
+  kind: "magnet-control";
+  onPayload: string;
+  offPayload: string;
+};
+
 export type StreamDisplayWidget = WidgetBase & {
   kind: "stream-display";
   source: StreamSource;
@@ -171,6 +178,7 @@ export type CanvasWidget =
   | RosbagControlWidget
   | MaxVelocityWidget
   | GripperControlWidget
+  | MagnetControlWidget
   | StreamDisplayWidget
   | CurvesWidget
   | LogsWidget;

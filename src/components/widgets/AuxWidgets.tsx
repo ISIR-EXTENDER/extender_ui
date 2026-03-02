@@ -19,6 +19,7 @@ import type {
   CurvesWidget as CurvesWidgetModel,
   GripperControlWidget as GripperControlWidgetModel,
   LogsWidget as LogsWidgetModel,
+  MagnetControlWidget as MagnetControlWidgetModel,
   ModeButtonWidget as ModeButtonWidgetModel,
   MaxVelocityWidget as MaxVelocityWidgetModel,
   NavigationBarWidget as NavigationBarWidgetModel,
@@ -97,6 +98,13 @@ type GripperControlWidgetProps = BaseWidgetProps & {
   onForceChange: (value: number) => void;
   onOpen: () => void;
   onClose: () => void;
+};
+
+type MagnetControlWidgetProps = BaseWidgetProps & {
+  widget: MagnetControlWidgetModel;
+  onLabelChange: (nextLabel: string) => void;
+  onActivate: () => void;
+  onDeactivate: () => void;
 };
 
 type StreamDisplayWidgetProps = BaseWidgetProps & {
@@ -531,6 +539,44 @@ export function GripperControlWidget({
             </div>
           </>
         ) : null}
+      </div>
+    </CanvasItem>
+  );
+}
+
+export function MagnetControlWidget({
+  widget,
+  selected,
+  onSelect,
+  onRectChange,
+  onLabelChange,
+  onActivate,
+  onDeactivate,
+}: MagnetControlWidgetProps) {
+  return (
+    <CanvasItem
+      x={widget.rect.x}
+      y={widget.rect.y}
+      w={widget.rect.w}
+      h={widget.rect.h}
+      onChange={onRectChange}
+      onSelect={onSelect}
+      selected={selected}
+      minSize={{ w: 180, h: 92 }}
+      className="controls-magnet-item"
+    >
+      <div className="controls-magnet-widget">
+        <div className="controls-magnet-title">
+          <InlineEditableText value={widget.label} onCommit={onLabelChange} className="controls-inline-label" />
+        </div>
+        <div className="controls-magnet-actions">
+          <button type="button" className="action-button on" onClick={onActivate}>
+            ON
+          </button>
+          <button type="button" className="action-button off" onClick={onDeactivate}>
+            OFF
+          </button>
+        </div>
       </div>
     </CanvasItem>
   );

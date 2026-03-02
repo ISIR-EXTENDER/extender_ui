@@ -450,19 +450,12 @@ export const DEFAULT_DEMO_CONFIGURATIONS: WidgetConfiguration[] = [
       tone: "danger",
       rect: { w: 150, h: 58 },
     }),
-    createDemoWidget("pet-magnet-on", "button", 1112, 90, {
-      label: "Mag ON",
+    createDemoWidget("pet-magnet", "magnet-control", 1112, 90, {
+      label: "Magnet",
       topic: "/hub/digital_output",
-      payload: "electromagnet_on",
-      tone: "success",
-      rect: { w: 70, h: 58 },
-    }),
-    createDemoWidget("pet-magnet-off", "button", 1188, 90, {
-      label: "Mag OFF",
-      topic: "/hub/digital_output",
-      payload: "electromagnet_off",
-      tone: "danger",
-      rect: { w: 70, h: 58 },
+      onPayload: "electromagnet_on",
+      offPayload: "electromagnet_off",
+      rect: { w: 146, h: 92 },
     }),
     createDemoWidget("pet-speed", "max-velocity", 20, 166, {
       label: "Throw Speed",
@@ -794,7 +787,7 @@ const normalizePetanqueSliderRanges = (
   });
 };
 
-const ensurePetanqueElectromagnetButtons = (
+const ensurePetanqueElectromagnetControl = (
   configurations: WidgetConfiguration[]
 ): WidgetConfiguration[] => {
   const latestPetanque = DEFAULT_DEMO_CONFIGURATIONS.find(
@@ -802,35 +795,32 @@ const ensurePetanqueElectromagnetButtons = (
   );
   if (!latestPetanque) return configurations;
 
-  const magnetButtons = latestPetanque.widgets.filter(
-    (widget) =>
-      widget.id === "pet-magnet-on" || widget.id === "pet-magnet-off"
+  const magnetTemplate = latestPetanque.widgets.find(
+    (widget) => widget.id === "pet-magnet"
   );
-  if (magnetButtons.length !== 2) return configurations;
+  if (!magnetTemplate) return configurations;
 
   return configurations.map((configuration) => {
     if (configuration.name !== "petanque") return configuration;
 
-    const hasMagnetOn = configuration.widgets.some(
-      (widget) => widget.id === "pet-magnet-on"
+    const hasMagnetControl = configuration.widgets.some(
+      (widget) => widget.id === "pet-magnet"
     );
-    const hasMagnetOff = configuration.widgets.some(
-      (widget) => widget.id === "pet-magnet-off"
+    const hasLegacyMagnetButtons = configuration.widgets.some(
+      (widget) => widget.id === "pet-magnet-on" || widget.id === "pet-magnet-off"
     );
-    if (hasMagnetOn && hasMagnetOff) return configuration;
+    if (hasMagnetControl && !hasLegacyMagnetButtons) return configuration;
 
-    const toAdd = magnetButtons
-      .filter(
-        (widget) =>
-          widget.id === "pet-magnet-on"
-            ? !hasMagnetOn
-            : !hasMagnetOff
-      )
-      .map((widget) => cloneWidgets([widget])[0]);
+    const withoutLegacy = configuration.widgets.filter(
+      (widget) => widget.id !== "pet-magnet-on" && widget.id !== "pet-magnet-off"
+    );
+    const nextWidgets = hasMagnetControl
+      ? withoutLegacy
+      : [...withoutLegacy, cloneWidgets([magnetTemplate])[0]];
 
     return {
       ...configuration,
-      widgets: [...configuration.widgets, ...toAdd],
+      widgets: nextWidgets,
       updatedAt: new Date().toISOString(),
     };
   });
@@ -932,7 +922,7 @@ export function loadConfigurationsFromLocalStorage(): WidgetConfiguration[] {
         updatedAt: typeof item.updatedAt === "string" ? item.updatedAt : new Date().toISOString(),
       }));
     return normalizePetanqueSliderRanges(
-      ensurePetanqueElectromagnetButtons(
+      ensurePetanqueElectromagnetControl(
         disablePetanqueViewerWidget(
           migrateLegacyPetanque(migrateLegacyDefaultControl(mergeMissingDemoConfigurations(sanitized)))
         )
