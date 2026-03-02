@@ -44,6 +44,7 @@ const TOPIC_FRESHNESS_MS = 200;
 const TOPIC_FRESHNESS_TICK_MS = 100;
 const PETANQUE_STATE_TOPIC = "/petanque_state_machine/change_state";
 const PETANQUE_TOTAL_DURATION_TOPIC = "/petanque_throw/total_duration";
+const PETANQUE_ANGLE_TOPIC = "/petanque_throw/angle_between_start_and_finish";
 const PETANQUE_TOTAL_DURATION_MIN_S = 0.4;
 const PETANQUE_TOTAL_DURATION_MAX_S = 3.0;
 const PETANQUE_DEFAULT_TOTAL_DURATION_S = 1.0;
@@ -57,6 +58,7 @@ const PETANQUE_COMMANDS = [
 ] as const;
 type PetanqueStateCommand = (typeof PETANQUE_COMMANDS)[number];
 type PetanqueFlowStage = "teleop" | "start_ready";
+type SliderChannel = "z" | "rz";
 
 const clampSignedUnit = (value: number) => Math.max(-1, Math.min(1, value));
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
@@ -116,6 +118,7 @@ export function ApplicationPage({
   const [rosbagRecording, setRosbagRecording] = useState(false);
   const [rosbagStatus, setRosbagStatus] = useState("idle");
   const [petanqueFlowStage, setPetanqueFlowStage] = useState<PetanqueFlowStage>("teleop");
+  const [maxVelocityWidgetValues, setMaxVelocityWidgetValues] = useState<Record<string, number>>({});
   const canvasViewportRef = useRef<HTMLDivElement | null>(null);
   const [canvasViewportSize, setCanvasViewportSize] = useState<{ width: number; height: number }>({
     width: 0,
@@ -216,6 +219,25 @@ export function ApplicationPage({
   const isWidgetFresh = (widgetId: string) =>
     freshnessClock - (widgetPulseMap[widgetId] ?? 0) <= TOPIC_FRESHNESS_MS;
 
+  const resolveSliderChannel = (
+    widget: Extract<CanvasWidget, { kind: "slider" }>
+  ): SliderChannel => {
+    const topic = widget.topic.toLowerCase();
+    const looksLikeRotationZ =
+      topic.includes("joystick_rz") ||
+      topic.includes("angular_z") ||
+      topic.endsWith("/rz");
+    if (looksLikeRotationZ) return "rz";
+
+    const looksLikeTranslationZ =
+      topic.includes("joystick_z") ||
+      topic.includes("linear_z") ||
+      topic.endsWith("/z");
+    if (looksLikeTranslationZ) return "z";
+
+    return widget.binding === "z" ? "z" : "rz";
+  };
+
   const isPetanqueStateCommand = (value: string): value is PetanqueStateCommand =>
     (PETANQUE_COMMANDS as readonly string[]).includes(value);
 
@@ -307,7 +329,8 @@ export function ApplicationPage({
 
     for (const widget of widgets) {
       if (widget.kind === "slider") {
-        const value = widget.binding === "z" ? z : rz;
+        const channel = resolveSliderChannel(widget);
+        const value = channel === "z" ? z : rz;
         topics[widget.topic] = { kind: "scalar", value };
         continue;
       }
@@ -358,7 +381,8 @@ export function ApplicationPage({
 
       if (widget.kind === "slider" && topicValue.kind === "scalar") {
         const clamped = Math.min(widget.max, Math.max(widget.min, topicValue.value));
-        if (widget.binding === "z") {
+        const channel = resolveSliderChannel(widget);
+        if (channel === "z") {
           setZ(clamped);
         } else {
           setRz(clamped);
@@ -554,6 +578,12 @@ export function ApplicationPage({
     }
 
     if (widget.kind === "max-velocity") {
+      const widgetValue =
+        typeof maxVelocityWidgetValues[widget.id] === "number"
+          ? maxVelocityWidgetValues[widget.id]
+          : widget.topic === "/cmd/max_velocity"
+            ? maxVelocity
+            : 1;
       return (
         <MaxVelocityWidget
           key={widget.id}
@@ -562,13 +592,25 @@ export function ApplicationPage({
           onSelect={() => {}}
           onRectChange={NOOP_RECT_CHANGE}
           onLabelChange={NOOP_TEXT_CHANGE}
-          value={maxVelocity}
+          value={widgetValue}
           onValueChange={(nextValue) => {
-            setMaxVelocity(nextValue);
+            setMaxVelocityWidgetValues((prev) => ({
+              ...prev,
+              [widget.id]: nextValue,
+            }));
+            if (widget.topic === "/cmd/max_velocity") {
+              setMaxVelocity(nextValue);
+            }
             if (widget.topic === PETANQUE_TOTAL_DURATION_TOPIC) {
               wsClient.send({
                 type: "petanque_cfg",
                 total_duration: mapGainToPetanqueDuration(nextValue),
+              });
+            }
+            if (widget.topic === PETANQUE_ANGLE_TOPIC) {
+              wsClient.send({
+                type: "petanque_cfg",
+                angle_between_start_and_finish: nextValue,
               });
             }
             markWidgetPulse(widget.id);
@@ -660,8 +702,9 @@ export function ApplicationPage({
     }
 
     if (widget.kind === "slider") {
-      const value = widget.binding === "z" ? z : rz;
-      const onChange = widget.binding === "z" ? setZ : setRz;
+      const channel = resolveSliderChannel(widget);
+      const value = channel === "z" ? z : rz;
+      const onChange = channel === "z" ? setZ : setRz;
       const topicPreview = `${widget.topic}: ${value.toFixed(2)}`;
       return (
         <SliderWidget
