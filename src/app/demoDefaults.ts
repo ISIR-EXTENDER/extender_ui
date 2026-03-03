@@ -10,6 +10,7 @@ export const ADMIN_DEMO_SCREEN_IDS = [
   "logs",
   "poses",
   "petanque",
+  "petanque_teleop_config",
   "curves",
   "configurations",
   "debug",

@@ -636,6 +636,8 @@ function CurvesWidget({ title }: { title: string }) {
   const rotY = useTeleopStore((s) => s.rotY);
   const scaleX = useTeleopStore((s) => s.scaleX);
   const scaleY = useTeleopStore((s) => s.scaleY);
+  const angularScaleX = useTeleopStore((s) => s.angularScaleX);
+  const angularScaleY = useTeleopStore((s) => s.angularScaleY);
   const maxVelocity = useTeleopStore((s) => s.maxVelocity);
   const wsState = useTeleopStore((s) => s.wsState);
   const jointPositions = useUiStore((s) => s.jointPositions);
@@ -665,7 +667,7 @@ function CurvesWidget({ title }: { title: string }) {
     const interval = setInterval(() => {
       const t = (Date.now() - chartStartRef.current) / 1000;
       const lin = Math.hypot(joyX * scaleX, joyY * scaleY);
-      const ang = Math.hypot(rotX * scaleX, rotY * scaleY);
+      const ang = Math.hypot(rotX * angularScaleX, rotY * angularScaleY);
       const err =
         wsState?.cmd_age_ms != null && wsState?.watchdog_timeout_ms
           ? Math.min(1, wsState.cmd_age_ms / wsState.watchdog_timeout_ms)
@@ -694,7 +696,19 @@ function CurvesWidget({ title }: { title: string }) {
     }, 200);
 
     return () => clearInterval(interval);
-  }, [joyX, joyY, rotX, rotY, scaleX, scaleY, wsState, maxVelocity, jointPositions]);
+  }, [
+    joyX,
+    joyY,
+    rotX,
+    rotY,
+    scaleX,
+    scaleY,
+    angularScaleX,
+    angularScaleY,
+    wsState,
+    maxVelocity,
+    jointPositions,
+  ]);
 
   return (
     <section className="card widget-fill">

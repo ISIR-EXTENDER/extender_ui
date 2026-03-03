@@ -116,9 +116,8 @@ export const DEFAULT_DEMO_CONFIGURATIONS: WidgetConfiguration[] = [
       rect: { w: 470, h: 470 },
     }),
     createDemoWidget("ctrl-gripper", "gripper-control", 24, 16, {
-      label: "",
+      label: "Gripper",
       topic: "/cmd/gripper",
-      showAdvancedControls: false,
       rect: { w: 300, h: 108 },
     }),
     createDemoWidget("ctrl-max-velocity", "max-velocity", 334, 620, {
@@ -450,7 +449,12 @@ export const DEFAULT_DEMO_CONFIGURATIONS: WidgetConfiguration[] = [
       tone: "danger",
       rect: { w: 150, h: 58 },
     }),
-    createDemoWidget("pet-magnet", "magnet-control", 1112, 90, {
+    createDemoWidget("pet-gripper", "gripper-control", 950, 20, {
+      label: "Gripper",
+      topic: "/cmd/gripper",
+      rect: { w: 146, h: 92 },
+    }),
+    createDemoWidget("pet-magnet", "magnet-control", 1112, 20, {
       label: "Magnet",
       topic: "/hub/digital_output",
       onPayload: "electromagnet_on",
@@ -482,12 +486,135 @@ export const DEFAULT_DEMO_CONFIGURATIONS: WidgetConfiguration[] = [
       overlayText: "petanque trajectory",
       rect: { w: 720, h: 420 },
     }),
-    createDemoWidget("pet-nav-default", "navigation-button", 20, 506, {
-      label: "Open Default Control",
-      topic: "/ui/navigation",
-      icon: "arrow-right",
-      targetScreenId: "default_control",
-      rect: { w: 260, h: 58 },
+  ]),
+
+  createDemoConfiguration("petanque_teleop_config", [
+    createDemoWidget("pet-cfg-lin-gain", "max-velocity", 20, 94, {
+      label: "Translation Gain",
+      topic: "/teleop_config/translation_gain",
+      min: 0.1,
+      max: 2.0,
+      step: 0.01,
+      rect: { w: 610, h: 92 },
+    }),
+    createDemoWidget("pet-cfg-ang-gain", "max-velocity", 650, 94, {
+      label: "Rotation Gain",
+      topic: "/teleop_config/rotation_gain",
+      min: 0.1,
+      max: 2.0,
+      step: 0.01,
+      rect: { w: 610, h: 92 },
+    }),
+    createDemoWidget("pet-cfg-lin-scale-x", "max-velocity", 20, 200, {
+      label: "Linear X",
+      topic: "/teleop_config/linear_scale_x",
+      min: 0.1,
+      max: 2.0,
+      step: 0.01,
+      rect: { w: 530, h: 92 },
+    }),
+    createDemoWidget("pet-cfg-ang-scale-x", "max-velocity", 650, 200, {
+      label: "Angular X",
+      topic: "/teleop_config/angular_scale_x",
+      min: 0.1,
+      max: 2.0,
+      step: 0.01,
+      rect: { w: 530, h: 92 },
+    }),
+    createDemoWidget("pet-cfg-lin-scale-y", "max-velocity", 20, 306, {
+      label: "Linear Y",
+      topic: "/teleop_config/linear_scale_y",
+      min: 0.1,
+      max: 2.0,
+      step: 0.01,
+      rect: { w: 530, h: 92 },
+    }),
+    createDemoWidget("pet-cfg-ang-scale-y", "max-velocity", 650, 306, {
+      label: "Angular Y",
+      topic: "/teleop_config/angular_scale_y",
+      min: 0.1,
+      max: 2.0,
+      step: 0.01,
+      rect: { w: 530, h: 92 },
+    }),
+    createDemoWidget("pet-cfg-lin-scale-z", "max-velocity", 20, 412, {
+      label: "Linear Z",
+      topic: "/teleop_config/linear_scale_z",
+      min: 0.1,
+      max: 2.0,
+      step: 0.01,
+      rect: { w: 530, h: 92 },
+    }),
+    createDemoWidget("pet-cfg-ang-scale-z", "max-velocity", 650, 412, {
+      label: "Angular Z",
+      topic: "/teleop_config/angular_scale_z",
+      min: 0.1,
+      max: 2.0,
+      step: 0.01,
+      rect: { w: 530, h: 92 },
+    }),
+    createDemoWidget("pet-cfg-swap-xy", "button", 650, 20, {
+      label: "Swap XY",
+      topic: "/teleop_config/swap_xy",
+      payload: "toggle",
+      tone: "accent",
+      rect: { w: 170, h: 58 },
+    }),
+    createDemoWidget("pet-cfg-save-explorer", "button", 840, 20, {
+      label: "Save Explorer",
+      topic: "/teleop_config/save_profile",
+      payload: "save",
+      tone: "success",
+      rect: { w: 190, h: 58 },
+    }),
+    createDemoWidget("pet-cfg-reset", "button", 1050, 20, {
+      label: "Reset",
+      topic: "/teleop_config/reset_defaults",
+      payload: "reset",
+      tone: "accent",
+      rect: { w: 170, h: 58 },
+    }),
+    createDemoWidget("pet-cfg-lin-x", "button", 560, 217, {
+      label: "LX +",
+      topic: "/teleop_config/invert_linear_x",
+      payload: "toggle",
+      tone: "success",
+      rect: { w: 70, h: 58 },
+    }),
+    createDemoWidget("pet-cfg-lin-y", "button", 560, 323, {
+      label: "LY +",
+      topic: "/teleop_config/invert_linear_y",
+      payload: "toggle",
+      tone: "success",
+      rect: { w: 70, h: 58 },
+    }),
+    createDemoWidget("pet-cfg-lin-z", "button", 560, 429, {
+      label: "LZ +",
+      topic: "/teleop_config/invert_linear_z",
+      payload: "toggle",
+      tone: "success",
+      rect: { w: 70, h: 58 },
+    }),
+    createDemoWidget("pet-cfg-ang-x", "button", 1190, 217, {
+      label: "AX +",
+      topic: "/teleop_config/invert_angular_x",
+      payload: "toggle",
+      tone: "danger",
+      rect: { w: 70, h: 58 },
+    }),
+    createDemoWidget("pet-cfg-ang-y", "button", 1190, 323, {
+      label: "AY +",
+      topic: "/teleop_config/invert_angular_y",
+      payload: "toggle",
+      tone: "danger",
+      rect: { w: 70, h: 58 },
+    }),
+    createDemoWidget("pet-cfg-ang-z", "button", 1190, 429, {
+      label: "AZ +",
+      topic: "/teleop_config/invert_angular_z",
+      payload: "toggle",
+      tone: "danger",
+      rect: { w: 70, h: 58 },
     }),
   ]),
 
@@ -826,6 +953,374 @@ const ensurePetanqueElectromagnetControl = (
   });
 };
 
+const ensurePetanqueGripperControl = (
+  configurations: WidgetConfiguration[]
+): WidgetConfiguration[] => {
+  const latestPetanque = DEFAULT_DEMO_CONFIGURATIONS.find(
+    (configuration) => configuration.name === "petanque"
+  );
+  if (!latestPetanque) return configurations;
+
+  const gripperTemplate = latestPetanque.widgets.find(
+    (widget) => widget.id === "pet-gripper"
+  );
+  if (!gripperTemplate) return configurations;
+
+  return configurations.map((configuration) => {
+    if (configuration.name !== "petanque") return configuration;
+    if (configuration.widgets.some((widget) => widget.id === "pet-gripper")) {
+      return configuration;
+    }
+
+    return {
+      ...configuration,
+      widgets: [...configuration.widgets, cloneWidgets([gripperTemplate])[0]],
+      updatedAt: new Date().toISOString(),
+    };
+  });
+};
+
+const removePetanqueLegacyNavigationButtons = (
+  configurations: WidgetConfiguration[]
+): WidgetConfiguration[] => {
+  return configurations.map((configuration) => {
+    if (configuration.name !== "petanque" && configuration.name !== "petanque_teleop_config") {
+      return configuration;
+    }
+
+    const nextWidgets = configuration.widgets.filter(
+      (widget) => widget.kind !== "navigation-button"
+    );
+    if (nextWidgets.length === configuration.widgets.length) return configuration;
+
+    return {
+      ...configuration,
+      widgets: nextWidgets,
+      updatedAt: new Date().toISOString(),
+    };
+  });
+};
+
+const migratePetanqueTeleopConfigLayout = (
+  configurations: WidgetConfiguration[]
+): WidgetConfiguration[] => {
+  const latestTeleopConfig = DEFAULT_DEMO_CONFIGURATIONS.find(
+    (configuration) => configuration.name === "petanque_teleop_config"
+  );
+  if (!latestTeleopConfig) return configurations;
+
+  const requiredWidgetIds = new Set([
+    "pet-cfg-lin-gain",
+    "pet-cfg-ang-gain",
+    "pet-cfg-lin-scale-x",
+    "pet-cfg-lin-scale-y",
+    "pet-cfg-lin-scale-z",
+    "pet-cfg-ang-scale-x",
+    "pet-cfg-ang-scale-y",
+    "pet-cfg-ang-scale-z",
+    "pet-cfg-swap-xy",
+    "pet-cfg-save-explorer",
+    "pet-cfg-reset",
+    "pet-cfg-lin-x",
+    "pet-cfg-lin-y",
+    "pet-cfg-lin-z",
+    "pet-cfg-ang-x",
+    "pet-cfg-ang-y",
+    "pet-cfg-ang-z",
+  ]);
+  const legacyWidgetIds = new Set([
+    "pet-cfg-translation-gain",
+    "pet-cfg-rotation-gain",
+    "pet-cfg-scale-x",
+    "pet-cfg-scale-y",
+    "pet-cfg-scale-z",
+    "pet-cfg-title",
+    "pet-cfg-mode",
+    "pet-cfg-rz",
+    "pet-cfg-z",
+    "pet-cfg-translation",
+    "pet-cfg-rotation",
+  ]);
+
+  return configurations.map((configuration) => {
+    if (configuration.name !== "petanque_teleop_config") return configuration;
+
+    const hasLegacyWidget = configuration.widgets.some((widget) =>
+      legacyWidgetIds.has(widget.id)
+    );
+    const hasAllRequiredWidgets = [...requiredWidgetIds].every((requiredId) =>
+      configuration.widgets.some((widget) => widget.id === requiredId)
+    );
+
+    if (!hasLegacyWidget && hasAllRequiredWidgets) return configuration;
+
+    return {
+      ...cloneConfiguration(latestTeleopConfig),
+      poses: clonePoses(configuration.poses),
+    };
+  });
+};
+
+const normalizePetanqueTeleopButtonLayout = (
+  configurations: WidgetConfiguration[]
+): WidgetConfiguration[] => {
+  return configurations.map((configuration) => {
+    if (configuration.name !== "petanque_teleop_config") return configuration;
+
+    let changed = false;
+    const nextWidgets = configuration.widgets.map((widget) => {
+      if (widget.id === "pet-cfg-lin-scale-x") {
+        const nextWidget = {
+          ...widget,
+          rect: { ...widget.rect, x: 20, y: 200, w: 530, h: 92 },
+        };
+        if (
+          widget.rect.x !== nextWidget.rect.x ||
+          widget.rect.y !== nextWidget.rect.y ||
+          widget.rect.w !== nextWidget.rect.w ||
+          widget.rect.h !== nextWidget.rect.h
+        ) {
+          changed = true;
+        }
+        return nextWidget;
+      }
+
+      if (widget.id === "pet-cfg-lin-scale-y") {
+        const nextWidget = {
+          ...widget,
+          rect: { ...widget.rect, x: 20, y: 306, w: 530, h: 92 },
+        };
+        if (
+          widget.rect.x !== nextWidget.rect.x ||
+          widget.rect.y !== nextWidget.rect.y ||
+          widget.rect.w !== nextWidget.rect.w ||
+          widget.rect.h !== nextWidget.rect.h
+        ) {
+          changed = true;
+        }
+        return nextWidget;
+      }
+
+      if (widget.id === "pet-cfg-lin-scale-z") {
+        const nextWidget = {
+          ...widget,
+          rect: { ...widget.rect, x: 20, y: 412, w: 530, h: 92 },
+        };
+        if (
+          widget.rect.x !== nextWidget.rect.x ||
+          widget.rect.y !== nextWidget.rect.y ||
+          widget.rect.w !== nextWidget.rect.w ||
+          widget.rect.h !== nextWidget.rect.h
+        ) {
+          changed = true;
+        }
+        return nextWidget;
+      }
+
+      if (widget.id === "pet-cfg-ang-scale-x") {
+        const nextWidget = {
+          ...widget,
+          rect: { ...widget.rect, x: 650, y: 200, w: 530, h: 92 },
+        };
+        if (
+          widget.rect.x !== nextWidget.rect.x ||
+          widget.rect.y !== nextWidget.rect.y ||
+          widget.rect.w !== nextWidget.rect.w ||
+          widget.rect.h !== nextWidget.rect.h
+        ) {
+          changed = true;
+        }
+        return nextWidget;
+      }
+
+      if (widget.id === "pet-cfg-ang-scale-y") {
+        const nextWidget = {
+          ...widget,
+          rect: { ...widget.rect, x: 650, y: 306, w: 530, h: 92 },
+        };
+        if (
+          widget.rect.x !== nextWidget.rect.x ||
+          widget.rect.y !== nextWidget.rect.y ||
+          widget.rect.w !== nextWidget.rect.w ||
+          widget.rect.h !== nextWidget.rect.h
+        ) {
+          changed = true;
+        }
+        return nextWidget;
+      }
+
+      if (widget.id === "pet-cfg-ang-scale-z") {
+        const nextWidget = {
+          ...widget,
+          rect: { ...widget.rect, x: 650, y: 412, w: 530, h: 92 },
+        };
+        if (
+          widget.rect.x !== nextWidget.rect.x ||
+          widget.rect.y !== nextWidget.rect.y ||
+          widget.rect.w !== nextWidget.rect.w ||
+          widget.rect.h !== nextWidget.rect.h
+        ) {
+          changed = true;
+        }
+        return nextWidget;
+      }
+
+      if (widget.id === "pet-cfg-swap-xy") {
+        const nextWidget = {
+          ...widget,
+          rect: { ...widget.rect, x: 650, y: 20, w: 170, h: 58 },
+        };
+        if (
+          widget.rect.x !== nextWidget.rect.x ||
+          widget.rect.y !== nextWidget.rect.y ||
+          widget.rect.w !== nextWidget.rect.w ||
+          widget.rect.h !== nextWidget.rect.h
+        ) {
+          changed = true;
+        }
+        return nextWidget;
+      }
+
+      if (widget.id === "pet-cfg-save-explorer") {
+        const nextWidget = {
+          ...widget,
+          rect: { ...widget.rect, x: 840, y: 20, w: 190, h: 58 },
+        };
+        if (
+          widget.rect.x !== nextWidget.rect.x ||
+          widget.rect.y !== nextWidget.rect.y ||
+          widget.rect.w !== nextWidget.rect.w ||
+          widget.rect.h !== nextWidget.rect.h
+        ) {
+          changed = true;
+        }
+        return nextWidget;
+      }
+
+      if (widget.id === "pet-cfg-reset") {
+        const nextWidget = {
+          ...widget,
+          rect: { ...widget.rect, x: 1050, y: 20, w: 170, h: 58 },
+        };
+        if (
+          widget.rect.x !== nextWidget.rect.x ||
+          widget.rect.y !== nextWidget.rect.y ||
+          widget.rect.w !== nextWidget.rect.w ||
+          widget.rect.h !== nextWidget.rect.h
+        ) {
+          changed = true;
+        }
+        return nextWidget;
+      }
+
+      if (widget.id === "pet-cfg-lin-x") {
+        const nextWidget = {
+          ...widget,
+          rect: { ...widget.rect, x: 560, y: 217, w: 70, h: 58 },
+        };
+        if (
+          widget.rect.x !== nextWidget.rect.x ||
+          widget.rect.y !== nextWidget.rect.y ||
+          widget.rect.w !== nextWidget.rect.w ||
+          widget.rect.h !== nextWidget.rect.h
+        ) {
+          changed = true;
+        }
+        return nextWidget;
+      }
+
+      if (widget.id === "pet-cfg-lin-y") {
+        const nextWidget = {
+          ...widget,
+          rect: { ...widget.rect, x: 560, y: 323, w: 70, h: 58 },
+        };
+        if (
+          widget.rect.x !== nextWidget.rect.x ||
+          widget.rect.y !== nextWidget.rect.y ||
+          widget.rect.w !== nextWidget.rect.w ||
+          widget.rect.h !== nextWidget.rect.h
+        ) {
+          changed = true;
+        }
+        return nextWidget;
+      }
+
+      if (widget.id === "pet-cfg-lin-z") {
+        const nextWidget = {
+          ...widget,
+          rect: { ...widget.rect, x: 560, y: 429, w: 70, h: 58 },
+        };
+        if (
+          widget.rect.x !== nextWidget.rect.x ||
+          widget.rect.y !== nextWidget.rect.y ||
+          widget.rect.w !== nextWidget.rect.w ||
+          widget.rect.h !== nextWidget.rect.h
+        ) {
+          changed = true;
+        }
+        return nextWidget;
+      }
+
+      if (widget.id === "pet-cfg-ang-x") {
+        const nextWidget = {
+          ...widget,
+          rect: { ...widget.rect, x: 1190, y: 217, w: 70, h: 58 },
+        };
+        if (
+          widget.rect.x !== nextWidget.rect.x ||
+          widget.rect.y !== nextWidget.rect.y ||
+          widget.rect.w !== nextWidget.rect.w ||
+          widget.rect.h !== nextWidget.rect.h
+        ) {
+          changed = true;
+        }
+        return nextWidget;
+      }
+
+      if (widget.id === "pet-cfg-ang-y") {
+        const nextWidget = {
+          ...widget,
+          rect: { ...widget.rect, x: 1190, y: 323, w: 70, h: 58 },
+        };
+        if (
+          widget.rect.x !== nextWidget.rect.x ||
+          widget.rect.y !== nextWidget.rect.y ||
+          widget.rect.w !== nextWidget.rect.w ||
+          widget.rect.h !== nextWidget.rect.h
+        ) {
+          changed = true;
+        }
+        return nextWidget;
+      }
+
+      if (widget.id === "pet-cfg-ang-z") {
+        const nextWidget = {
+          ...widget,
+          rect: { ...widget.rect, x: 1190, y: 429, w: 70, h: 58 },
+        };
+        if (
+          widget.rect.x !== nextWidget.rect.x ||
+          widget.rect.y !== nextWidget.rect.y ||
+          widget.rect.w !== nextWidget.rect.w ||
+          widget.rect.h !== nextWidget.rect.h
+        ) {
+          changed = true;
+        }
+        return nextWidget;
+      }
+
+      return widget;
+    });
+
+    if (!changed) return configuration;
+    return {
+      ...configuration,
+      widgets: nextWidgets,
+      updatedAt: new Date().toISOString(),
+    };
+  });
+};
+
 const cloneDefaultConfigurations = () => DEFAULT_DEMO_CONFIGURATIONS.map(cloneConfiguration);
 
 const mergeMissingDemoConfigurations = (
@@ -921,10 +1416,22 @@ export function loadConfigurationsFromLocalStorage(): WidgetConfiguration[] {
         canvas: normalizeCanvasSettings(item.canvas),
         updatedAt: typeof item.updatedAt === "string" ? item.updatedAt : new Date().toISOString(),
       }));
-    return normalizePetanqueSliderRanges(
-      ensurePetanqueElectromagnetControl(
-        disablePetanqueViewerWidget(
-          migrateLegacyPetanque(migrateLegacyDefaultControl(mergeMissingDemoConfigurations(sanitized)))
+    return normalizePetanqueTeleopButtonLayout(
+      normalizePetanqueSliderRanges(
+        ensurePetanqueGripperControl(
+          ensurePetanqueElectromagnetControl(
+            removePetanqueLegacyNavigationButtons(
+              migratePetanqueTeleopConfigLayout(
+                disablePetanqueViewerWidget(
+                  migrateLegacyPetanque(
+                    migrateLegacyDefaultControl(
+                      mergeMissingDemoConfigurations(sanitized)
+                    )
+                  )
+                )
+              )
+            )
+          )
         )
       )
     );

@@ -92,10 +92,6 @@ type MaxVelocityWidgetProps = BaseWidgetProps & {
 type GripperControlWidgetProps = BaseWidgetProps & {
   widget: GripperControlWidgetModel;
   onLabelChange: (nextLabel: string) => void;
-  speed: number;
-  force: number;
-  onSpeedChange: (value: number) => void;
-  onForceChange: (value: number) => void;
   onOpen: () => void;
   onClose: () => void;
 };
@@ -467,15 +463,10 @@ export function GripperControlWidget({
   onSelect,
   onRectChange,
   onLabelChange,
-  speed,
-  force,
-  onSpeedChange,
-  onForceChange,
   onOpen,
   onClose,
 }: GripperControlWidgetProps) {
-  const showAdvancedControls = widget.showAdvancedControls ?? true;
-  const minSize = showAdvancedControls ? { w: 240, h: 140 } : { w: 180, h: 92 };
+  const [activeSide, setActiveSide] = useState<"open" | "close" | null>(null);
 
   return (
     <CanvasItem
@@ -486,59 +477,37 @@ export function GripperControlWidget({
       onChange={onRectChange}
       onSelect={onSelect}
       selected={selected}
-      minSize={minSize}
+      minSize={{ w: 180, h: 92 }}
       className="controls-gripper-item"
     >
-      <div className={`controls-gripper-widget ${showAdvancedControls ? "" : "is-compact"}`.trim()}>
-        {showAdvancedControls ? (
-          <div className="controls-gripper-title">
-            <InlineEditableText value={widget.label} onCommit={onLabelChange} className="controls-inline-label" />
-          </div>
-        ) : null}
+      <div className="controls-gripper-widget">
+        <div className="controls-gripper-title">
+          <InlineEditableText value={widget.label} onCommit={onLabelChange} className="controls-inline-label" />
+        </div>
         <div className="controls-gripper-actions">
-          <button type="button" className="action-button open" onClick={onOpen}>
+          <button
+            type="button"
+            className={`action-button open ${activeSide === "open" ? "is-active" : ""}`.trim()}
+            aria-pressed={activeSide === "open"}
+            onClick={() => {
+              setActiveSide("open");
+              onOpen();
+            }}
+          >
             Open
           </button>
-          <button type="button" className="action-button close" onClick={onClose}>
+          <button
+            type="button"
+            className={`action-button close ${activeSide === "close" ? "is-active" : ""}`.trim()}
+            aria-pressed={activeSide === "close"}
+            onClick={() => {
+              setActiveSide("close");
+              onClose();
+            }}
+          >
             Close
           </button>
         </div>
-        {showAdvancedControls ? (
-          <>
-            <div className="axis-row">
-              <label>Speed: {speed.toFixed(2)}</label>
-              <Slider.Root
-                className="slider"
-                min={0}
-                max={1}
-                step={0.01}
-                value={[speed]}
-                onValueChange={(next) => onSpeedChange(next[0] ?? speed)}
-              >
-                <Slider.Track className="slider-track">
-                  <Slider.Range className="slider-range" />
-                </Slider.Track>
-                <Slider.Thumb className="slider-thumb" />
-              </Slider.Root>
-            </div>
-            <div className="axis-row">
-              <label>Force: {force.toFixed(2)}</label>
-              <Slider.Root
-                className="slider"
-                min={0}
-                max={1}
-                step={0.01}
-                value={[force]}
-                onValueChange={(next) => onForceChange(next[0] ?? force)}
-              >
-                <Slider.Track className="slider-track">
-                  <Slider.Range className="slider-range" />
-                </Slider.Track>
-                <Slider.Thumb className="slider-thumb" />
-              </Slider.Root>
-            </div>
-          </>
-        ) : null}
       </div>
     </CanvasItem>
   );
