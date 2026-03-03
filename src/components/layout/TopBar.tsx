@@ -72,6 +72,9 @@ export function TopBar({
             </div>
           </div>
         </div>
+        {isRuntimeView && !isCanvasDesign ? (
+          <div id="topbar-controls-slot" className="topbar-controls-slot" />
+        ) : null}
         <div className="header-actions">
           {isCanvasDesign ? (
             <Button
@@ -92,7 +95,9 @@ export function TopBar({
           </Button>
         </div>
       </div>
-      <div id="topbar-controls-slot" className="topbar-controls-slot" />
+      {isRuntimeView && !isCanvasDesign ? null : (
+        <div id="topbar-controls-slot" className="topbar-controls-slot" />
+      )}
     </header>
   );
 }

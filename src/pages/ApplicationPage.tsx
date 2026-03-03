@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 import { loadApplicationsFromLocalStorage } from "../app/applications";
 import type { CanvasRect } from "../components/layout/CanvasItem";
@@ -49,6 +50,26 @@ const PETANQUE_ANGLE_TOPIC = "/petanque_throw/angle_between_start_and_finish";
 const PETANQUE_TOTAL_DURATION_MIN_S = 1.0;
 const PETANQUE_TOTAL_DURATION_MAX_S = 3.0;
 const PETANQUE_DEFAULT_TOTAL_DURATION_S = 1.1;
+const TELEOP_CONFIG_TRANSLATION_GAIN_TOPIC = "/teleop_config/translation_gain";
+const TELEOP_CONFIG_ROTATION_GAIN_TOPIC = "/teleop_config/rotation_gain";
+const TELEOP_CONFIG_LINEAR_SCALE_X_TOPIC = "/teleop_config/linear_scale_x";
+const TELEOP_CONFIG_LINEAR_SCALE_Y_TOPIC = "/teleop_config/linear_scale_y";
+const TELEOP_CONFIG_LINEAR_SCALE_Z_TOPIC = "/teleop_config/linear_scale_z";
+const TELEOP_CONFIG_ANGULAR_SCALE_X_TOPIC = "/teleop_config/angular_scale_x";
+const TELEOP_CONFIG_ANGULAR_SCALE_Y_TOPIC = "/teleop_config/angular_scale_y";
+const TELEOP_CONFIG_ANGULAR_SCALE_Z_TOPIC = "/teleop_config/angular_scale_z";
+const TELEOP_CONFIG_LEGACY_SCALE_X_TOPIC = "/teleop_config/scale_x";
+const TELEOP_CONFIG_LEGACY_SCALE_Y_TOPIC = "/teleop_config/scale_y";
+const TELEOP_CONFIG_LEGACY_SCALE_Z_TOPIC = "/teleop_config/scale_z";
+const TELEOP_CONFIG_SWAP_XY_TOPIC = "/teleop_config/swap_xy";
+const TELEOP_CONFIG_INVERT_LINEAR_X_TOPIC = "/teleop_config/invert_linear_x";
+const TELEOP_CONFIG_INVERT_LINEAR_Y_TOPIC = "/teleop_config/invert_linear_y";
+const TELEOP_CONFIG_INVERT_LINEAR_Z_TOPIC = "/teleop_config/invert_linear_z";
+const TELEOP_CONFIG_INVERT_ANGULAR_X_TOPIC = "/teleop_config/invert_angular_x";
+const TELEOP_CONFIG_INVERT_ANGULAR_Y_TOPIC = "/teleop_config/invert_angular_y";
+const TELEOP_CONFIG_INVERT_ANGULAR_Z_TOPIC = "/teleop_config/invert_angular_z";
+const TELEOP_CONFIG_RESET_TOPIC = "/teleop_config/reset_defaults";
+const TELEOP_CONFIG_SAVE_PROFILE_TOPIC = "/teleop_config/save_profile";
 const PETANQUE_COMMANDS = [
   "teleop",
   "activate_throw",
@@ -60,6 +81,10 @@ const PETANQUE_COMMANDS = [
 type PetanqueStateCommand = (typeof PETANQUE_COMMANDS)[number];
 type PetanqueFlowStage = "teleop" | "start_ready";
 type SliderChannel = "z" | "rz";
+type TeleopConfigButtonState = {
+  active: boolean;
+  tone: "default" | "accent" | "success" | "danger";
+};
 
 const clampSignedUnit = (value: number) => Math.max(-1, Math.min(1, value));
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
@@ -108,11 +133,39 @@ export function ApplicationPage({
   const setRz = useTeleopStore((s) => s.setRz);
   const maxVelocity = useTeleopStore((s) => s.maxVelocity);
   const setMaxVelocity = useTeleopStore((s) => s.setMaxVelocity);
+  const scaleX = useTeleopStore((s) => s.scaleX);
+  const scaleY = useTeleopStore((s) => s.scaleY);
+  const scaleZ = useTeleopStore((s) => s.scaleZ);
+  const angularScaleX = useTeleopStore((s) => s.angularScaleX);
+  const angularScaleY = useTeleopStore((s) => s.angularScaleY);
+  const angularScaleZ = useTeleopStore((s) => s.angularScaleZ);
+  const translationGain = useTeleopStore((s) => s.translationGain);
+  const rotationGain = useTeleopStore((s) => s.rotationGain);
+  const swapXY = useTeleopStore((s) => s.swapXY);
+  const invertLinearX = useTeleopStore((s) => s.invertLinearX);
+  const invertLinearY = useTeleopStore((s) => s.invertLinearY);
+  const invertLinearZ = useTeleopStore((s) => s.invertLinearZ);
+  const invertAngularX = useTeleopStore((s) => s.invertAngularX);
+  const invertAngularY = useTeleopStore((s) => s.invertAngularY);
+  const invertAngularZ = useTeleopStore((s) => s.invertAngularZ);
+  const setTranslationGain = useTeleopStore((s) => s.setTranslationGain);
+  const setRotationGain = useTeleopStore((s) => s.setRotationGain);
+  const setScaleX = useTeleopStore((s) => s.setScaleX);
+  const setScaleY = useTeleopStore((s) => s.setScaleY);
+  const setScaleZ = useTeleopStore((s) => s.setScaleZ);
+  const setAngularScaleX = useTeleopStore((s) => s.setAngularScaleX);
+  const setAngularScaleY = useTeleopStore((s) => s.setAngularScaleY);
+  const setAngularScaleZ = useTeleopStore((s) => s.setAngularScaleZ);
+  const setSwapXY = useTeleopStore((s) => s.setSwapXY);
+  const setInvertLinearX = useTeleopStore((s) => s.setInvertLinearX);
+  const setInvertLinearY = useTeleopStore((s) => s.setInvertLinearY);
+  const setInvertLinearZ = useTeleopStore((s) => s.setInvertLinearZ);
+  const setInvertAngularX = useTeleopStore((s) => s.setInvertAngularX);
+  const setInvertAngularY = useTeleopStore((s) => s.setInvertAngularY);
+  const setInvertAngularZ = useTeleopStore((s) => s.setInvertAngularZ);
+  const saveTeleopProfile = useTeleopStore((s) => s.saveTeleopProfile);
+  const resetTeleopConfig = useTeleopStore((s) => s.resetTeleopConfig);
   const wsStatus = useTeleopStore((s) => s.wsStatus);
-  const gripperSpeed = useUiStore((s) => s.gripperSpeed);
-  const gripperForce = useUiStore((s) => s.gripperForce);
-  const setGripperSpeed = useUiStore((s) => s.setGripperSpeed);
-  const setGripperForce = useUiStore((s) => s.setGripperForce);
   const cameraStreamUrl = useUiStore((s) => s.cameraStreamUrl);
   const rvizStreamUrl = useUiStore((s) => s.rvizStreamUrl);
 
@@ -271,6 +324,113 @@ export function ApplicationPage({
 
   const isPetanqueStateCommand = (value: string): value is PetanqueStateCommand =>
     (PETANQUE_COMMANDS as readonly string[]).includes(value);
+
+  const isTeleopConfigButtonTopic = (topic: string) =>
+    topic === TELEOP_CONFIG_SWAP_XY_TOPIC ||
+    topic === TELEOP_CONFIG_INVERT_LINEAR_X_TOPIC ||
+    topic === TELEOP_CONFIG_INVERT_LINEAR_Y_TOPIC ||
+    topic === TELEOP_CONFIG_INVERT_LINEAR_Z_TOPIC ||
+    topic === TELEOP_CONFIG_INVERT_ANGULAR_X_TOPIC ||
+    topic === TELEOP_CONFIG_INVERT_ANGULAR_Y_TOPIC ||
+    topic === TELEOP_CONFIG_INVERT_ANGULAR_Z_TOPIC ||
+    topic === TELEOP_CONFIG_RESET_TOPIC ||
+    topic === TELEOP_CONFIG_SAVE_PROFILE_TOPIC;
+
+  const getTeleopConfigButtonState = (topic: string): TeleopConfigButtonState | null => {
+    if (topic === TELEOP_CONFIG_SWAP_XY_TOPIC) {
+      return { active: swapXY, tone: swapXY ? "accent" : "default" };
+    }
+    if (topic === TELEOP_CONFIG_INVERT_LINEAR_X_TOPIC) {
+      return { active: invertLinearX, tone: invertLinearX ? "success" : "default" };
+    }
+    if (topic === TELEOP_CONFIG_INVERT_LINEAR_Y_TOPIC) {
+      return { active: invertLinearY, tone: invertLinearY ? "success" : "default" };
+    }
+    if (topic === TELEOP_CONFIG_INVERT_LINEAR_Z_TOPIC) {
+      return { active: invertLinearZ, tone: invertLinearZ ? "success" : "default" };
+    }
+    if (topic === TELEOP_CONFIG_INVERT_ANGULAR_X_TOPIC) {
+      return { active: invertAngularX, tone: invertAngularX ? "danger" : "default" };
+    }
+    if (topic === TELEOP_CONFIG_INVERT_ANGULAR_Y_TOPIC) {
+      return { active: invertAngularY, tone: invertAngularY ? "danger" : "default" };
+    }
+    if (topic === TELEOP_CONFIG_INVERT_ANGULAR_Z_TOPIC) {
+      return { active: invertAngularZ, tone: invertAngularZ ? "danger" : "default" };
+    }
+    if (topic === TELEOP_CONFIG_RESET_TOPIC) {
+      return { active: false, tone: "accent" };
+    }
+    if (topic === TELEOP_CONFIG_SAVE_PROFILE_TOPIC) {
+      return { active: false, tone: "success" };
+    }
+    return null;
+  };
+
+  const getTeleopConfigButtonLabel = (widget: Extract<CanvasWidget, { kind: "button" }>) => {
+    if (widget.topic === TELEOP_CONFIG_SWAP_XY_TOPIC) {
+      return swapXY ? "Swap XY ON" : "Swap XY OFF";
+    }
+    if (widget.topic === TELEOP_CONFIG_INVERT_LINEAR_X_TOPIC) {
+      return invertLinearX ? "LX -" : "LX +";
+    }
+    if (widget.topic === TELEOP_CONFIG_INVERT_LINEAR_Y_TOPIC) {
+      return invertLinearY ? "LY -" : "LY +";
+    }
+    if (widget.topic === TELEOP_CONFIG_INVERT_LINEAR_Z_TOPIC) {
+      return invertLinearZ ? "LZ -" : "LZ +";
+    }
+    if (widget.topic === TELEOP_CONFIG_INVERT_ANGULAR_X_TOPIC) {
+      return invertAngularX ? "AX -" : "AX +";
+    }
+    if (widget.topic === TELEOP_CONFIG_INVERT_ANGULAR_Y_TOPIC) {
+      return invertAngularY ? "AY -" : "AY +";
+    }
+    if (widget.topic === TELEOP_CONFIG_INVERT_ANGULAR_Z_TOPIC) {
+      return invertAngularZ ? "AZ -" : "AZ +";
+    }
+    return widget.label;
+  };
+
+  const triggerTeleopConfigButton = (topic: string) => {
+    if (topic === TELEOP_CONFIG_SWAP_XY_TOPIC) {
+      setSwapXY(!swapXY);
+      return true;
+    }
+    if (topic === TELEOP_CONFIG_INVERT_LINEAR_X_TOPIC) {
+      setInvertLinearX(!invertLinearX);
+      return true;
+    }
+    if (topic === TELEOP_CONFIG_INVERT_LINEAR_Y_TOPIC) {
+      setInvertLinearY(!invertLinearY);
+      return true;
+    }
+    if (topic === TELEOP_CONFIG_INVERT_LINEAR_Z_TOPIC) {
+      setInvertLinearZ(!invertLinearZ);
+      return true;
+    }
+    if (topic === TELEOP_CONFIG_INVERT_ANGULAR_X_TOPIC) {
+      setInvertAngularX(!invertAngularX);
+      return true;
+    }
+    if (topic === TELEOP_CONFIG_INVERT_ANGULAR_Y_TOPIC) {
+      setInvertAngularY(!invertAngularY);
+      return true;
+    }
+    if (topic === TELEOP_CONFIG_INVERT_ANGULAR_Z_TOPIC) {
+      setInvertAngularZ(!invertAngularZ);
+      return true;
+    }
+    if (topic === TELEOP_CONFIG_RESET_TOPIC) {
+      resetTeleopConfig();
+      return true;
+    }
+    if (topic === TELEOP_CONFIG_SAVE_PROFILE_TOPIC) {
+      saveTeleopProfile("explorer");
+      return true;
+    }
+    return false;
+  };
 
   const getPetanqueButtonState = (command: PetanqueStateCommand) => {
     if (command === "teleop") {
@@ -553,21 +713,33 @@ export function ApplicationPage({
       const petanqueCommand = isPetanqueStateCommand(widget.payload) ? widget.payload : null;
       const isStateMachineButton =
         widget.topic === PETANQUE_STATE_TOPIC && petanqueCommand !== null;
+      const isTeleopConfigButton = isTeleopConfigButtonTopic(widget.topic);
       const petanqueButtonState = isStateMachineButton && petanqueCommand
         ? getPetanqueButtonState(petanqueCommand)
         : null;
+      const teleopConfigButtonState = isTeleopConfigButton
+        ? getTeleopConfigButtonState(widget.topic)
+        : null;
+      const runtimeButtonWidget = isTeleopConfigButton
+        ? { ...widget, label: getTeleopConfigButtonLabel(widget) }
+        : widget;
 
       return (
         <ActionButtonWidget
           key={widget.id}
-          widget={widget}
+          widget={runtimeButtonWidget}
           selected={false}
           onSelect={() => {}}
           onRectChange={NOOP_RECT_CHANGE}
           onLabelChange={NOOP_TEXT_CHANGE}
           disabled={petanqueButtonState?.disabled ?? false}
-          active={petanqueButtonState?.active ?? false}
-          tone={petanqueButtonState?.tone ?? widget.tone ?? "default"}
+          active={petanqueButtonState?.active ?? teleopConfigButtonState?.active ?? false}
+          tone={
+            petanqueButtonState?.tone ??
+            teleopConfigButtonState?.tone ??
+            widget.tone ??
+            "default"
+          }
           onTrigger={() => {
             if (isStateMachineButton && petanqueCommand) {
               if (petanqueButtonState?.disabled) return;
@@ -577,6 +749,14 @@ export function ApplicationPage({
               });
               advancePetanqueFlow(petanqueCommand);
               markWidgetPulse(widget.id);
+              return;
+            }
+
+            if (isTeleopConfigButton) {
+              const changed = triggerTeleopConfigButton(widget.topic);
+              if (changed) {
+                markWidgetPulse(widget.id);
+              }
               return;
             }
 
@@ -610,15 +790,34 @@ export function ApplicationPage({
 
     if (widget.kind === "max-velocity") {
       const widgetValue =
-        typeof maxVelocityWidgetValues[widget.id] === "number"
-          ? maxVelocityWidgetValues[widget.id]
-          : widget.topic === PETANQUE_TOTAL_DURATION_TOPIC
-            ? mapDurationToPetanqueGain(PETANQUE_DEFAULT_TOTAL_DURATION_S)
-            : widget.topic === PETANQUE_ANGLE_TOPIC
-              ? 0
-          : widget.topic === "/cmd/max_velocity"
-            ? maxVelocity
-            : 1;
+        widget.topic === TELEOP_CONFIG_TRANSLATION_GAIN_TOPIC
+          ? translationGain
+          : widget.topic === TELEOP_CONFIG_ROTATION_GAIN_TOPIC
+            ? rotationGain
+            : widget.topic === TELEOP_CONFIG_LINEAR_SCALE_X_TOPIC ||
+                widget.topic === TELEOP_CONFIG_LEGACY_SCALE_X_TOPIC
+              ? scaleX
+              : widget.topic === TELEOP_CONFIG_LINEAR_SCALE_Y_TOPIC ||
+                  widget.topic === TELEOP_CONFIG_LEGACY_SCALE_Y_TOPIC
+                ? scaleY
+                : widget.topic === TELEOP_CONFIG_LINEAR_SCALE_Z_TOPIC ||
+                    widget.topic === TELEOP_CONFIG_LEGACY_SCALE_Z_TOPIC
+                  ? scaleZ
+                  : widget.topic === TELEOP_CONFIG_ANGULAR_SCALE_X_TOPIC
+                    ? angularScaleX
+                    : widget.topic === TELEOP_CONFIG_ANGULAR_SCALE_Y_TOPIC
+                      ? angularScaleY
+                      : widget.topic === TELEOP_CONFIG_ANGULAR_SCALE_Z_TOPIC
+                        ? angularScaleZ
+            : typeof maxVelocityWidgetValues[widget.id] === "number"
+              ? maxVelocityWidgetValues[widget.id]
+              : widget.topic === PETANQUE_TOTAL_DURATION_TOPIC
+                ? mapDurationToPetanqueGain(PETANQUE_DEFAULT_TOTAL_DURATION_S)
+                : widget.topic === PETANQUE_ANGLE_TOPIC
+                  ? 0
+                  : widget.topic === "/cmd/max_velocity"
+                    ? maxVelocity
+                    : 1;
       return (
         <MaxVelocityWidget
           key={widget.id}
@@ -635,6 +834,39 @@ export function ApplicationPage({
             }));
             if (widget.topic === "/cmd/max_velocity") {
               setMaxVelocity(nextValue);
+            }
+            if (widget.topic === TELEOP_CONFIG_TRANSLATION_GAIN_TOPIC) {
+              setTranslationGain(nextValue);
+            }
+            if (widget.topic === TELEOP_CONFIG_ROTATION_GAIN_TOPIC) {
+              setRotationGain(nextValue);
+            }
+            if (
+              widget.topic === TELEOP_CONFIG_LINEAR_SCALE_X_TOPIC ||
+              widget.topic === TELEOP_CONFIG_LEGACY_SCALE_X_TOPIC
+            ) {
+              setScaleX(nextValue);
+            }
+            if (
+              widget.topic === TELEOP_CONFIG_LINEAR_SCALE_Y_TOPIC ||
+              widget.topic === TELEOP_CONFIG_LEGACY_SCALE_Y_TOPIC
+            ) {
+              setScaleY(nextValue);
+            }
+            if (
+              widget.topic === TELEOP_CONFIG_LINEAR_SCALE_Z_TOPIC ||
+              widget.topic === TELEOP_CONFIG_LEGACY_SCALE_Z_TOPIC
+            ) {
+              setScaleZ(nextValue);
+            }
+            if (widget.topic === TELEOP_CONFIG_ANGULAR_SCALE_X_TOPIC) {
+              setAngularScaleX(nextValue);
+            }
+            if (widget.topic === TELEOP_CONFIG_ANGULAR_SCALE_Y_TOPIC) {
+              setAngularScaleY(nextValue);
+            }
+            if (widget.topic === TELEOP_CONFIG_ANGULAR_SCALE_Z_TOPIC) {
+              setAngularScaleZ(nextValue);
             }
             if (widget.topic === PETANQUE_TOTAL_DURATION_TOPIC) {
               wsClient.send({
@@ -664,16 +896,8 @@ export function ApplicationPage({
           onSelect={() => {}}
           onRectChange={NOOP_RECT_CHANGE}
           onLabelChange={NOOP_TEXT_CHANGE}
-          speed={gripperSpeed}
-          force={gripperForce}
-          onSpeedChange={setGripperSpeed}
-          onForceChange={setGripperForce}
-          onOpen={() =>
-            wsClient.send({ type: "gripper_cmd", action: "open", speed: gripperSpeed, force: gripperForce })
-          }
-          onClose={() =>
-            wsClient.send({ type: "gripper_cmd", action: "close", speed: gripperSpeed, force: gripperForce })
-          }
+          onOpen={() => wsClient.send({ type: "gripper_cmd", action: "open" })}
+          onClose={() => wsClient.send({ type: "gripper_cmd", action: "close" })}
         />
       );
     }
@@ -833,6 +1057,29 @@ export function ApplicationPage({
   const activeScreenClassName = activeScreenId
     ? `application-runtime-screen-${toScreenClassToken(activeScreenId)}`
     : "";
+  const topBarSlotElement =
+    typeof document !== "undefined"
+      ? document.getElementById("topbar-controls-slot")
+      : null;
+  const runtimeScreenIds = activeApplication?.screenIds ?? [];
+  const runtimeScreenTabs =
+    showRuntimeScreenTabs && topBarSlotElement
+      ? createPortal(
+          <div className="application-runtime-topbar-tabs">
+            {runtimeScreenIds.map((screenId) => (
+              <button
+                key={screenId}
+                type="button"
+                className={`tab-button ${screenId === activeScreenId ? "active" : ""}`}
+                onClick={() => onNavigateToScreen(screenId)}
+              >
+                {screenId}
+              </button>
+            ))}
+          </div>,
+          topBarSlotElement
+        )
+      : null;
 
   if (!activeApplication) {
     return (
@@ -864,20 +1111,6 @@ export function ApplicationPage({
     >
       <section className="controls-workspace">
         <div className="controls-canvas-zone application-runtime-canvas-zone">
-          {showRuntimeScreenTabs ? (
-            <div className="application-runtime-screen-tabs">
-              {activeApplication.screenIds.map((screenId) => (
-                <button
-                  key={screenId}
-                  type="button"
-                  className={`tab-button ${screenId === activeScreenId ? "active" : ""}`}
-                  onClick={() => onNavigateToScreen(screenId)}
-                >
-                  {screenId}
-                </button>
-              ))}
-            </div>
-          ) : null}
           <div className="controls-canvas-surface">
             <div className={canvasViewportClassName} ref={canvasViewportRef}>
               <div className="controls-canvas-frame" style={canvasFrameStyle}>
@@ -891,6 +1124,7 @@ export function ApplicationPage({
           </div>
         </div>
       </section>
+      {runtimeScreenTabs}
     </main>
   );
 }

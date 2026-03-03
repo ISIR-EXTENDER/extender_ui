@@ -72,6 +72,12 @@ Scope: Explorer tablet control + petanque state-machine integration
 - [ ] Add a standard local launcher script/target for ROS launch + backend + UI.
 - [ ] Document usage briefly.
 
+### Phase 9 - Teleop config UX and profile persistence
+- [ ] Polish `petanque_teleop_config` for fast operator tuning (clear left/right split, per-axis sliders, obvious invert toggles).
+- [ ] Add `Save` action for teleop config profiles per robot (default profile: `explorer`).
+- [ ] Add `Load` action for profiles and robot selector for future `kinova` support.
+- [ ] Design and prototype automatic teleop calibration flow (guided motion probes + save profile).
+
 ## Validation Gates
 - [ ] Gate 0: petanque launch baseline healthy (state machine + controllers up in sim).
 - [ ] Gate A: teleop mapping correctness (RViz + sim).

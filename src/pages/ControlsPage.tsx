@@ -71,7 +71,6 @@ import {
 import { useTeleopStore } from "../store/teleopStore";
 import { useUiStore } from "../store/uiStore";
 import {
-  resizeWidgetsForPresetTransition,
   resolvePendingResizeSourcePreset,
 } from "./controls/canvasPresetResizing";
 import { useCanvasHistory } from "./controls/useCanvasHistory";
@@ -109,36 +108,6 @@ const SNAP_MODE_LABEL: Record<SnapMode, string> = {
   off: "Off",
   slide: "Slide",
   smart: "Smart",
-};
-
-const readDetectedDisplaySize = () => {
-  if (typeof window === "undefined") {
-    return { width: 0, height: 0 };
-  }
-  const width = window.visualViewport?.width ?? window.innerWidth;
-  const height = window.visualViewport?.height ?? window.innerHeight;
-  return {
-    width: Math.max(0, Math.round(width)),
-    height: Math.max(0, Math.round(height)),
-  };
-};
-
-const pickClosestCanvasPreset = (width: number, height: number) => {
-  if (width <= 0 || height <= 0) return CANVAS_PRESETS[0];
-  const targetAspect = width / height;
-  const targetArea = width * height;
-
-  return CANVAS_PRESETS.reduce((best, preset) => {
-    const bestAspectDiff = Math.abs(best.width / best.height - targetAspect);
-    const presetAspectDiff = Math.abs(preset.width / preset.height - targetAspect);
-    if (presetAspectDiff < bestAspectDiff - 0.00001) return preset;
-    if (Math.abs(presetAspectDiff - bestAspectDiff) <= 0.00001) {
-      const bestAreaDiff = Math.abs(best.width * best.height - targetArea);
-      const presetAreaDiff = Math.abs(preset.width * preset.height - targetArea);
-      if (presetAreaDiff < bestAreaDiff) return preset;
-    }
-    return best;
-  }, CANVAS_PRESETS[0]);
 };
 
 const readNumber = (raw: string, fallback: number) => {
@@ -180,10 +149,6 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
   const setRz = useTeleopStore((s) => s.setRz);
   const maxVelocity = useTeleopStore((s) => s.maxVelocity);
   const setMaxVelocity = useTeleopStore((s) => s.setMaxVelocity);
-  const gripperSpeed = useUiStore((s) => s.gripperSpeed);
-  const gripperForce = useUiStore((s) => s.gripperForce);
-  const setGripperSpeed = useUiStore((s) => s.setGripperSpeed);
-  const setGripperForce = useUiStore((s) => s.setGripperForce);
   const cameraStreamUrl = useUiStore((s) => s.cameraStreamUrl);
   const rvizStreamUrl = useUiStore((s) => s.rvizStreamUrl);
 
@@ -225,10 +190,9 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
     width: 0,
     height: 0,
   });
-  const [detectedDisplaySize, setDetectedDisplaySize] = useState(() => readDetectedDisplaySize());
-  const [pendingResizeSourcePresetId, setPendingResizeSourcePresetId] = useState<CanvasSettings["presetId"] | null>(null);
+  const [, setPendingResizeSourcePresetId] = useState<CanvasSettings["presetId"] | null>(null);
   const [editorZoom, setEditorZoom] = useState<number>(1);
-  const [snapMode, setSnapMode] = useState<SnapMode>("smart");
+  const [snapMode] = useState<SnapMode>("smart");
   const [snapGuides, setSnapGuides] = useState<SnapGuides>({ vertical: [], horizontal: [] });
   const snapGuideTimeoutRef = useRef<number | null>(null);
 
@@ -275,19 +239,6 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
 
     return () => observer.disconnect();
   }, [focusOnly]);
-
-  useEffect(() => {
-    const updateDisplaySize = () => {
-      setDetectedDisplaySize(readDetectedDisplaySize());
-    };
-    updateDisplaySize();
-    window.addEventListener("resize", updateDisplaySize);
-    window.visualViewport?.addEventListener("resize", updateDisplaySize);
-    return () => {
-      window.removeEventListener("resize", updateDisplaySize);
-      window.visualViewport?.removeEventListener("resize", updateDisplaySize);
-    };
-  }, []);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -412,10 +363,6 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
     () => getCanvasPreset(canvasSettings.presetId),
     [canvasSettings.presetId]
   );
-  const recommendedDisplayPreset = useMemo(
-    () => pickClosestCanvasPreset(detectedDisplaySize.width, detectedDisplaySize.height),
-    [detectedDisplaySize.height, detectedDisplaySize.width]
-  );
   const runtimeCanvasMode: RuntimeCanvasMode = focusOnly ? "fit" : "left";
   const baseCanvasScale = useMemo(
     () => resolveCanvasFitScale(runtimeCanvasMode, canvasSize, canvasViewportSize),
@@ -432,19 +379,6 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
     }),
     [canvasScale, canvasSize]
   );
-  const fitZoomForTarget = useMemo(() => {
-    if (canvasViewportSize.width <= 0 || canvasViewportSize.height <= 0) {
-      return 1;
-    }
-    const viewportPadding = 28;
-    const availableWidth = Math.max(120, canvasViewportSize.width - viewportPadding);
-    const availableHeight = Math.max(120, canvasViewportSize.height - viewportPadding);
-    const fitScale = Math.min(
-      availableWidth / targetCanvasPreset.width,
-      availableHeight / targetCanvasPreset.height
-    );
-    return clampEditorZoom(fitScale);
-  }, [canvasViewportSize, targetCanvasPreset.height, targetCanvasPreset.width]);
   const editorZoomPercent = Math.round(editorZoom * 100);
 
   useCanvasHistory({
@@ -1083,10 +1017,6 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
     setEditorZoom(1);
   };
 
-  const fitEditorCanvasToTarget = () => {
-    setEditorZoom(fitZoomForTarget);
-  };
-
   const applyCanvasPreset = (nextPresetId: CanvasSettings["presetId"]) => {
     const previousPreset = getCanvasPreset(canvasSettings.presetId);
     const nextPreset = getCanvasPreset(nextPresetId);
@@ -1119,44 +1049,6 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
       previousPreset,
       nextPreset,
     };
-  };
-
-  const resizeWidgetsToCurrentPreset = () => {
-    if (!widgets.length) {
-      setPendingResizeSourcePresetId(null);
-      setStatusMessage("No widgets to resize.");
-      return;
-    }
-    const sourcePresetId = pendingResizeSourcePresetId;
-    if (!sourcePresetId || sourcePresetId === canvasSettings.presetId) {
-      setStatusMessage("No pending canvas preset change to resize from.");
-      return;
-    }
-
-    const { resizedWidgets, resizedCount, fromPreset, toPreset } = resizeWidgetsForPresetTransition(
-      widgets,
-      sourcePresetId,
-      canvasSettings.presetId
-    );
-    setWidgets(resizedWidgets);
-    setPendingResizeSourcePresetId(null);
-    setStatusMessage(
-      `Resized ${resizedCount} widget(s) from ${fromPreset.label} to ${toPreset.label}.`
-    );
-  };
-
-  const matchCanvasToDetectedDisplay = () => {
-    if (recommendedDisplayPreset.id === canvasSettings.presetId) {
-      setStatusMessage(
-        `Canvas already matches ${recommendedDisplayPreset.label} for display ${detectedDisplaySize.width}x${detectedDisplaySize.height}.`
-      );
-      return;
-    }
-    const result = applyCanvasPreset(recommendedDisplayPreset.id);
-    const resizeHint = result.widgetCount > 0 ? ' Use "Resize Widgets" to scale layout.' : "";
-    setStatusMessage(
-      `Canvas set to ${recommendedDisplayPreset.label} for display ${detectedDisplaySize.width}x${detectedDisplaySize.height}.${resizeHint}`
-    );
   };
 
   const handleCanvasContextMenu = (event: ReactMouseEvent<HTMLDivElement>) => {
@@ -1387,16 +1279,12 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
               current.kind === "gripper-control" ? { ...current, label: nextLabel } : current
             )
           }
-          speed={gripperSpeed}
-          force={gripperForce}
-          onSpeedChange={setGripperSpeed}
-          onForceChange={setGripperForce}
           onOpen={() => {
-            wsClient.send({ type: "gripper_cmd", action: "open", speed: gripperSpeed, force: gripperForce });
+            wsClient.send({ type: "gripper_cmd", action: "open" });
             setStatusMessage("Gripper open command sent.");
           }}
           onClose={() => {
-            wsClient.send({ type: "gripper_cmd", action: "close", speed: gripperSpeed, force: gripperForce });
+            wsClient.send({ type: "gripper_cmd", action: "close" });
             setStatusMessage("Gripper close command sent.");
           }}
         />
@@ -1612,7 +1500,7 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
               const nextPresetId = event.target.value as CanvasSettings["presetId"];
               const result = applyCanvasPreset(nextPresetId);
               if (!result.changed) return;
-              const resizeHint = result.widgetCount > 0 ? ' Use "Resize Widgets" to scale layout.' : "";
+              const resizeHint = result.widgetCount > 0 ? " Widgets kept their relative positions." : "";
               setStatusMessage(
                 `Canvas size changed to ${result.nextPreset.label}.${resizeHint}`
               );
@@ -1625,63 +1513,6 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
             ))}
           </select>
         </label>
-        <button
-          type="button"
-          className="tab-button"
-          onClick={resizeWidgetsToCurrentPreset}
-          disabled={
-            !pendingResizeSourcePresetId ||
-            pendingResizeSourcePresetId === canvasSettings.presetId ||
-            !widgets.length
-          }
-          title={
-            pendingResizeSourcePresetId
-              ? `Resize from ${getCanvasPreset(pendingResizeSourcePresetId).label} to ${targetCanvasPreset.label}`
-              : "Resize widgets after changing canvas size"
-          }
-        >
-          Resize Widgets
-        </button>
-        <button
-          type="button"
-          className="tab-button"
-          onClick={matchCanvasToDetectedDisplay}
-          title={`Detected display: ${detectedDisplaySize.width}x${detectedDisplaySize.height}`}
-        >
-          Match Display
-        </button>
-
-        <label className="controls-field controls-config-field">
-          <span>Runtime Layout</span>
-          <select
-            className="editor-input"
-            value={canvasSettings.runtimeMode}
-            onChange={(event) =>
-              setCanvasSettings((prev) => ({
-                ...prev,
-                runtimeMode: event.target.value as RuntimeCanvasMode,
-              }))
-            }
-          >
-            <option value="left">left</option>
-            <option value="center">center</option>
-            <option value="fit">fit (uniform)</option>
-          </select>
-        </label>
-
-        <label className="controls-field controls-config-field">
-          <span>Snap</span>
-          <select
-            className="editor-input"
-            value={snapMode}
-            onChange={(event) => setSnapMode(event.target.value as SnapMode)}
-          >
-            <option value="off">off</option>
-            <option value="slide">slide</option>
-            <option value="smart">smart</option>
-          </select>
-        </label>
-
         <div className="controls-field controls-config-field controls-zoom-field">
           <span>Zoom</span>
           <div className="controls-zoom-controls">
@@ -1693,9 +1524,6 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
             </button>
             <button type="button" className="tab-button" onClick={zoomInEditorCanvas} aria-label="Zoom in canvas">
               +
-            </button>
-            <button type="button" className="tab-button" onClick={fitEditorCanvasToTarget} title="Fit target slide">
-              Fit
             </button>
           </div>
         </div>
@@ -2659,25 +2487,8 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
                   ) : selectedWidget.kind === "gripper-control" ? (
                     <>
                       <div className="controls-property-title">Gripper Control</div>
-                      <label className="controls-field">
-                        <span>Layout</span>
-                        <select
-                          className="editor-input"
-                          value={(selectedWidget.showAdvancedControls ?? true) ? "full" : "compact"}
-                          onChange={(event) =>
-                            updateSelectedWidget((widget) =>
-                              widget.kind === "gripper-control"
-                                ? { ...widget, showAdvancedControls: event.target.value === "full" }
-                                : widget
-                            )
-                          }
-                        >
-                          <option value="compact">buttons only</option>
-                          <option value="full">buttons + tuning</option>
-                        </select>
-                      </label>
                       <div className="controls-hint">
-                        Uses runtime speed/force values from the control state.
+                        Sends `open` and `close` commands to the backend bridge.
                       </div>
                     </>
                   ) : selectedWidget.kind === "stream-display" ? (
