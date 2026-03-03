@@ -489,6 +489,85 @@ export const DEFAULT_DEMO_CONFIGURATIONS: WidgetConfiguration[] = [
       targetScreenId: "default_control",
       rect: { w: 260, h: 58 },
     }),
+    createDemoWidget("pet-nav-teleop-config", "navigation-button", 292, 506, {
+      label: "Open Teleop Config",
+      topic: "/ui/navigation",
+      icon: "arrow-right",
+      targetScreenId: "petanque_teleop_config",
+      rect: { w: 252, h: 58 },
+    }),
+  ]),
+
+  createDemoConfiguration("petanque_teleop_config", [
+    createDemoWidget("pet-cfg-title", "text", 20, 20, {
+      text: "Pétanque Teleop Config",
+      fontSize: 26,
+      rect: { w: 420, h: 56 },
+    }),
+    createDemoWidget("pet-cfg-summary", "textarea", 20, 90, {
+      label: "How To",
+      topic: "/ui/config/petanque/how_to",
+      text: "Teleop config page\n\n1) Tune gains\n2) Validate axis behavior in runtime\n3) Keep mapping coherent with tablet joystick labels\n\nTarget backend params (tablet_interface):\n- linear_scale\n- angular_scale\n- linear_axes / linear_signs\n- angular_axes / angular_signs\n- swap_xy",
+      fontSize: 14,
+      rect: { w: 560, h: 220 },
+    }),
+    createDemoWidget("pet-cfg-max-velocity", "max-velocity", 20, 324, {
+      label: "Teleop Max Velocity",
+      topic: "/cmd/max_velocity",
+      min: 0.0,
+      max: 2.0,
+      step: 0.01,
+      rect: { w: 560, h: 92 },
+    }),
+    createDemoWidget("pet-cfg-axis", "textarea", 20, 430, {
+      label: "Axis Mapping",
+      topic: "/ui/config/petanque/axis",
+      text: "linear_axes: [0, 1, 2]\nlinear_signs: [1.0, 1.0, 1.0]\nangular_axes: [0, 1, 2]\nangular_signs: [1.0, 1.0, 1.0]\nswap_xy: false",
+      fontSize: 14,
+      rect: { w: 560, h: 210 },
+    }),
+    createDemoWidget("pet-cfg-gains", "textarea", 20, 652, {
+      label: "Gains",
+      topic: "/ui/config/petanque/gains",
+      text: "linear_scale: 0.035\nangular_scale: 0.2\n\nPer robot recommendation:\n- explorer: linear_scale=0.035 angular_scale=0.2\n- kinova: TBD",
+      fontSize: 14,
+      rect: { w: 560, h: 130 },
+    }),
+    createDemoWidget("pet-cfg-apply", "button", 20, 794, {
+      label: "Apply Config",
+      topic: "/ui/config/petanque",
+      payload: "apply",
+      rect: { w: 220, h: 58 },
+    }),
+    createDemoWidget("pet-cfg-reset", "button", 252, 794, {
+      label: "Reset Defaults",
+      topic: "/ui/config/petanque",
+      payload: "reset_defaults",
+      rect: { w: 220, h: 58 },
+    }),
+    createDemoWidget("pet-cfg-go-petanque", "navigation-button", 600, 90, {
+      label: "Open Pétanque Page",
+      topic: "/ui/navigation",
+      icon: "arrow-right",
+      targetScreenId: "petanque",
+      rect: { w: 300, h: 58 },
+    }),
+    createDemoWidget("pet-cfg-go-default", "navigation-button", 914, 90, {
+      label: "Open Default Control",
+      topic: "/ui/navigation",
+      icon: "arrow-right",
+      targetScreenId: "default_control",
+      rect: { w: 346, h: 58 },
+    }),
+    createDemoWidget("pet-cfg-curves", "curves", 600, 162, {
+      label: "Teleop Signals",
+      topic: "/telemetry/control",
+      sampleRateHz: 12,
+      historySeconds: 12,
+      showLegend: true,
+      showSpeed: true,
+      rect: { w: 660, h: 620 },
+    }),
   ]),
 
   createDemoConfiguration("curves", [
@@ -826,6 +905,35 @@ const ensurePetanqueElectromagnetControl = (
   });
 };
 
+const ensurePetanqueTeleopConfigNavigation = (
+  configurations: WidgetConfiguration[]
+): WidgetConfiguration[] => {
+  const latestPetanque = DEFAULT_DEMO_CONFIGURATIONS.find(
+    (configuration) => configuration.name === "petanque"
+  );
+  if (!latestPetanque) return configurations;
+
+  const navigationTemplate = latestPetanque.widgets.find(
+    (widget) => widget.id === "pet-nav-teleop-config"
+  );
+  if (!navigationTemplate) return configurations;
+
+  return configurations.map((configuration) => {
+    if (configuration.name !== "petanque") return configuration;
+
+    const hasNavigation = configuration.widgets.some(
+      (widget) => widget.id === "pet-nav-teleop-config"
+    );
+    if (hasNavigation) return configuration;
+
+    return {
+      ...configuration,
+      widgets: [...configuration.widgets, cloneWidgets([navigationTemplate])[0]],
+      updatedAt: new Date().toISOString(),
+    };
+  });
+};
+
 const cloneDefaultConfigurations = () => DEFAULT_DEMO_CONFIGURATIONS.map(cloneConfiguration);
 
 const mergeMissingDemoConfigurations = (
@@ -923,8 +1031,10 @@ export function loadConfigurationsFromLocalStorage(): WidgetConfiguration[] {
       }));
     return normalizePetanqueSliderRanges(
       ensurePetanqueElectromagnetControl(
-        disablePetanqueViewerWidget(
-          migrateLegacyPetanque(migrateLegacyDefaultControl(mergeMissingDemoConfigurations(sanitized)))
+        ensurePetanqueTeleopConfigNavigation(
+          disablePetanqueViewerWidget(
+            migrateLegacyPetanque(migrateLegacyDefaultControl(mergeMissingDemoConfigurations(sanitized)))
+          )
         )
       )
     );

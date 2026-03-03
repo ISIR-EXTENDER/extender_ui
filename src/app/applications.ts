@@ -14,6 +14,8 @@ export type ApplicationConfig = {
 };
 
 const STORAGE_KEY = "extender.controls.applications.v1";
+const PETANQUE_SCREEN_ID = "petanque";
+const PETANQUE_TELEOP_CONFIG_SCREEN_ID = "petanque_teleop_config";
 
 type DirectoryPickerHandle = {
   values: () => AsyncIterable<FileSystemHandle>;
@@ -45,6 +47,31 @@ const uniqStrings = (values: string[]) => {
     result.push(trimmed);
   }
   return result;
+};
+
+const ensurePetanqueTeleopConfigScreen = (application: ApplicationConfig): ApplicationConfig => {
+  if (!application.screenIds.includes(PETANQUE_SCREEN_ID)) return application;
+  if (application.screenIds.includes(PETANQUE_TELEOP_CONFIG_SCREEN_ID)) return application;
+
+  const nextScreenIds: string[] = [];
+  for (const screenId of application.screenIds) {
+    nextScreenIds.push(screenId);
+    if (screenId === PETANQUE_SCREEN_ID) {
+      nextScreenIds.push(PETANQUE_TELEOP_CONFIG_SCREEN_ID);
+    }
+  }
+
+  const normalizedScreenIds = uniqStrings(nextScreenIds);
+  const nextHomeScreenId =
+    application.homeScreenId && normalizedScreenIds.includes(application.homeScreenId)
+      ? application.homeScreenId
+      : normalizedScreenIds[0] ?? null;
+
+  return {
+    ...application,
+    screenIds: normalizedScreenIds,
+    homeScreenId: nextHomeScreenId,
+  };
 };
 
 const createDefaultAdminApplication = (): ApplicationConfig => ({
@@ -98,6 +125,7 @@ export function loadApplicationsFromLocalStorage(): ApplicationConfig[] {
     const sanitized = parsed
       .map(sanitizeApplication)
       .filter((item): item is ApplicationConfig => item !== null)
+      .map(ensurePetanqueTeleopConfigScreen)
       .sort((a, b) => a.name.localeCompare(b.name));
     if (!sanitized.length) return [createDefaultAdminApplication()];
     if (sanitized.some((application) => application.id === ADMIN_DEMO_APP_ID)) {
@@ -127,13 +155,16 @@ export function upsertApplication(
     homeScreenId: nextApplication.homeScreenId?.trim() || null,
     updatedAt: new Date().toISOString(),
   };
+  const normalizedWithDefaults = ensurePetanqueTeleopConfigScreen(normalized);
 
-  const index = applications.findIndex((application) => application.id === normalized.id);
+  const index = applications.findIndex((application) => application.id === normalizedWithDefaults.id);
   if (index === -1) {
-    return [...applications, normalized].sort((a, b) => a.name.localeCompare(b.name));
+    return [...applications, normalizedWithDefaults].sort((a, b) => a.name.localeCompare(b.name));
   }
 
-  return applications.map((application, i) => (i === index ? normalized : application));
+  return applications.map((application, i) =>
+    i === index ? normalizedWithDefaults : application
+  );
 }
 
 export function removeApplication(applications: ApplicationConfig[], applicationId: string) {
