@@ -1,0 +1,25 @@
+{
+  "name": "rosbag",
+  "widgets": [
+    {
+      "id": "widget-1771022641748-2f5b2",
+      "kind": "rosbag-control",
+      "label": "Rosbag",
+      "topic": "/rosbag/control",
+      "bagName": "session_01",
+      "autoTimestamp": true,
+      "rect": {
+        "x": 530,
+        "y": 161,
+        "w": 300,
+        "h": 180
+      }
+    }
+  ],
+  "poses": [],
+  "canvas": {
+    "presetId": "hd",
+    "runtimeMode": "left"
+  },
+  "updatedAt": "2026-02-13T22:44:07.553Z"
+}

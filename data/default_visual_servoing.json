@@ -1,0 +1,120 @@
+{
+  "name": "default_visual_servoing",
+  "widgets": [
+    {
+      "id": "servo-title",
+      "kind": "text",
+      "label": "Title",
+      "topic": "/ui/text/servo/title",
+      "text": "Visual Servoing",
+      "fontSize": 30,
+      "align": "left",
+      "rect": {
+        "x": 40,
+        "y": 32,
+        "w": 420,
+        "h": 64
+      }
+    },
+    {
+      "id": "servo-camera",
+      "kind": "stream-display",
+      "label": "Camera Stream",
+      "topic": "/ui/stream/camera",
+      "source": "camera",
+      "streamUrl": "webrtc://localhost:8001/stream",
+      "rect": {
+        "x": 40,
+        "y": 112,
+        "w": 760,
+        "h": 430
+      }
+    },
+    {
+      "id": "servo-enable",
+      "kind": "button",
+      "label": "Enable Servo",
+      "topic": "/cmd/visual_servoing/enable",
+      "payload": "on",
+      "rect": {
+        "x": 830,
+        "y": 112,
+        "w": 190,
+        "h": 52
+      }
+    },
+    {
+      "id": "servo-disable",
+      "kind": "button",
+      "label": "Disable Servo",
+      "topic": "/cmd/visual_servoing/enable",
+      "payload": "off",
+      "rect": {
+        "x": 1030,
+        "y": 112,
+        "w": 190,
+        "h": 52
+      }
+    },
+    {
+      "id": "servo-target-a",
+      "kind": "button",
+      "label": "Target A",
+      "topic": "/cmd/visual_servoing/target",
+      "payload": "A",
+      "rect": {
+        "x": 830,
+        "y": 182,
+        "w": 190,
+        "h": 52
+      }
+    },
+    {
+      "id": "servo-target-b",
+      "kind": "button",
+      "label": "Target B",
+      "topic": "/cmd/visual_servoing/target",
+      "payload": "B",
+      "rect": {
+        "x": 1030,
+        "y": 182,
+        "w": 190,
+        "h": 52
+      }
+    },
+    {
+      "id": "servo-pid-note",
+      "kind": "textarea",
+      "label": "PID Notes",
+      "topic": "/ui/text/servo/pid",
+      "text": "PID / gain settings placeholder. Replace with dedicated widgets when available.",
+      "fontSize": 16,
+      "rect": {
+        "x": 830,
+        "y": 260,
+        "w": 390,
+        "h": 198
+      }
+    },
+    {
+      "id": "servo-back-home",
+      "kind": "navigation-button",
+      "label": "Home",
+      "topic": "/ui/navigation",
+      "targetScreenId": "default_home",
+      "icon": "home",
+      "rect": {
+        "x": 1030,
+        "y": 488,
+        "w": 190,
+        "h": 52
+      }
+    }
+  ],
+  "poses": [],
+  "canvas": {
+    "presetId": "hd",
+    "runtimeMode": "left"
+  },
+  "updatedAt": "2026-02-13T22:59:18.069Z"
+}

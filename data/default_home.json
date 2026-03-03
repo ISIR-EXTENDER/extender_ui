@@ -1,0 +1,152 @@
+{
+  "name": "default_home",
+  "widgets": [
+    {
+      "id": "default-home-title",
+      "kind": "text",
+      "label": "Title",
+      "topic": "/ui/text/home/title",
+      "text": "Extender Tablet Interface",
+      "fontSize": 34,
+      "align": "left",
+      "rect": {
+        "x": 44,
+        "y": 36,
+        "w": 620,
+        "h": 76
+      }
+    },
+    {
+      "id": "default-home-subtitle",
+      "kind": "textarea",
+      "label": "Subtitle",
+      "topic": "/ui/text/home/subtitle",
+      "text": "Select a screen below. This home canvas is intended for runtime navigation.",
+      "fontSize": 18,
+      "rect": {
+        "x": 44,
+        "y": 124,
+        "w": 620,
+        "h": 112
+      }
+    },
+    {
+      "id": "default-home-nav",
+      "kind": "navigation-bar",
+      "label": "Navigation",
+      "topic": "/ui/navigation/home",
+      "orientation": "vertical",
+      "items": [
+        {
+          "id": "home-nav-01",
+          "label": "Controls",
+          "targetScreenId": "default_control"
+        },
+        {
+          "id": "home-nav-02",
+          "label": "Live Teleop",
+          "targetScreenId": "default_live_teleop"
+        },
+        {
+          "id": "home-nav-03",
+          "label": "Articular",
+          "targetScreenId": "default_articular"
+        },
+        {
+          "id": "home-nav-04",
+          "label": "Camera",
+          "targetScreenId": "default_camera"
+        },
+        {
+          "id": "home-nav-05",
+          "label": "Visual Servoing",
+          "targetScreenId": "default_visual_servoing"
+        },
+        {
+          "id": "home-nav-06",
+          "label": "Logs / Rosbags",
+          "targetScreenId": "default_logs_rosbags"
+        },
+        {
+          "id": "home-nav-07",
+          "label": "Poses / Traj",
+          "targetScreenId": "default_poses_trajectories"
+        },
+        {
+          "id": "home-nav-08",
+          "label": "Petanque",
+          "targetScreenId": "default_petanque"
+        },
+        {
+          "id": "home-nav-09",
+          "label": "Courbes",
+          "targetScreenId": "default_courbes"
+        },
+        {
+          "id": "home-nav-10",
+          "label": "Configurations",
+          "targetScreenId": "default_configurations"
+        },
+        {
+          "id": "home-nav-11",
+          "label": "Debug",
+          "targetScreenId": "default_debug"
+        }
+      ],
+      "rect": {
+        "x": 730,
+        "y": 36,
+        "w": 320,
+        "h": 604
+      }
+    },
+    {
+      "id": "default-home-open-controls",
+      "kind": "navigation-button",
+      "label": "Open Controls",
+      "topic": "/ui/navigation/button",
+      "targetScreenId": "default_control",
+      "icon": "arrow-right",
+      "rect": {
+        "x": 44,
+        "y": 268,
+        "w": 220,
+        "h": 56
+      }
+    },
+    {
+      "id": "default-home-open-camera",
+      "kind": "navigation-button",
+      "label": "Open Camera",
+      "topic": "/ui/navigation/button",
+      "targetScreenId": "default_camera",
+      "icon": "arrow-right",
+      "rect": {
+        "x": 280,
+        "y": 268,
+        "w": 220,
+        "h": 56
+      }
+    },
+    {
+      "id": "default-home-open-rosbag",
+      "kind": "navigation-button",
+      "label": "Open Rosbag",
+      "topic": "/ui/navigation/button",
+      "targetScreenId": "default_logs_rosbags",
+      "icon": "arrow-right",
+      "rect": {
+        "x": 516,
+        "y": 268,
+        "w": 180,
+        "h": 56
+      }
+    }
+  ],
+  "poses": [],
+  "canvas": {
+    "presetId": "hd",
+    "runtimeMode": "left"
+  },
+  "updatedAt": "2026-02-13T22:59:18.069Z"
+}

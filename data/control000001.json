@@ -1,0 +1,86 @@
+{
+  "name": "control000001",
+  "widgets": [
+    {
+      "id": "widget-1771022558988-fa869",
+      "kind": "slider",
+      "binding": "z",
+      "label": "Slider",
+      "topic": "/cmd/slider",
+      "direction": "vertical",
+      "min": -1,
+      "max": 1,
+      "step": 0.01,
+      "rect": {
+        "x": 883,
+        "y": 244,
+        "w": 60,
+        "h": 120
+      }
+    },
+    {
+      "id": "widget-1771022561005-c776b",
+      "kind": "load-pose-button",
+      "label": "Load Pose",
+      "topic": "/ui/load_pose",
+      "poseName": "",
+      "icon": "home",
+      "rect": {
+        "x": 579,
+        "y": 358,
+        "w": 130,
+        "h": 52
+      }
+    },
+    {
+      "id": "widget-1771022565125-1308e",
+      "kind": "joystick",
+      "binding": "joy",
+      "label": "Joystick",
+      "topic": "/cmd/joystick",
+      "color": "#4a9eff",
+      "deadzone": 0.1,
+      "diskSize": 80,
+      "labels": {
+        "top": "Y+",
+        "right": "X+",
+        "bottom": "Y-",
+        "left": "X-"
+      },
+      "rect": {
+        "x": 487,
+        "y": 467,
+        "w": 150,
+        "h": 150
+      }
+    },
+    {
+      "id": "widget-1771022567471-3bf4e",
+      "kind": "joystick",
+      "binding": "joy",
+      "label": "Joystick",
+      "topic": "/cmd/joystick",
+      "color": "#4a9eff",
+      "deadzone": 0.1,
+      "diskSize": 80,
+      "labels": {
+        "top": "Y+",
+        "right": "X+",
+        "bottom": "Y-",
+        "left": "X-"
+      },
+      "rect": {
+        "x": 283,
+        "y": 268,
+        "w": 150,
+        "h": 150
+      }
+    }
+  ],
+  "poses": [],
+  "canvas": {
+    "presetId": "hd",
+    "runtimeMode": "left"
+  },
+  "updatedAt": "2026-02-13T22:43:03.747Z"
+}

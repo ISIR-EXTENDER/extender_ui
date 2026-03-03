@@ -1,0 +1,99 @@
+{
+  "name": "articular",
+  "widgets": [
+    {
+      "id": "art-title",
+      "kind": "text",
+      "label": "Text",
+      "topic": "/ui/text",
+      "text": "Articular Control",
+      "fontSize": 26,
+      "align": "left",
+      "rect": {
+        "x": 20,
+        "y": 20,
+        "w": 360,
+        "h": 56
+      }
+    },
+    {
+      "id": "art-notes",
+      "kind": "textarea",
+      "label": "Roadmap",
+      "topic": "/ui/textarea",
+      "text": "TODO backend integration:\n- joint state subscription\n- per-joint command topics\n- limits/safety checks",
+      "fontSize": 15,
+      "rect": {
+        "x": 20,
+        "y": 90,
+        "w": 430,
+        "h": 220
+      }
+    },
+    {
+      "id": "art-visualization",
+      "kind": "stream-display",
+      "label": "Articular Visualization",
+      "topic": "/ui/stream",
+      "source": "visualization",
+      "streamUrl": "webrtc://localhost:8001/stream",
+      "fitMode": "contain",
+      "showStatus": true,
+      "showUrl": false,
+      "overlayText": "joint visualization",
+      "rect": {
+        "x": 470,
+        "y": 90,
+        "w": 790,
+        "h": 430
+      }
+    },
+    {
+      "id": "art-send-goal",
+      "kind": "button",
+      "label": "Send Joint Goal",
+      "topic": "/cmd/joint_goal",
+      "payload": "execute",
+      "rect": {
+        "x": 20,
+        "y": 340,
+        "w": 200,
+        "h": 58
+      }
+    },
+    {
+      "id": "art-stop",
+      "kind": "button",
+      "label": "Stop Motion",
+      "topic": "/cmd/joint_stop",
+      "payload": "stop",
+      "rect": {
+        "x": 240,
+        "y": 340,
+        "w": 180,
+        "h": 58
+      }
+    },
+    {
+      "id": "art-speed",
+      "kind": "max-velocity",
+      "label": "Joint Speed Scale",
+      "topic": "/cmd/joint_speed_scale",
+      "min": 0,
+      "max": 2,
+      "step": 0.01,
+      "rect": {
+        "x": 20,
+        "y": 430,
+        "w": 400,
+        "h": 100
+      }
+    }
+  ],
+  "poses": [],
+  "canvas": {
+    "presetId": "tablet",
+    "runtimeMode": "fit"
+  },
+  "updatedAt": "2026-02-17T00:00:00.000Z"
+}

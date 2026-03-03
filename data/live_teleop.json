@@ -1,0 +1,94 @@
+{
+  "name": "live_teleop",
+  "widgets": [
+    {
+      "id": "live-title",
+      "kind": "text",
+      "label": "Live Teleop",
+      "topic": "/ui/title/live_teleop",
+      "text": "Live Teleoperation Monitor",
+      "fontSize": 26,
+      "align": "left",
+      "rect": {
+        "x": 20,
+        "y": 20,
+        "w": 420,
+        "h": 56
+      }
+    },
+    {
+      "id": "live-rviz",
+      "kind": "stream-display",
+      "label": "RViz",
+      "topic": "/viz/rviz",
+      "source": "rviz",
+      "streamUrl": "webrtc://localhost:8001/stream",
+      "fitMode": "contain",
+      "showStatus": true,
+      "showUrl": false,
+      "overlayText": "rviz overlay",
+      "rect": {
+        "x": 20,
+        "y": 90,
+        "w": 610,
+        "h": 410
+      }
+    },
+    {
+      "id": "live-camera",
+      "kind": "stream-display",
+      "label": "Camera",
+      "topic": "/camera/front",
+      "source": "camera",
+      "streamUrl": "webrtc://localhost:8001/stream",
+      "fitMode": "cover",
+      "showStatus": true,
+      "showUrl": false,
+      "overlayText": "front camera",
+      "rect": {
+        "x": 650,
+        "y": 90,
+        "w": 610,
+        "h": 410
+      }
+    },
+    {
+      "id": "live-curves",
+      "kind": "curves",
+      "label": "Control Curves",
+      "topic": "/telemetry/control",
+      "sampleRateHz": 12,
+      "historySeconds": 10,
+      "showLegend": true,
+      "showSpeed": true,
+      "rect": {
+        "x": 20,
+        "y": 520,
+        "w": 760,
+        "h": 240
+      }
+    },
+    {
+      "id": "live-logs",
+      "kind": "logs",
+      "label": "Runtime Logs",
+      "topic": "/logs/runtime",
+      "maxEntries": 120,
+      "levelFilter": "warn",
+      "autoScroll": true,
+      "showTimestamp": true,
+      "rect": {
+        "x": 800,
+        "y": 520,
+        "w": 460,
+        "h": 240
+      }
+    }
+  ],
+  "poses": [],
+  "canvas": {
+    "presetId": "tablet",
+    "runtimeMode": "fit"
+  },
+  "updatedAt": "2026-02-17T00:00:00.000Z"
+}

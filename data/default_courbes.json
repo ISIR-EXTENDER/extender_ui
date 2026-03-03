@@ -1,0 +1,95 @@
+{
+  "name": "default_courbes",
+  "widgets": [
+    {
+      "id": "courbes-title",
+      "kind": "text",
+      "label": "Title",
+      "topic": "/ui/text/courbes/title",
+      "text": "Courbes",
+      "fontSize": 30,
+      "align": "left",
+      "rect": {
+        "x": 40,
+        "y": 32,
+        "w": 320,
+        "h": 64
+      }
+    },
+    {
+      "id": "courbes-note",
+      "kind": "textarea",
+      "label": "Graph Placeholder",
+      "topic": "/ui/text/courbes/placeholder",
+      "text": "Placeholders for velocity/error/gain curves. Replace with plot widgets once available.",
+      "fontSize": 18,
+      "rect": {
+        "x": 40,
+        "y": 112,
+        "w": 560,
+        "h": 220
+      }
+    },
+    {
+      "id": "courbes-export",
+      "kind": "button",
+      "label": "Export Metrics",
+      "topic": "/cmd/metrics/export",
+      "payload": "export",
+      "rect": {
+        "x": 40,
+        "y": 350,
+        "w": 180,
+        "h": 52
+      }
+    },
+    {
+      "id": "courbes-rosbag",
+      "kind": "rosbag-control",
+      "label": "Rosbag Recorder",
+      "topic": "/rosbag/control",
+      "bagName": "metrics_session",
+      "autoTimestamp": true,
+      "rect": {
+        "x": 40,
+        "y": 422,
+        "w": 360,
+        "h": 190
+      }
+    },
+    {
+      "id": "courbes-rviz",
+      "kind": "stream-display",
+      "label": "RViz Stream",
+      "topic": "/ui/stream/rviz",
+      "source": "rviz",
+      "streamUrl": "webrtc://localhost:8001/rviz",
+      "rect": {
+        "x": 620,
+        "y": 112,
+        "w": 600,
+        "h": 500
+      }
+    },
+    {
+      "id": "courbes-back-home",
+      "kind": "navigation-button",
+      "label": "Home",
+      "topic": "/ui/navigation",
+      "targetScreenId": "default_home",
+      "icon": "home",
+      "rect": {
+        "x": 240,
+        "y": 350,
+        "w": 160,
+        "h": 52
+      }
+    }
+  ],
+  "poses": [],
+  "canvas": {
+    "presetId": "hd",
+    "runtimeMode": "left"
+  },
+  "updatedAt": "2026-02-13T22:59:18.069Z"
+}

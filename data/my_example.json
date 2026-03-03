@@ -1,0 +1,55 @@
+{
+  "name": "my example",
+  "widgets": [
+    {
+      "id": "widget-1771014190954-67ba3",
+      "kind": "joystick",
+      "binding": "joy",
+      "label": "Joystick",
+      "topic": "/cmd/joystick",
+      "color": "#4a9eff",
+      "deadzone": 0.1,
+      "diskSize": 80,
+      "labels": {
+        "top": "Y+",
+        "right": "X+",
+        "bottom": "Y-",
+        "left": "X-"
+      },
+      "rect": {
+        "x": 500,
+        "y": 349,
+        "w": 150,
+        "h": 150
+      }
+    },
+    {
+      "id": "widget-1771014193983-091d0",
+      "kind": "joystick",
+      "binding": "joy",
+      "label": "Joystickde la mort",
+      "topic": "/cmd/joystick",
+      "color": "#4dff61",
+      "deadzone": 0.1,
+      "diskSize": 80,
+      "labels": {
+        "top": "Y+",
+        "right": "X+",
+        "bottom": "Y-",
+        "left": "X-"
+      },
+      "rect": {
+        "x": 726,
+        "y": 274,
+        "w": 370,
+        "h": 324
+      }
+    }
+  ],
+  "poses": [],
+  "canvas": {
+    "presetId": "hd",
+    "runtimeMode": "left"
+  },
+  "updatedAt": "2026-02-13T20:25:48.896Z"
+}

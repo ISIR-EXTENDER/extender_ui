@@ -1,0 +1,95 @@
+{
+  "name": "default_configurations",
+  "widgets": [
+    {
+      "id": "config-title",
+      "kind": "text",
+      "label": "Title",
+      "topic": "/ui/text/config/title",
+      "text": "Configurations",
+      "fontSize": 30,
+      "align": "left",
+      "rect": {
+        "x": 40,
+        "y": 32,
+        "w": 380,
+        "h": 64
+      }
+    },
+    {
+      "id": "config-note",
+      "kind": "textarea",
+      "label": "Config Notes",
+      "topic": "/ui/text/config/notes",
+      "text": "Use this screen for gains, streams and behavior toggles.",
+      "fontSize": 18,
+      "rect": {
+        "x": 40,
+        "y": 112,
+        "w": 520,
+        "h": 140
+      }
+    },
+    {
+      "id": "config-max-velocity",
+      "kind": "max-velocity",
+      "label": "Max Velocity",
+      "topic": "/cmd/max_velocity",
+      "min": 0,
+      "max": 2,
+      "step": 0.01,
+      "rect": {
+        "x": 40,
+        "y": 274,
+        "w": 360,
+        "h": 110
+      }
+    },
+    {
+      "id": "config-gripper",
+      "kind": "gripper-control",
+      "label": "Gripper Control",
+      "topic": "/cmd/gripper",
+      "rect": {
+        "x": 40,
+        "y": 398,
+        "w": 360,
+        "h": 214
+      }
+    },
+    {
+      "id": "config-camera-preview",
+      "kind": "stream-display",
+      "label": "Camera Stream",
+      "topic": "/ui/stream/camera",
+      "source": "camera",
+      "streamUrl": "webrtc://localhost:8001/stream",
+      "rect": {
+        "x": 430,
+        "y": 112,
+        "w": 790,
+        "h": 500
+      }
+    },
+    {
+      "id": "config-back-home",
+      "kind": "navigation-button",
+      "label": "Home",
+      "topic": "/ui/navigation",
+      "targetScreenId": "default_home",
+      "icon": "home",
+      "rect": {
+        "x": 1060,
+        "y": 32,
+        "w": 160,
+        "h": 52
+      }
+    }
+  ],
+  "poses": [],
+  "canvas": {
+    "presetId": "hd",
+    "runtimeMode": "left"
+  },
+  "updatedAt": "2026-02-13T22:59:18.069Z"
+}

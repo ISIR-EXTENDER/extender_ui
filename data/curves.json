@@ -1,0 +1,74 @@
+{
+  "name": "curves",
+  "widgets": [
+    {
+      "id": "curves-title",
+      "kind": "text",
+      "label": "Text",
+      "topic": "/ui/text",
+      "text": "Curves & Metrics",
+      "fontSize": 26,
+      "align": "left",
+      "rect": {
+        "x": 20,
+        "y": 20,
+        "w": 340,
+        "h": 56
+      }
+    },
+    {
+      "id": "curves-main",
+      "kind": "curves",
+      "label": "TCP / Joystick Trends",
+      "topic": "/telemetry/main",
+      "sampleRateHz": 15,
+      "historySeconds": 12,
+      "showLegend": true,
+      "showSpeed": true,
+      "rect": {
+        "x": 20,
+        "y": 90,
+        "w": 830,
+        "h": 320
+      }
+    },
+    {
+      "id": "curves-secondary",
+      "kind": "curves",
+      "label": "Joint Trends",
+      "topic": "/telemetry/joints",
+      "sampleRateHz": 10,
+      "historySeconds": 15,
+      "showLegend": true,
+      "showSpeed": false,
+      "rect": {
+        "x": 20,
+        "y": 430,
+        "w": 830,
+        "h": 330
+      }
+    },
+    {
+      "id": "curves-logs",
+      "kind": "logs",
+      "label": "Curve Events",
+      "topic": "/telemetry/events",
+      "maxEntries": 160,
+      "levelFilter": "info",
+      "autoScroll": true,
+      "showTimestamp": true,
+      "rect": {
+        "x": 870,
+        "y": 90,
+        "w": 390,
+        "h": 670
+      }
+    }
+  ],
+  "poses": [],
+  "canvas": {
+    "presetId": "tablet",
+    "runtimeMode": "fit"
+  },
+  "updatedAt": "2026-02-17T00:00:00.000Z"
+}

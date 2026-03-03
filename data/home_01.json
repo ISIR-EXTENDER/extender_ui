@@ -1,0 +1,47 @@
+{
+  "name": "home 01",
+  "widgets": [
+    {
+      "id": "widget-1771021740927-74b63",
+      "kind": "navigation-bar",
+      "label": "Navigation",
+      "topic": "/ui/navigation",
+      "orientation": "vertical",
+      "items": [],
+      "rect": {
+        "x": 360,
+        "y": 109,
+        "w": 220,
+        "h": 140
+      }
+    },
+    {
+      "id": "widget-1771021749309-3fcaf",
+      "kind": "joystick",
+      "binding": "joy",
+      "label": "Joystick",
+      "topic": "/cmd/joystick",
+      "color": "#4a9eff",
+      "deadzone": 0.1,
+      "diskSize": 80,
+      "labels": {
+        "top": "Y+",
+        "right": "X+",
+        "bottom": "Y-",
+        "left": "X-"
+      },
+      "rect": {
+        "x": 621,
+        "y": 299,
+        "w": 150,
+        "h": 150
+      }
+    }
+  ],
+  "poses": [],
+  "canvas": {
+    "presetId": "hd",
+    "runtimeMode": "left"
+  },
+  "updatedAt": "2026-02-13T22:35:31.536Z"
+}

@@ -1,0 +1,172 @@
+{
+  "name": "default_articular",
+  "widgets": [
+    {
+      "id": "articular-title",
+      "kind": "text",
+      "label": "Title",
+      "topic": "/ui/text/articular/title",
+      "text": "Articular",
+      "fontSize": 30,
+      "align": "left",
+      "rect": {
+        "x": 40,
+        "y": 32,
+        "w": 320,
+        "h": 64
+      }
+    },
+    {
+      "id": "articular-note",
+      "kind": "textarea",
+      "label": "Note",
+      "topic": "/ui/text/articular/note",
+      "text": "Joint control layout. Keep these buttons/topics to map dedicated joint widgets later.",
+      "fontSize": 16,
+      "rect": {
+        "x": 40,
+        "y": 110,
+        "w": 520,
+        "h": 96
+      }
+    },
+    {
+      "id": "articular-j1-minus",
+      "kind": "button",
+      "label": "J1 -",
+      "topic": "/cmd/joint/j1/decrement",
+      "payload": "-",
+      "rect": {
+        "x": 40,
+        "y": 230,
+        "w": 120,
+        "h": 52
+      }
+    },
+    {
+      "id": "articular-j1-plus",
+      "kind": "button",
+      "label": "J1 +",
+      "topic": "/cmd/joint/j1/increment",
+      "payload": "+",
+      "rect": {
+        "x": 176,
+        "y": 230,
+        "w": 120,
+        "h": 52
+      }
+    },
+    {
+      "id": "articular-j2-minus",
+      "kind": "button",
+      "label": "J2 -",
+      "topic": "/cmd/joint/j2/decrement",
+      "payload": "-",
+      "rect": {
+        "x": 312,
+        "y": 230,
+        "w": 120,
+        "h": 52
+      }
+    },
+    {
+      "id": "articular-j2-plus",
+      "kind": "button",
+      "label": "J2 +",
+      "topic": "/cmd/joint/j2/increment",
+      "payload": "+",
+      "rect": {
+        "x": 448,
+        "y": 230,
+        "w": 120,
+        "h": 52
+      }
+    },
+    {
+      "id": "articular-j3-minus",
+      "kind": "button",
+      "label": "J3 -",
+      "topic": "/cmd/joint/j3/decrement",
+      "payload": "-",
+      "rect": {
+        "x": 40,
+        "y": 300,
+        "w": 120,
+        "h": 52
+      }
+    },
+    {
+      "id": "articular-j3-plus",
+      "kind": "button",
+      "label": "J3 +",
+      "topic": "/cmd/joint/j3/increment",
+      "payload": "+",
+      "rect": {
+        "x": 176,
+        "y": 300,
+        "w": 120,
+        "h": 52
+      }
+    },
+    {
+      "id": "articular-j4-minus",
+      "kind": "button",
+      "label": "J4 -",
+      "topic": "/cmd/joint/j4/decrement",
+      "payload": "-",
+      "rect": {
+        "x": 312,
+        "y": 300,
+        "w": 120,
+        "h": 52
+      }
+    },
+    {
+      "id": "articular-j4-plus",
+      "kind": "button",
+      "label": "J4 +",
+      "topic": "/cmd/joint/j4/increment",
+      "payload": "+",
+      "rect": {
+        "x": 448,
+        "y": 300,
+        "w": 120,
+        "h": 52
+      }
+    },
+    {
+      "id": "articular-rviz",
+      "kind": "stream-display",
+      "label": "RViz Stream",
+      "topic": "/ui/stream/rviz",
+      "source": "rviz",
+      "streamUrl": "webrtc://localhost:8001/rviz",
+      "rect": {
+        "x": 600,
+        "y": 110,
+        "w": 620,
+        "h": 430
+      }
+    },
+    {
+      "id": "articular-back-home",
+      "kind": "navigation-button",
+      "label": "Home",
+      "topic": "/ui/navigation",
+      "targetScreenId": "default_home",
+      "icon": "home",
+      "rect": {
+        "x": 40,
+        "y": 560,
+        "w": 160,
+        "h": 52
+      }
+    }
+  ],
+  "poses": [],
+  "canvas": {
+    "presetId": "hd",
+    "runtimeMode": "left"
+  },
+  "updatedAt": "2026-02-13T22:59:18.068Z"
+}

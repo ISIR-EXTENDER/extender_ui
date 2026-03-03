@@ -1,0 +1,94 @@
+{
+  "name": "default_debug",
+  "widgets": [
+    {
+      "id": "debug-title",
+      "kind": "text",
+      "label": "Title",
+      "topic": "/ui/text/debug/title",
+      "text": "Debug",
+      "fontSize": 30,
+      "align": "left",
+      "rect": {
+        "x": 40,
+        "y": 32,
+        "w": 260,
+        "h": 64
+      }
+    },
+    {
+      "id": "debug-console",
+      "kind": "textarea",
+      "label": "Console",
+      "topic": "/ui/text/debug/console",
+      "text": "WebSocket status, backend health and telemetry logs.",
+      "fontSize": 16,
+      "rect": {
+        "x": 40,
+        "y": 112,
+        "w": 700,
+        "h": 500
+      }
+    },
+    {
+      "id": "debug-rviz",
+      "kind": "stream-display",
+      "label": "RViz Stream",
+      "topic": "/ui/stream/rviz",
+      "source": "rviz",
+      "streamUrl": "webrtc://localhost:8001/rviz",
+      "rect": {
+        "x": 770,
+        "y": 112,
+        "w": 450,
+        "h": 300
+      }
+    },
+    {
+      "id": "debug-stop",
+      "kind": "button",
+      "label": "Stop Robot",
+      "topic": "/cmd/safety/stop",
+      "payload": "stop",
+      "rect": {
+        "x": 770,
+        "y": 430,
+        "w": 220,
+        "h": 56
+      }
+    },
+    {
+      "id": "debug-reset",
+      "kind": "button",
+      "label": "Reset Fault",
+      "topic": "/cmd/safety/reset",
+      "payload": "reset",
+      "rect": {
+        "x": 1000,
+        "y": 430,
+        "w": 220,
+        "h": 56
+      }
+    },
+    {
+      "id": "debug-back-home",
+      "kind": "navigation-button",
+      "label": "Home",
+      "topic": "/ui/navigation",
+      "targetScreenId": "default_home",
+      "icon": "home",
+      "rect": {
+        "x": 1060,
+        "y": 32,
+        "w": 160,
+        "h": 52
+      }
+    }
+  ],
+  "poses": [],
+  "canvas": {
+    "presetId": "hd",
+    "runtimeMode": "left"
+  },
+  "updatedAt": "2026-02-13T22:59:18.069Z"
+}

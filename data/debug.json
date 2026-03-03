@@ -1,0 +1,87 @@
+{
+  "name": "debug",
+  "widgets": [
+    {
+      "id": "dbg-title",
+      "kind": "text",
+      "label": "Text",
+      "topic": "/ui/text",
+      "text": "Debug Console",
+      "fontSize": 26,
+      "align": "left",
+      "rect": {
+        "x": 20,
+        "y": 20,
+        "w": 320,
+        "h": 56
+      }
+    },
+    {
+      "id": "dbg-stream",
+      "kind": "stream-display",
+      "label": "Debug Visualization",
+      "topic": "/debug/rviz",
+      "source": "rviz",
+      "streamUrl": "webrtc://localhost:8001/stream",
+      "fitMode": "contain",
+      "showStatus": true,
+      "showUrl": true,
+      "overlayText": "debug stream",
+      "rect": {
+        "x": 20,
+        "y": 90,
+        "w": 620,
+        "h": 360
+      }
+    },
+    {
+      "id": "dbg-logs",
+      "kind": "logs",
+      "label": "Debug Logs",
+      "topic": "/debug/logs",
+      "maxEntries": 200,
+      "levelFilter": "all",
+      "autoScroll": true,
+      "showTimestamp": true,
+      "rect": {
+        "x": 660,
+        "y": 90,
+        "w": 600,
+        "h": 360
+      }
+    },
+    {
+      "id": "dbg-raw",
+      "kind": "textarea",
+      "label": "Raw Topics",
+      "topic": "/debug/raw",
+      "text": "TODO backend integration:\n- websocket topic inspector\n- message replay\n- export snapshots",
+      "fontSize": 14,
+      "rect": {
+        "x": 20,
+        "y": 470,
+        "w": 1240,
+        "h": 230
+      }
+    },
+    {
+      "id": "dbg-ping",
+      "kind": "button",
+      "label": "Ping Backend",
+      "topic": "/debug/ping",
+      "payload": "ping",
+      "rect": {
+        "x": 20,
+        "y": 720,
+        "w": 200,
+        "h": 58
+      }
+    }
+  ],
+  "poses": [],
+  "canvas": {
+    "presetId": "tablet",
+    "runtimeMode": "fit"
+  },
+  "updatedAt": "2026-02-17T00:00:00.000Z"
+}

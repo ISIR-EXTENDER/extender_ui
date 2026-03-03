@@ -1,0 +1,40 @@
+{
+  "name": "camera",
+  "widgets": [
+    {
+      "id": "widget-1771021824555-03a21",
+      "kind": "stream-display",
+      "label": "Camera Stream",
+      "topic": "/ui/stream",
+      "source": "camera",
+      "streamUrl": "webrtc://localhost:8001/stream",
+      "rect": {
+        "x": 230,
+        "y": 128,
+        "w": 360,
+        "h": 260
+      }
+    },
+    {
+      "id": "widget-1771021835920-629de",
+      "kind": "text",
+      "label": "camera",
+      "topic": "/ui/text",
+      "text": "cameraaaa",
+      "fontSize": 20,
+      "align": "left",
+      "rect": {
+        "x": 661,
+        "y": 69,
+        "w": 280,
+        "h": 64
+      }
+    }
+  ],
+  "poses": [],
+  "canvas": {
+    "presetId": "hd",
+    "runtimeMode": "left"
+  },
+  "updatedAt": "2026-02-13T22:31:06.155Z"
+}

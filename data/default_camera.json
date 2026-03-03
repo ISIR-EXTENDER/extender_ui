@@ -1,0 +1,81 @@
+{
+  "name": "default_camera",
+  "widgets": [
+    {
+      "id": "camera-title",
+      "kind": "text",
+      "label": "Title",
+      "topic": "/ui/text/camera/title",
+      "text": "Camera",
+      "fontSize": 30,
+      "align": "left",
+      "rect": {
+        "x": 40,
+        "y": 32,
+        "w": 260,
+        "h": 64
+      }
+    },
+    {
+      "id": "camera-main",
+      "kind": "stream-display",
+      "label": "Camera Stream",
+      "topic": "/ui/stream/camera",
+      "source": "camera",
+      "streamUrl": "webrtc://localhost:8001/stream",
+      "rect": {
+        "x": 40,
+        "y": 110,
+        "w": 860,
+        "h": 500
+      }
+    },
+    {
+      "id": "camera-rviz",
+      "kind": "stream-display",
+      "label": "RViz Stream",
+      "topic": "/ui/stream/rviz",
+      "source": "rviz",
+      "streamUrl": "webrtc://localhost:8001/rviz",
+      "rect": {
+        "x": 920,
+        "y": 110,
+        "w": 300,
+        "h": 280
+      }
+    },
+    {
+      "id": "camera-refresh",
+      "kind": "button",
+      "label": "Refresh Stream",
+      "topic": "/ui/camera/refresh",
+      "payload": "refresh",
+      "rect": {
+        "x": 920,
+        "y": 410,
+        "w": 300,
+        "h": 52
+      }
+    },
+    {
+      "id": "camera-back-home",
+      "kind": "navigation-button",
+      "label": "Home",
+      "topic": "/ui/navigation",
+      "targetScreenId": "default_home",
+      "icon": "home",
+      "rect": {
+        "x": 920,
+        "y": 478,
+        "w": 300,
+        "h": 52
+      }
+    }
+  ],
+  "poses": [],
+  "canvas": {
+    "presetId": "hd",
+    "runtimeMode": "left"
+  },
+  "updatedAt": "2026-02-13T22:59:18.068Z"
+}

@@ -1,0 +1,82 @@
+{
+  "name": "default_logs_rosbags",
+  "widgets": [
+    {
+      "id": "logs-title",
+      "kind": "text",
+      "label": "Title",
+      "topic": "/ui/text/logs/title",
+      "text": "Logs / Rosbags",
+      "fontSize": 30,
+      "align": "left",
+      "rect": {
+        "x": 40,
+        "y": 32,
+        "w": 420,
+        "h": 64
+      }
+    },
+    {
+      "id": "logs-rosbag",
+      "kind": "rosbag-control",
+      "label": "Rosbag Recorder",
+      "topic": "/rosbag/control",
+      "bagName": "session_default",
+      "autoTimestamp": true,
+      "rect": {
+        "x": 40,
+        "y": 112,
+        "w": 430,
+        "h": 210
+      }
+    },
+    {
+      "id": "logs-status",
+      "kind": "textarea",
+      "label": "Status",
+      "topic": "/ui/text/logs/status",
+      "text": "Recording status, file size, and diagnostics.",
+      "fontSize": 16,
+      "rect": {
+        "x": 40,
+        "y": 342,
+        "w": 430,
+        "h": 200
+      }
+    },
+    {
+      "id": "logs-stream",
+      "kind": "stream-display",
+      "label": "Camera Stream",
+      "topic": "/ui/stream/camera",
+      "source": "camera",
+      "streamUrl": "webrtc://localhost:8001/stream",
+      "rect": {
+        "x": 500,
+        "y": 112,
+        "w": 720,
+        "h": 430
+      }
+    },
+    {
+      "id": "logs-back-home",
+      "kind": "navigation-button",
+      "label": "Home",
+      "topic": "/ui/navigation",
+      "targetScreenId": "default_home",
+      "icon": "home",
+      "rect": {
+        "x": 40,
+        "y": 560,
+        "w": 160,
+        "h": 52
+      }
+    }
+  ],
+  "poses": [],
+  "canvas": {
+    "presetId": "hd",
+    "runtimeMode": "left"
+  },
+  "updatedAt": "2026-02-13T22:59:18.068Z"
+}

@@ -1,0 +1,83 @@
+{
+  "name": "logs",
+  "widgets": [
+    {
+      "id": "logs-title",
+      "kind": "text",
+      "label": "Text",
+      "topic": "/ui/text",
+      "text": "Logs & Rosbags",
+      "fontSize": 26,
+      "align": "left",
+      "rect": {
+        "x": 20,
+        "y": 20,
+        "w": 320,
+        "h": 56
+      }
+    },
+    {
+      "id": "logs-runtime",
+      "kind": "logs",
+      "label": "Robot Logs",
+      "topic": "/logs/robot",
+      "maxEntries": 200,
+      "levelFilter": "all",
+      "autoScroll": true,
+      "showTimestamp": true,
+      "rect": {
+        "x": 20,
+        "y": 90,
+        "w": 860,
+        "h": 670
+      }
+    },
+    {
+      "id": "logs-rec",
+      "kind": "rosbag-control",
+      "label": "Session Recording",
+      "topic": "/rosbag/control",
+      "bagName": "session",
+      "autoTimestamp": true,
+      "rect": {
+        "x": 900,
+        "y": 90,
+        "w": 360,
+        "h": 220
+      }
+    },
+    {
+      "id": "logs-note",
+      "kind": "textarea",
+      "label": "Session Notes",
+      "topic": "/ui/session_notes",
+      "text": "Operator notes...",
+      "fontSize": 14,
+      "rect": {
+        "x": 900,
+        "y": 330,
+        "w": 360,
+        "h": 220
+      }
+    },
+    {
+      "id": "logs-mark",
+      "kind": "button",
+      "label": "Insert Marker",
+      "topic": "/logs/marker",
+      "payload": "marker",
+      "rect": {
+        "x": 900,
+        "y": 570,
+        "w": 180,
+        "h": 58
+      }
+    }
+  ],
+  "poses": [],
+  "canvas": {
+    "presetId": "tablet",
+    "runtimeMode": "fit"
+  },
+  "updatedAt": "2026-02-17T00:00:00.000Z"
+}

@@ -1,0 +1,127 @@
+{
+  "name": "poses",
+  "widgets": [
+    {
+      "id": "poses-title",
+      "kind": "text",
+      "label": "Text",
+      "topic": "/ui/text",
+      "text": "Poses & Trajectories",
+      "fontSize": 26,
+      "align": "left",
+      "rect": {
+        "x": 20,
+        "y": 20,
+        "w": 420,
+        "h": 56
+      }
+    },
+    {
+      "id": "poses-save",
+      "kind": "save-pose-button",
+      "label": "Save Current Pose",
+      "topic": "/ui/save_pose",
+      "rect": {
+        "x": 20,
+        "y": 90,
+        "w": 220,
+        "h": 58
+      }
+    },
+    {
+      "id": "poses-load-home",
+      "kind": "load-pose-button",
+      "label": "Load Home",
+      "topic": "/ui/load_pose",
+      "poseName": "home",
+      "icon": "home",
+      "rect": {
+        "x": 260,
+        "y": 90,
+        "w": 200,
+        "h": 58
+      }
+    },
+    {
+      "id": "poses-run",
+      "kind": "button",
+      "label": "Run Trajectory",
+      "topic": "/cmd/trajectory",
+      "payload": "run",
+      "rect": {
+        "x": 480,
+        "y": 90,
+        "w": 200,
+        "h": 58
+      }
+    },
+    {
+      "id": "poses-preview",
+      "kind": "stream-display",
+      "label": "Trajectory Preview",
+      "topic": "/viz/trajectory",
+      "source": "visualization",
+      "streamUrl": "webrtc://localhost:8001/stream",
+      "fitMode": "contain",
+      "showStatus": true,
+      "showUrl": false,
+      "overlayText": "trajectory view",
+      "rect": {
+        "x": 20,
+        "y": 170,
+        "w": 760,
+        "h": 460
+      }
+    },
+    {
+      "id": "poses-list",
+      "kind": "textarea",
+      "label": "Saved Poses",
+      "topic": "/ui/poses",
+      "text": "home\ninspect\npick\nplace",
+      "fontSize": 14,
+      "rect": {
+        "x": 800,
+        "y": 170,
+        "w": 460,
+        "h": 300
+      }
+    },
+    {
+      "id": "poses-nav",
+      "kind": "navigation-bar",
+      "label": "Quick Pages",
+      "topic": "/ui/navigation",
+      "orientation": "horizontal",
+      "items": [
+        {
+          "id": "pose-nav-control",
+          "label": "Control",
+          "targetScreenId": "default_control"
+        },
+        {
+          "id": "pose-nav-live",
+          "label": "Live",
+          "targetScreenId": "live_teleop"
+        },
+        {
+          "id": "pose-nav-debug",
+          "label": "Debug",
+          "targetScreenId": "debug"
+        }
+      ],
+      "rect": {
+        "x": 800,
+        "y": 490,
+        "w": 460,
+        "h": 120
+      }
+    }
+  ],
+  "poses": [],
+  "canvas": {
+    "presetId": "tablet",
+    "runtimeMode": "fit"
+  },
+  "updatedAt": "2026-02-17T00:00:00.000Z"
+}
