@@ -914,6 +914,36 @@ const normalizePetanqueSliderRanges = (
   });
 };
 
+const normalizeTeleopVelocitySliderRange = (
+  configurations: WidgetConfiguration[]
+): WidgetConfiguration[] => {
+  return configurations.map((configuration) => {
+    let changed = false;
+    const nextWidgets = configuration.widgets.map((widget) => {
+      if (widget.kind !== "max-velocity" || widget.topic !== "/cmd/max_velocity") {
+        return widget;
+      }
+      if (widget.min === 0 && widget.max === 3 && widget.step === 0.01) {
+        return widget;
+      }
+      changed = true;
+      return {
+        ...widget,
+        min: 0,
+        max: 3,
+        step: 0.01,
+      };
+    });
+
+    if (!changed) return configuration;
+    return {
+      ...configuration,
+      widgets: nextWidgets,
+      updatedAt: new Date().toISOString(),
+    };
+  });
+};
+
 const ensurePetanqueElectromagnetControl = (
   configurations: WidgetConfiguration[]
 ): WidgetConfiguration[] => {
@@ -1417,15 +1447,17 @@ export function loadConfigurationsFromLocalStorage(): WidgetConfiguration[] {
         updatedAt: typeof item.updatedAt === "string" ? item.updatedAt : new Date().toISOString(),
       }));
     return normalizePetanqueTeleopButtonLayout(
-      normalizePetanqueSliderRanges(
-        ensurePetanqueGripperControl(
-          ensurePetanqueElectromagnetControl(
-            removePetanqueLegacyNavigationButtons(
-              migratePetanqueTeleopConfigLayout(
-                disablePetanqueViewerWidget(
-                  migrateLegacyPetanque(
-                    migrateLegacyDefaultControl(
-                      mergeMissingDemoConfigurations(sanitized)
+      normalizeTeleopVelocitySliderRange(
+        normalizePetanqueSliderRanges(
+          ensurePetanqueGripperControl(
+            ensurePetanqueElectromagnetControl(
+              removePetanqueLegacyNavigationButtons(
+                migratePetanqueTeleopConfigLayout(
+                  disablePetanqueViewerWidget(
+                    migrateLegacyPetanque(
+                      migrateLegacyDefaultControl(
+                        mergeMissingDemoConfigurations(sanitized)
+                      )
                     )
                   )
                 )

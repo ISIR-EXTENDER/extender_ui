@@ -19,6 +19,8 @@ export default function App() {
   const focusMode = useUiStore((s) => s.focusMode);
   const setIsEditorMode = useUiStore((s) => s.setIsEditorMode);
   const [hasUnsavedCanvasChanges, setHasUnsavedCanvasChanges] = useState(false);
+  const [gripperCardsVisible, setGripperCardsVisible] = useState(true);
+  const [modeButtonsVisible, setModeButtonsVisible] = useState(true);
   const applicationTitle = useMemo(() => {
     if (route.kind !== "application") return null;
     const match = loadApplicationsFromLocalStorage().find(
@@ -57,6 +59,10 @@ export default function App() {
         isCanvasDesign={route.kind === "canvas-design"}
         isRuntimeView={route.kind === "application"}
         pageTitle={pageTitle}
+        gripperCardsVisible={gripperCardsVisible}
+        onToggleGripperCards={() => setGripperCardsVisible((prev) => !prev)}
+        modeButtonsVisible={modeButtonsVisible}
+        onToggleModeButtons={() => setModeButtonsVisible((prev) => !prev)}
       />
       {route.kind === "home" ? (
         <HomePage
@@ -77,6 +83,8 @@ export default function App() {
           onNavigateToScreen={(screenId) =>
             navigate({ kind: "application", appId: route.appId, screenId })
           }
+          gripperCardsVisible={gripperCardsVisible}
+          modeButtonsVisible={modeButtonsVisible}
         />
       )}
     </div>

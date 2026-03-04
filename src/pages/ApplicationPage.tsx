@@ -40,6 +40,8 @@ type ApplicationPageProps = {
   applicationId: string;
   routeScreenId: string | null;
   onNavigateToScreen: (screenId: string) => void;
+  gripperCardsVisible?: boolean;
+  modeButtonsVisible?: boolean;
 };
 
 const TOPIC_FRESHNESS_MS = 200;
@@ -120,6 +122,8 @@ export function ApplicationPage({
   applicationId,
   routeScreenId,
   onNavigateToScreen,
+  gripperCardsVisible = true,
+  modeButtonsVisible = true,
 }: ApplicationPageProps) {
   const joyX = useTeleopStore((s) => s.joyX);
   const joyY = useTeleopStore((s) => s.joyY);
@@ -211,6 +215,15 @@ export function ApplicationPage({
     () => cloneWidgets(activeConfiguration?.widgets ?? []),
     [activeConfiguration]
   );
+  const runtimeWidgets: CanvasWidget[] = useMemo(
+    () =>
+      widgets.filter((widget) => {
+        if (!gripperCardsVisible && widget.kind === "gripper-control") return false;
+        if (!modeButtonsVisible && widget.kind === "mode-button") return false;
+        return true;
+      }),
+    [gripperCardsVisible, modeButtonsVisible, widgets]
+  );
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -281,14 +294,32 @@ export function ApplicationPage({
     () => resolveCanvasPresetSize(canvasSettings),
     [canvasSettings]
   );
+  const effectiveRuntimeMode = useMemo(() => {
+    const viewportWidth =
+      canvasViewportSize.width > 0
+        ? canvasViewportSize.width
+        : typeof window !== "undefined"
+          ? window.innerWidth
+          : 0;
+    if (viewportWidth > 0 && viewportWidth <= 1200) return "fit";
+    return canvasSettings.runtimeMode;
+  }, [canvasSettings.runtimeMode, canvasViewportSize.width]);
   const canvasScale = useMemo(
-    () => resolveCanvasFitScale(canvasSettings.runtimeMode, canvasSize, canvasViewportSize),
-    [canvasSettings.runtimeMode, canvasSize, canvasViewportSize]
+    () => {
+      const scale = resolveCanvasFitScale(
+        effectiveRuntimeMode,
+        canvasSize,
+        canvasViewportSize
+      );
+      // Keep a tiny margin to avoid 1px overflow caused by browser chrome and rounding.
+      return effectiveRuntimeMode === "fit" ? scale * 0.99 : scale;
+    },
+    [effectiveRuntimeMode, canvasSize, canvasViewportSize]
   );
   const scaledCanvasSize = useMemo(
     () => ({
-      width: Math.round(canvasSize.width * canvasScale),
-      height: Math.round(canvasSize.height * canvasScale),
+      width: Math.max(1, Math.floor(canvasSize.width * canvasScale)),
+      height: Math.max(1, Math.floor(canvasSize.height * canvasScale)),
     }),
     [canvasScale, canvasSize]
   );
@@ -827,6 +858,7 @@ export function ApplicationPage({
           onRectChange={NOOP_RECT_CHANGE}
           onLabelChange={NOOP_TEXT_CHANGE}
           value={widgetValue}
+          reverseDirection={widget.topic === PETANQUE_ANGLE_TOPIC}
           onValueChange={(nextValue) => {
             setMaxVelocityWidgetValues((prev) => ({
               ...prev,
@@ -896,8 +928,8 @@ export function ApplicationPage({
           onSelect={() => {}}
           onRectChange={NOOP_RECT_CHANGE}
           onLabelChange={NOOP_TEXT_CHANGE}
-          onOpen={() => wsClient.send({ type: "gripper_cmd", action: "open" })}
-          onClose={() => wsClient.send({ type: "gripper_cmd", action: "close" })}
+          onOpen={() => wsClient.send({ type: "gripper_cmd", action: "close" })}
+          onClose={() => wsClient.send({ type: "gripper_cmd", action: "open" })}
         />
       );
     }
@@ -1042,7 +1074,7 @@ export function ApplicationPage({
     );
   };
 
-  const canvasViewportClassName = `controls-canvas-viewport controls-canvas-mode-${canvasSettings.runtimeMode}`;
+  const canvasViewportClassName = `controls-canvas-viewport controls-canvas-mode-${effectiveRuntimeMode}`;
   const canvasFrameStyle = {
     width: `${scaledCanvasSize.width}px`,
     height: `${scaledCanvasSize.height}px`,
@@ -1116,7 +1148,7 @@ export function ApplicationPage({
               <div className="controls-canvas-frame" style={canvasFrameStyle}>
                 <div className="controls-canvas-transform" style={canvasTransformStyle}>
                   <div className="controls-canvas" style={{ width: `${canvasSize.width}px`, height: `${canvasSize.height}px` }}>
-                    {widgets.map(renderWidget)}
+                    {runtimeWidgets.map(renderWidget)}
                   </div>
                 </div>
               </div>
