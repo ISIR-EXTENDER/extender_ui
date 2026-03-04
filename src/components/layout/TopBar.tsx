@@ -10,6 +10,10 @@ type TopBarProps = {
   isCanvasDesign: boolean;
   isRuntimeView?: boolean;
   pageTitle?: string;
+  gripperCardsVisible?: boolean;
+  onToggleGripperCards?: () => void;
+  modeButtonsVisible?: boolean;
+  onToggleModeButtons?: () => void;
 };
 
 export function TopBar({
@@ -18,20 +22,25 @@ export function TopBar({
   isCanvasDesign,
   isRuntimeView = false,
   pageTitle,
+  gripperCardsVisible = true,
+  onToggleGripperCards,
+  modeButtonsVisible = true,
+  onToggleModeButtons,
 }: TopBarProps) {
   const focusMode = useUiStore((s) => s.focusMode);
   const setFocusMode = useUiStore((s) => s.setFocusMode);
   const wsStatus = useTeleopStore((s) => s.wsStatus);
+  const showRuntimeCompact = (isRuntimeView && !isCanvasDesign) || (isCanvasDesign && focusMode);
 
   const connectionIndicator = useMemo(() => {
     if (wsStatus === "connected") {
-      return { level: "ok", label: "Backend connected" };
+      return { level: "ok", label: showRuntimeCompact ? "Connected" : "Backend connected" };
     }
     if (wsStatus === "connecting") {
-      return { level: "warn", label: "WebSocket issue" };
+      return { level: "warn", label: showRuntimeCompact ? "WS issue" : "WebSocket issue" };
     }
-    return { level: "error", label: "Backend off" };
-  }, [wsStatus]);
+    return { level: "error", label: showRuntimeCompact ? "Backend off" : "Backend off" };
+  }, [showRuntimeCompact, wsStatus]);
 
   const modeIndicator = useMemo(() => {
     if (!isCanvasDesign) {
@@ -53,8 +62,6 @@ export function TopBar({
       label: "Screen Builder",
     };
   }, [focusMode, isCanvasDesign]);
-  const showRuntimeCompact = (isRuntimeView && !isCanvasDesign) || (isCanvasDesign && focusMode);
-
   return (
     <header className={`header ${showRuntimeCompact ? "header-runtime" : ""}`.trim()}>
       <div className="header-main">
@@ -88,6 +95,24 @@ export function TopBar({
           {!isCanvasDesign && !showRuntimeCompact ? (
             <Button className="focus" type="button" onClick={onOpenCanvasDesign}>
               Screen Builder
+            </Button>
+          ) : null}
+          {isRuntimeView && !isCanvasDesign ? (
+            <Button
+              className={`gripper-toggle ${gripperCardsVisible ? "is-visible" : "is-hidden"}`.trim()}
+              type="button"
+              onClick={onToggleGripperCards}
+            >
+              {gripperCardsVisible ? "Hide Gripper" : "Show Gripper"}
+            </Button>
+          ) : null}
+          {isRuntimeView && !isCanvasDesign ? (
+            <Button
+              className={`mode-toggle ${modeButtonsVisible ? "is-visible" : "is-hidden"}`.trim()}
+              type="button"
+              onClick={onToggleModeButtons}
+            >
+              {modeButtonsVisible ? "Hide Mode" : "Show Mode"}
             </Button>
           ) : null}
           <Button className="home" type="button" onClick={onHome}>

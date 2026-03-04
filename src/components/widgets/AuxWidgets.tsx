@@ -87,6 +87,7 @@ type MaxVelocityWidgetProps = BaseWidgetProps & {
   onLabelChange: (nextLabel: string) => void;
   value: number;
   onValueChange: (value: number) => void;
+  reverseDirection?: boolean;
 };
 
 type GripperControlWidgetProps = BaseWidgetProps & {
@@ -421,6 +422,7 @@ export function MaxVelocityWidget({
   onLabelChange,
   value,
   onValueChange,
+  reverseDirection = false,
 }: MaxVelocityWidgetProps) {
   return (
     <CanvasItem
@@ -443,6 +445,7 @@ export function MaxVelocityWidget({
           min={widget.min}
           max={widget.max}
           step={widget.step}
+          dir={reverseDirection ? "rtl" : "ltr"}
           value={[value]}
           onValueChange={(next) => onValueChange(next[0] ?? value)}
         >

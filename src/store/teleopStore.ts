@@ -30,24 +30,39 @@ const normalizeProfileRobot = (robot: string) => {
   return normalized || DEFAULT_TELEOP_PROFILE_ROBOT;
 };
 
-const getDefaultTeleopConfigProfile = (): TeleopConfigProfile => ({
-  maxVelocity: 1,
-  scaleX: 1,
-  scaleY: 1,
-  scaleZ: 1,
-  angularScaleX: 1,
-  angularScaleY: 1,
-  angularScaleZ: 1,
-  translationGain: 1,
-  rotationGain: 1,
-  swapXY: false,
-  invertLinearX: false,
-  invertLinearY: false,
-  invertLinearZ: false,
-  invertAngularX: false,
-  invertAngularY: false,
-  invertAngularZ: false,
-});
+const getDefaultTeleopConfigProfile = (
+  robot: string = DEFAULT_TELEOP_PROFILE_ROBOT
+): TeleopConfigProfile => {
+  const baseDefaults: TeleopConfigProfile = {
+    maxVelocity: 1,
+    scaleX: 1,
+    scaleY: 1,
+    scaleZ: 1,
+    angularScaleX: 1,
+    angularScaleY: 1,
+    angularScaleZ: 1,
+    translationGain: 1,
+    rotationGain: 1,
+    swapXY: false,
+    invertLinearX: false,
+    invertLinearY: false,
+    invertLinearZ: false,
+    invertAngularX: false,
+    invertAngularY: false,
+    invertAngularZ: false,
+  };
+
+  if (normalizeProfileRobot(robot) === "explorer") {
+    return {
+      ...baseDefaults,
+      maxVelocity: 3,
+      swapXY: true,
+      invertLinearX: true,
+    };
+  }
+
+  return baseDefaults;
+};
 
 const readTeleopProfiles = (): Record<string, TeleopConfigProfile> => {
   if (typeof window === "undefined") return {};
@@ -72,7 +87,7 @@ const writeTeleopProfiles = (profiles: Record<string, TeleopConfigProfile>) => {
 };
 
 const loadTeleopConfigProfile = (robot: string): TeleopConfigProfile => {
-  const defaults = getDefaultTeleopConfigProfile();
+  const defaults = getDefaultTeleopConfigProfile(robot);
   const profiles = readTeleopProfiles();
   const stored = profiles[normalizeProfileRobot(robot)];
   if (!stored || typeof stored !== "object") return defaults;
@@ -190,7 +205,7 @@ export const useTeleopStore = create<TeleopState>((set, get) => ({
   rotY: 0,
   z: 0,
   rz: 0,
-  mode: 0,
+  mode: 3,
   wsStatus: "disconnected",
   wsState: null,
   seq: 0,
@@ -291,24 +306,27 @@ export const useTeleopStore = create<TeleopState>((set, get) => ({
       invertAngularZ: profile.invertAngularZ,
     });
   },
-  resetTeleopConfig: () =>
+  resetTeleopConfig: () => {
+    const defaults = getDefaultTeleopConfigProfile(get().profileRobot);
     set({
-      scaleX: 1,
-      scaleY: 1,
-      scaleZ: 1,
-      angularScaleX: 1,
-      angularScaleY: 1,
-      angularScaleZ: 1,
-      translationGain: 1,
-      rotationGain: 1,
-      swapXY: false,
-      invertLinearX: false,
-      invertLinearY: false,
-      invertLinearZ: false,
-      invertAngularX: false,
-      invertAngularY: false,
-      invertAngularZ: false,
-    }),
+      maxVelocity: defaults.maxVelocity,
+      scaleX: defaults.scaleX,
+      scaleY: defaults.scaleY,
+      scaleZ: defaults.scaleZ,
+      angularScaleX: defaults.angularScaleX,
+      angularScaleY: defaults.angularScaleY,
+      angularScaleZ: defaults.angularScaleZ,
+      translationGain: defaults.translationGain,
+      rotationGain: defaults.rotationGain,
+      swapXY: defaults.swapXY,
+      invertLinearX: defaults.invertLinearX,
+      invertLinearY: defaults.invertLinearY,
+      invertLinearZ: defaults.invertLinearZ,
+      invertAngularX: defaults.invertAngularX,
+      invertAngularY: defaults.invertAngularY,
+      invertAngularZ: defaults.invertAngularZ,
+    });
+  },
   nextSeq: () => {
     const next = get().seq + 1;
     set({ seq: next });

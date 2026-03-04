@@ -1280,12 +1280,12 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
             )
           }
           onOpen={() => {
-            wsClient.send({ type: "gripper_cmd", action: "open" });
-            setStatusMessage("Gripper open command sent.");
-          }}
-          onClose={() => {
             wsClient.send({ type: "gripper_cmd", action: "close" });
             setStatusMessage("Gripper close command sent.");
+          }}
+          onClose={() => {
+            wsClient.send({ type: "gripper_cmd", action: "open" });
+            setStatusMessage("Gripper open command sent.");
           }}
         />
       );

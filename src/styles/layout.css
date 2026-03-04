@@ -265,6 +265,32 @@ body,
   box-shadow: 0 0 0 1px color-mix(in srgb, #67e8f9 40%, transparent);
 }
 
+.header-button.gripper-toggle {
+  background: color-mix(in srgb, var(--panel) 86%, var(--accent) 14%);
+  border-color: color-mix(in srgb, var(--border) 70%, var(--accent) 30%);
+  color: var(--text);
+  padding: 0.34rem 0.64rem;
+  font-size: 0.76rem;
+}
+
+.header-button.gripper-toggle.is-hidden {
+  background: color-mix(in srgb, var(--panel) 84%, #ef4444 16%);
+  border-color: color-mix(in srgb, var(--border) 60%, #ef4444 40%);
+}
+
+.header-button.mode-toggle {
+  background: color-mix(in srgb, var(--panel) 86%, #22c55e 14%);
+  border-color: color-mix(in srgb, var(--border) 70%, #22c55e 30%);
+  color: var(--text);
+  padding: 0.34rem 0.64rem;
+  font-size: 0.76rem;
+}
+
+.header-button.mode-toggle.is-hidden {
+  background: color-mix(in srgb, var(--panel) 84%, #ef4444 16%);
+  border-color: color-mix(in srgb, var(--border) 60%, #ef4444 40%);
+}
+
 .mode-status {
   display: inline-flex;
   align-items: center;
@@ -322,6 +348,55 @@ body,
 
   .header-actions {
     justify-content: flex-start;
+  }
+
+  .header-runtime .header-main {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.4rem;
+  }
+
+  .header-runtime .header-title-area {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.35rem;
+    min-width: 0;
+  }
+
+  .header-runtime h1 {
+    max-width: 9ch;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .header-runtime .header-feedback {
+    flex-wrap: nowrap;
+  }
+
+  .header-runtime .connection-status {
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 840px) {
+  .header-runtime h1 {
+    display: none;
+  }
+
+  .header-runtime {
+    padding: 0.38rem 0.45rem 0.12rem;
+  }
+
+  .header-runtime .header-button {
+    padding: 0.28rem 0.56rem;
+    font-size: 0.74rem;
+  }
+
+  .application-runtime-topbar-tabs .tab-button {
+    font-size: 0.75rem;
+    padding: 0.28rem 0.56rem;
   }
 }
 
@@ -1790,6 +1865,12 @@ body,
   padding: 0.25rem 0.45rem 0.45rem;
 }
 
+.application-runtime-page .controls-workspace,
+.application-runtime-page .controls-canvas-zone,
+.application-runtime-page .controls-canvas-surface {
+  overflow: hidden;
+}
+
 .application-runtime-canvas-zone {
   position: relative;
 }
@@ -2162,6 +2243,7 @@ body,
   border-radius: 999px;
   font-weight: 600;
   font-size: 0.85rem;
+  white-space: nowrap;
 }
 
 .tab-button.is-dirty-save {

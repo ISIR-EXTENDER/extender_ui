@@ -240,7 +240,7 @@ export function createWidgetFromCatalogType(
       label: "Max Velocity",
       topic: "/cmd/max_velocity",
       min: 0,
-      max: 2,
+      max: 3,
       step: 0.01,
       rect: { x, y, w: 260, h: 90 },
     };
