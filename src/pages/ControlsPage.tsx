@@ -149,6 +149,7 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
   const setRz = useTeleopStore((s) => s.setRz);
   const maxVelocity = useTeleopStore((s) => s.maxVelocity);
   const setMaxVelocity = useTeleopStore((s) => s.setMaxVelocity);
+  const wsState = useTeleopStore((s) => s.wsState);
   const cameraStreamUrl = useUiStore((s) => s.cameraStreamUrl);
   const rvizStreamUrl = useUiStore((s) => s.rvizStreamUrl);
 
@@ -1279,13 +1280,18 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
               current.kind === "gripper-control" ? { ...current, label: nextLabel } : current
             )
           }
+          activeState={
+            wsState?.gripper_state === "open" || wsState?.gripper_state === "close"
+              ? wsState.gripper_state
+              : null
+          }
           onOpen={() => {
-            wsClient.send({ type: "gripper_cmd", action: "close" });
-            setStatusMessage("Gripper close command sent.");
-          }}
-          onClose={() => {
             wsClient.send({ type: "gripper_cmd", action: "open" });
             setStatusMessage("Gripper open command sent.");
+          }}
+          onClose={() => {
+            wsClient.send({ type: "gripper_cmd", action: "close" });
+            setStatusMessage("Gripper close command sent.");
           }}
         />
       );
@@ -1303,6 +1309,13 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
             updateWidget(widget.id, (current) =>
               current.kind === "magnet-control" ? { ...current, label: nextLabel } : current
             )
+          }
+          activeState={
+            wsState?.electromagnet_enabled == null
+              ? null
+              : wsState.electromagnet_enabled
+                ? "on"
+                : "off"
           }
           onActivate={() => {
             wsClient.send({

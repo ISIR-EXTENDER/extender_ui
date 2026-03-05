@@ -162,6 +162,7 @@ export function ApplicationPage({
   const saveTeleopProfile = useTeleopStore((s) => s.saveTeleopProfile);
   const resetTeleopConfig = useTeleopStore((s) => s.resetTeleopConfig);
   const wsStatus = useTeleopStore((s) => s.wsStatus);
+  const wsState = useTeleopStore((s) => s.wsState);
   const cameraStreamUrl = useUiStore((s) => s.cameraStreamUrl);
   const rvizStreamUrl = useUiStore((s) => s.rvizStreamUrl);
 
@@ -926,8 +927,13 @@ export function ApplicationPage({
           onSelect={() => {}}
           onRectChange={NOOP_RECT_CHANGE}
           onLabelChange={NOOP_TEXT_CHANGE}
-          onOpen={() => wsClient.send({ type: "gripper_cmd", action: "close" })}
-          onClose={() => wsClient.send({ type: "gripper_cmd", action: "open" })}
+          activeState={
+            wsState?.gripper_state === "open" || wsState?.gripper_state === "close"
+              ? wsState.gripper_state
+              : null
+          }
+          onOpen={() => wsClient.send({ type: "gripper_cmd", action: "open" })}
+          onClose={() => wsClient.send({ type: "gripper_cmd", action: "close" })}
         />
       );
     }
@@ -941,6 +947,13 @@ export function ApplicationPage({
           onSelect={() => {}}
           onRectChange={NOOP_RECT_CHANGE}
           onLabelChange={NOOP_TEXT_CHANGE}
+          activeState={
+            wsState?.electromagnet_enabled == null
+              ? null
+              : wsState.electromagnet_enabled
+                ? "on"
+                : "off"
+          }
           onActivate={() => {
             wsClient.send({
               type: "ui_button",
