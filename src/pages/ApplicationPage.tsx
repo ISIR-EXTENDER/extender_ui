@@ -49,7 +49,7 @@ const TOPIC_FRESHNESS_TICK_MS = 100;
 const PETANQUE_STATE_TOPIC = "/petanque_state_machine/change_state";
 const PETANQUE_TOTAL_DURATION_TOPIC = "/petanque_throw/total_duration";
 const PETANQUE_ANGLE_TOPIC = "/petanque_throw/angle_between_start_and_finish";
-const PETANQUE_TOTAL_DURATION_MIN_S = 1.0;
+const PETANQUE_TOTAL_DURATION_MIN_S = 0.5;
 const PETANQUE_TOTAL_DURATION_MAX_S = 3.0;
 const PETANQUE_DEFAULT_TOTAL_DURATION_S = 1.1;
 const TELEOP_CONFIG_TRANSLATION_GAIN_TOPIC = "/teleop_config/translation_gain";
@@ -89,16 +89,8 @@ type TeleopConfigButtonState = {
 };
 
 const clampSignedUnit = (value: number) => Math.max(-1, Math.min(1, value));
-const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
-const mapGainToPetanqueDuration = (gain: number) => {
-  if (gain <= 0) return PETANQUE_TOTAL_DURATION_MAX_S;
-  const duration = PETANQUE_DEFAULT_TOTAL_DURATION_S / gain;
-  return clamp(duration, PETANQUE_TOTAL_DURATION_MIN_S, PETANQUE_TOTAL_DURATION_MAX_S);
-};
-const mapDurationToPetanqueGain = (durationSeconds: number) => {
-  if (durationSeconds <= 0) return 1;
-  return PETANQUE_DEFAULT_TOTAL_DURATION_S / durationSeconds;
-};
+const clampPetanqueDuration = (durationSeconds: number) =>
+  Math.max(PETANQUE_TOTAL_DURATION_MIN_S, Math.min(PETANQUE_TOTAL_DURATION_MAX_S, durationSeconds));
 
 const NOOP_RECT_CHANGE: (next: CanvasRect) => void = () => {};
 const NOOP_TEXT_CHANGE: (next: string) => void = () => {};
@@ -272,8 +264,7 @@ export function ApplicationPage({
 
     wsClient.send({
       type: "petanque_cfg",
-      total_duration: PETANQUE_DEFAULT_TOTAL_DURATION_S,
-      speed_gain: mapDurationToPetanqueGain(PETANQUE_DEFAULT_TOTAL_DURATION_S),
+      total_duration: clampPetanqueDuration(PETANQUE_DEFAULT_TOTAL_DURATION_S),
     });
     hasSentPetanqueDurationDefaultRef.current = true;
   }, [activeScreenId, widgets, wsStatus]);
@@ -843,12 +834,16 @@ export function ApplicationPage({
             : typeof maxVelocityWidgetValues[widget.id] === "number"
               ? maxVelocityWidgetValues[widget.id]
               : widget.topic === PETANQUE_TOTAL_DURATION_TOPIC
-                ? mapDurationToPetanqueGain(PETANQUE_DEFAULT_TOTAL_DURATION_S)
+                ? PETANQUE_DEFAULT_TOTAL_DURATION_S
                 : widget.topic === PETANQUE_ANGLE_TOPIC
                   ? 0
                   : widget.topic === "/cmd/max_velocity"
                     ? maxVelocity
                     : 1;
+      const valueLabel =
+        widget.topic === PETANQUE_TOTAL_DURATION_TOPIC
+          ? `duration: ${widgetValue.toFixed(1)}s`
+          : undefined;
       return (
         <MaxVelocityWidget
           key={widget.id}
@@ -858,7 +853,11 @@ export function ApplicationPage({
           onRectChange={NOOP_RECT_CHANGE}
           onLabelChange={NOOP_TEXT_CHANGE}
           value={widgetValue}
-          reverseDirection={widget.topic === PETANQUE_ANGLE_TOPIC}
+          valueLabel={valueLabel}
+          reverseDirection={
+            widget.topic === PETANQUE_ANGLE_TOPIC ||
+            widget.topic === PETANQUE_TOTAL_DURATION_TOPIC
+          }
           onValueChange={(nextValue) => {
             setMaxVelocityWidgetValues((prev) => ({
               ...prev,
@@ -903,8 +902,7 @@ export function ApplicationPage({
             if (widget.topic === PETANQUE_TOTAL_DURATION_TOPIC) {
               wsClient.send({
                 type: "petanque_cfg",
-                total_duration: mapGainToPetanqueDuration(nextValue),
-                speed_gain: nextValue,
+                total_duration: clampPetanqueDuration(nextValue),
               });
             }
             if (widget.topic === PETANQUE_ANGLE_TOPIC) {
