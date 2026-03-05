@@ -464,7 +464,7 @@ export const DEFAULT_DEMO_CONFIGURATIONS: WidgetConfiguration[] = [
     createDemoWidget("pet-speed", "max-velocity", 20, 166, {
       label: "Throw Speed",
       topic: "/petanque_throw/total_duration",
-      min: 0.5,
+      min: 0.9,
       max: 3.0,
       step: 0.1,
       rect: { w: 500, h: 92 },
@@ -871,7 +871,7 @@ const normalizePetanqueSliderRanges = (
       if (widget.topic === "/petanque_throw/total_duration") {
         const normalized = {
           ...widget,
-          min: 0.5,
+          min: 0.9,
           max: 3.0,
           step: 0.1,
         };

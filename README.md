@@ -16,9 +16,16 @@ This is a touch-first teleoperation UI for the Extender robot system. It is desi
 ### Data Flow
 
 1. User gestures update joystick and buttons (Z/RZ, mode).
-2. UI sends teleop_cmd messages over WebSocket at a fixed rate + on changes.
+2. UI sends `teleop_cmd` messages over WebSocket at a fixed rate + on changes.
 3. The tablet_interface node validates + scales commands, then publishes `/teleop_cmd` (ROS2).
 4. UI listens for state messages and renders live telemetry (watchdog, speed, pose, etc.).
+
+### Pétanque specifics
+
+- `Throw Speed` slider controls `/petanque_throw/total_duration` directly.
+- Runtime range is `3.0s` (slow, left) to `0.9s` (fast, right), step `0.1s`.
+- `Throw Angle` slider range is `[-0.26, 0.26]`.
+- Pétanque state-machine commands are sent on `/petanque_state_machine/change_state`.
 
 ## Tabs (What each tab answers)
 
@@ -60,7 +67,8 @@ This is a touch-first teleoperation UI for the Extender robot system. It is desi
 - **ROS2 rclpy Node**: The tablet_interface package hosts the WebSocket server and publishes `/teleop_cmd`.
 - **FastAPI + Uvicorn**: Lightweight async WebSocket server embedded in the node.
 - **Pydantic**: Validates incoming WS payloads.
-- **SafetyGate**: Enforces watchdog and max velocity limits before publishing.
+- **Command envelope**: WS validation accepts bounded amplified teleop values to support runtime gain tuning.
+- **Safety**: final motion limits are enforced by ROS controllers / robot configs.
 - **Default WS endpoint**: ws://<bind_host>:8765/ws/control (configurable in tablet_interface parameters).
 
 ## TODOs (Backend Wiring)
@@ -83,5 +91,3 @@ This is a touch-first teleoperation UI for the Extender robot system. It is desi
 
 - npm install
 - npm run dev
-
-
