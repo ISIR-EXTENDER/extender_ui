@@ -96,6 +96,7 @@ type GripperControlWidgetProps = BaseWidgetProps & {
   onLabelChange: (nextLabel: string) => void;
   onOpen: () => void;
   onClose: () => void;
+  activeState?: "open" | "close" | null;
 };
 
 type MagnetControlWidgetProps = BaseWidgetProps & {
@@ -103,6 +104,7 @@ type MagnetControlWidgetProps = BaseWidgetProps & {
   onLabelChange: (nextLabel: string) => void;
   onActivate: () => void;
   onDeactivate: () => void;
+  activeState?: "on" | "off" | null;
 };
 
 type StreamDisplayWidgetProps = BaseWidgetProps & {
@@ -472,8 +474,10 @@ export function GripperControlWidget({
   onLabelChange,
   onOpen,
   onClose,
+  activeState,
 }: GripperControlWidgetProps) {
-  const [activeSide, setActiveSide] = useState<"open" | "close" | null>(null);
+  const [localActiveSide, setLocalActiveSide] = useState<"open" | "close" | null>(null);
+  const activeSide = activeState ?? localActiveSide;
 
   return (
     <CanvasItem
@@ -497,7 +501,7 @@ export function GripperControlWidget({
             className={`action-button open ${activeSide === "open" ? "is-active" : ""}`.trim()}
             aria-pressed={activeSide === "open"}
             onClick={() => {
-              setActiveSide("open");
+              setLocalActiveSide("open");
               onOpen();
             }}
           >
@@ -508,7 +512,7 @@ export function GripperControlWidget({
             className={`action-button close ${activeSide === "close" ? "is-active" : ""}`.trim()}
             aria-pressed={activeSide === "close"}
             onClick={() => {
-              setActiveSide("close");
+              setLocalActiveSide("close");
               onClose();
             }}
           >
@@ -528,8 +532,10 @@ export function MagnetControlWidget({
   onLabelChange,
   onActivate,
   onDeactivate,
+  activeState,
 }: MagnetControlWidgetProps) {
-  const [activeSide, setActiveSide] = useState<"on" | "off" | null>(null);
+  const [localActiveSide, setLocalActiveSide] = useState<"on" | "off" | null>(null);
+  const activeSide = activeState ?? localActiveSide;
 
   return (
     <CanvasItem
@@ -553,7 +559,7 @@ export function MagnetControlWidget({
             className={`action-button on ${activeSide === "on" ? "is-active" : ""}`.trim()}
             aria-pressed={activeSide === "on"}
             onClick={() => {
-              setActiveSide("on");
+              setLocalActiveSide("on");
               onActivate();
             }}
           >
@@ -564,7 +570,7 @@ export function MagnetControlWidget({
             className={`action-button off ${activeSide === "off" ? "is-active" : ""}`.trim()}
             aria-pressed={activeSide === "off"}
             onClick={() => {
-              setActiveSide("off");
+              setLocalActiveSide("off");
               onDeactivate();
             }}
           >
