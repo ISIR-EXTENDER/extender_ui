@@ -4,6 +4,16 @@ Date: 2026-02-24
 Owner: Susana Sanchez Restrepo
 Scope: Explorer tablet control + petanque state-machine integration
 
+## Latest Status (2026-03-05)
+- [x] Pétanque state-machine bridge wired (`state_cmd` -> `/petanque_state_machine/change_state`).
+- [x] Pétanque config bridge wired (`petanque_cfg.total_duration` and `angle_between_start_and_finish`).
+- [x] Pétanque UI page flow updated to current state-machine behavior (`teleop`, `activate_throw`, `go_to_start`, `throw`, `pick_up`, `stop`).
+- [x] Throw Speed slider now controls `total_duration` directly.
+- [x] Throw Speed runtime range set to `3.0s -> 0.9s` with `0.1s` step.
+- [x] Throw Angle runtime range set to `[-0.26, 0.26]`.
+- [x] Backend WS validator updated to accept amplified teleop command values (fix for gain tuning page).
+- [ ] Hardware validation tomorrow: test max teleop gain/scale combinations on robot and confirm stable controller behavior.
+
 ## Contribution Guidelines
 - [x] Before coding, make sure you are on a `feat/*` branch in each repo you touch.
 - [ ] Keep changes scoped: do not modify unrelated files.
