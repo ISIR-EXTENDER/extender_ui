@@ -8,7 +8,6 @@ export type WsState = {
   publishing_rate_hz: number;
   current_mode: number;
   gripper_state?: "open" | "close" | "unknown" | null;
-  electromagnet_enabled?: boolean | null;
   tcp_speed_mps?: number;
   ee_pose?: {
     x: number;

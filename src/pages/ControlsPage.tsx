@@ -1310,13 +1310,6 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
               current.kind === "magnet-control" ? { ...current, label: nextLabel } : current
             )
           }
-          activeState={
-            wsState?.electromagnet_enabled == null
-              ? null
-              : wsState.electromagnet_enabled
-                ? "on"
-                : "off"
-          }
           onActivate={() => {
             wsClient.send({
               type: "ui_button",

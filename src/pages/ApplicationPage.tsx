@@ -947,13 +947,6 @@ export function ApplicationPage({
           onSelect={() => {}}
           onRectChange={NOOP_RECT_CHANGE}
           onLabelChange={NOOP_TEXT_CHANGE}
-          activeState={
-            wsState?.electromagnet_enabled == null
-              ? null
-              : wsState.electromagnet_enabled
-                ? "on"
-                : "off"
-          }
           onActivate={() => {
             wsClient.send({
               type: "ui_button",
