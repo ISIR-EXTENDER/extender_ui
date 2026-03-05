@@ -87,6 +87,7 @@ type MaxVelocityWidgetProps = BaseWidgetProps & {
   onLabelChange: (nextLabel: string) => void;
   value: number;
   onValueChange: (value: number) => void;
+  valueLabel?: string;
   reverseDirection?: boolean;
 };
 
@@ -422,6 +423,7 @@ export function MaxVelocityWidget({
   onLabelChange,
   value,
   onValueChange,
+  valueLabel,
   reverseDirection = false,
 }: MaxVelocityWidgetProps) {
   return (
@@ -454,7 +456,9 @@ export function MaxVelocityWidget({
           </Slider.Track>
           <Slider.Thumb className="slider-thumb" />
         </Slider.Root>
-        <div className="controls-max-velocity-value">gain: {value.toFixed(2)}</div>
+        <div className="controls-max-velocity-value">
+          {valueLabel ?? `gain: ${value.toFixed(2)}`}
+        </div>
       </div>
     </CanvasItem>
   );

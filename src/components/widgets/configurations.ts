@@ -464,9 +464,9 @@ export const DEFAULT_DEMO_CONFIGURATIONS: WidgetConfiguration[] = [
     createDemoWidget("pet-speed", "max-velocity", 20, 166, {
       label: "Throw Speed",
       topic: "/petanque_throw/total_duration",
-      min: 0.37,
-      max: 1.1,
-      step: 0.01,
+      min: 0.5,
+      max: 3.0,
+      step: 0.1,
       rect: { w: 500, h: 92 },
     }),
     createDemoWidget("pet-notes", "textarea", 20, 272, {
@@ -871,9 +871,9 @@ const normalizePetanqueSliderRanges = (
       if (widget.topic === "/petanque_throw/total_duration") {
         const normalized = {
           ...widget,
-          min: 0.37,
-          max: 1.1,
-          step: 0.01,
+          min: 0.5,
+          max: 3.0,
+          step: 0.1,
         };
         if (
           widget.min !== normalized.min ||
@@ -888,8 +888,8 @@ const normalizePetanqueSliderRanges = (
       if (widget.topic === "/petanque_throw/angle_between_start_and_finish") {
         const normalized = {
           ...widget,
-          min: -0.17,
-          max: 0.17,
+          min: -0.26,
+          max: 0.26,
           step: 0.005,
         };
         if (
