@@ -1650,6 +1650,10 @@ body,
   gap: 0.45rem;
 }
 
+.controls-stream-widget.has-webcam-picker {
+  grid-template-rows: auto auto 1fr auto auto;
+}
+
 .controls-stream-title {
   font-weight: 800;
   font-size: 0.92rem;
@@ -1660,6 +1664,29 @@ body,
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
+}
+
+.controls-stream-picker-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.controls-stream-picker-label {
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.controls-stream-picker {
+  width: 100%;
+  min-width: 0;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 8px;
+  font-size: 0.78rem;
+  padding: 0.3rem 0.45rem;
 }
 
 .controls-stream-source {
@@ -1688,6 +1715,13 @@ body,
   width: 100%;
   height: 100%;
   border: 0;
+  background: var(--panel-2);
+}
+
+.controls-stream-media {
+  width: 100%;
+  height: 100%;
+  display: block;
   background: var(--panel-2);
 }
 

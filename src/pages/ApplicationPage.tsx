@@ -975,13 +975,17 @@ export function ApplicationPage({
           ? cameraStreamUrl
           : widget.source === "rviz"
             ? rvizStreamUrl
-            : resolveVisualizationUrlForRuntime(widget.streamUrl);
+            : widget.source === "visualization"
+              ? resolveVisualizationUrlForRuntime(widget.streamUrl)
+              : widget.streamUrl;
       const sourceStatus =
         widget.source === "rviz"
           ? "RViz stream"
           : widget.source === "visualization"
             ? "Visualization stream"
-            : "Camera stream";
+            : widget.source === "webcam"
+              ? "Webcam stream"
+              : "Camera stream";
       return (
         <StreamDisplayWidget
           key={widget.id}

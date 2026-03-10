@@ -618,6 +618,25 @@ export const DEFAULT_DEMO_CONFIGURATIONS: WidgetConfiguration[] = [
     }),
   ]),
 
+  createDemoConfiguration("play_petanque_camera", [
+    createDemoWidget("play-cam-title", "text", 20, 20, {
+      text: "PlayPetanque Camera",
+      fontSize: 26,
+      rect: { w: 420, h: 56 },
+    }),
+    createDemoWidget("play-cam-feed", "stream-display", 20, 90, {
+      label: "Webcam /dev/video2",
+      topic: "/camera/play_petanque",
+      source: "webcam",
+      streamUrl: "webcam:///dev/video2",
+      fitMode: "cover",
+      showStatus: true,
+      showUrl: true,
+      overlayText: "webcam feed",
+      rect: { w: 1240, h: 620 },
+    }),
+  ]),
+
   createDemoConfiguration("curves", [
     createDemoWidget("curves-title", "text", 20, 20, {
       text: "Curves & Metrics",

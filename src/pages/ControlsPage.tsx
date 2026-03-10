@@ -1333,13 +1333,20 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
     }
 
     if (widget.kind === "stream-display") {
-      const url = widget.source === "camera" ? cameraStreamUrl : rvizStreamUrl;
+      const url =
+        widget.source === "camera"
+          ? cameraStreamUrl
+          : widget.source === "rviz"
+            ? rvizStreamUrl
+            : widget.streamUrl;
       const sourceStatus =
         widget.source === "rviz"
           ? "RViz stream"
           : widget.source === "visualization"
             ? "Visualization stream"
-            : "Camera stream";
+            : widget.source === "webcam"
+              ? "Webcam stream"
+              : "Camera stream";
       return (
         <StreamDisplayWidget
           key={widget.id}
@@ -2511,14 +2518,17 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
                               source:
                                 event.target.value === "rviz"
                                   ? "rviz"
-                                  : event.target.value === "visualization"
-                                    ? "visualization"
-                                    : "camera",
+                                  : event.target.value === "webcam"
+                                    ? "webcam"
+                                    : event.target.value === "visualization"
+                                      ? "visualization"
+                                      : "camera",
                             }))
                           }
                         >
                           <option value="camera">camera</option>
                           <option value="rviz">rviz</option>
+                          <option value="webcam">webcam</option>
                           <option value="visualization">visualization</option>
                         </select>
                       </label>

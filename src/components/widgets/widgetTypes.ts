@@ -7,7 +7,7 @@ export type WidgetIcon = "home" | "save" | "arrow-right";
 export type ButtonTone = "default" | "accent" | "success" | "danger";
 export type NavigationOrientation = "horizontal" | "vertical";
 export type TextAlign = "left" | "center" | "right";
-export type StreamSource = "camera" | "rviz" | "visualization";
+export type StreamSource = "camera" | "rviz" | "visualization" | "webcam";
 export type StreamFitMode = "contain" | "cover";
 export type LogLevelFilter = "all" | "info" | "warn" | "error";
 
