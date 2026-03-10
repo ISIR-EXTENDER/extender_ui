@@ -23,6 +23,7 @@ const PLAY_PETANQUE_APP_NAME = "PlayPetanque";
 const PLAY_PETANQUE_CAMERA_SCREEN_ID = "play_petanque_camera";
 const PLAY_PETANQUE_LANCER_SCREEN_ID = "play_petanque_lancer";
 const PLAY_PETANQUE_LANCER_DRAW_SCREEN_ID = "play_petanque_lancer_draw";
+const PETANQUE_DRAW_SCREEN_ID = "petanque_draw";
 const PLAY_PETANQUE_RAMASSAGE_SCREEN_ID = "play_petanque_ramassage";
 const PLAY_PETANQUE_MEASURES_SCREEN_ID = "play_petanque_measures";
 
@@ -57,9 +58,6 @@ const uniqStrings = (values: string[]) => {
   }
   return result;
 };
-
-const arraysEqual = (left: string[], right: string[]) =>
-  left.length === right.length && left.every((value, index) => value === right[index]);
 
 const ensurePetanqueTeleopConfigScreen = (application: ApplicationConfig): ApplicationConfig => {
   if (!application.screenIds.includes(PETANQUE_SCREEN_ID)) return application;
@@ -114,44 +112,24 @@ const ensurePlayPetanqueApplication = (
   const target = targetIndex >= 0 ? applications[targetIndex] : null;
 
   if (!source && !target) return applications;
+  // Once PlayPetanque exists, keep user-managed screen selection from Home as source of truth.
+  if (target) return applications;
 
-  const baseScreenIds = source?.screenIds ?? target?.screenIds ?? [];
+  // First-time creation: seed PlayPetanque from the PEPR source and required default screens.
+  const baseScreenIds = uniqStrings([...(source?.screenIds ?? [])]);
   const nextScreenIds = uniqStrings([
     ...baseScreenIds,
     PLAY_PETANQUE_CAMERA_SCREEN_ID,
     PLAY_PETANQUE_LANCER_SCREEN_ID,
     PLAY_PETANQUE_LANCER_DRAW_SCREEN_ID,
+    PETANQUE_DRAW_SCREEN_ID,
     PLAY_PETANQUE_RAMASSAGE_SCREEN_ID,
     PLAY_PETANQUE_MEASURES_SCREEN_ID,
   ]);
   const nextHomeScreenId =
     source?.homeScreenId && nextScreenIds.includes(source.homeScreenId)
       ? source.homeScreenId
-      : target?.homeScreenId && nextScreenIds.includes(target.homeScreenId)
-        ? target.homeScreenId
-        : nextScreenIds[0] ?? null;
-
-  if (target) {
-    const unchanged =
-      target.id === PLAY_PETANQUE_APP_ID &&
-      target.name === PLAY_PETANQUE_APP_NAME &&
-      target.homeScreenId === nextHomeScreenId &&
-      arraysEqual(target.screenIds, nextScreenIds);
-    if (unchanged) return applications;
-
-    const nextTarget: ApplicationConfig = {
-      ...target,
-      id: PLAY_PETANQUE_APP_ID,
-      name: PLAY_PETANQUE_APP_NAME,
-      screenIds: nextScreenIds,
-      homeScreenId: nextHomeScreenId,
-      updatedAt: new Date().toISOString(),
-    };
-
-    return applications.map((application, index) =>
-      index === targetIndex ? nextTarget : application
-    );
-  }
+      : nextScreenIds[0] ?? null;
 
   const nextApplication: ApplicationConfig = {
     id: PLAY_PETANQUE_APP_ID,

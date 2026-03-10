@@ -102,13 +102,15 @@ type MaxVelocityWidgetProps = BaseWidgetProps & {
 
 type ThrowDrawWidgetProps = BaseWidgetProps & {
   widget: ThrowDrawWidgetModel;
-  onLabelChange: (nextLabel: string) => void;
   angleValue: number;
   durationValue: number;
+  alphaValue?: number;
+  onAlphaChange?: (nextAlpha: number) => void;
   onValueChange: (next: {
     angle?: number;
     duration?: number;
     powerPercent: number;
+    alpha?: number;
     throwRequested?: boolean;
   }) => void;
 };
@@ -663,9 +665,10 @@ export function ThrowDrawWidget({
   selected,
   onSelect,
   onRectChange,
-  onLabelChange,
   angleValue,
   durationValue,
+  alphaValue,
+  onAlphaChange,
   onValueChange,
 }: ThrowDrawWidgetProps) {
   type ThrowHistoryEntry = {
@@ -673,6 +676,7 @@ export function ThrowDrawWidget({
     angle: number;
     duration: number;
     powerPercent: number;
+    alpha?: number;
   };
 
   const angleMin = Math.min(widget.angleMin, widget.angleMax);
@@ -681,9 +685,17 @@ export function ThrowDrawWidget({
   const durationMin = Math.min(widget.durationMin, widget.durationMax);
   const durationMax = Math.max(widget.durationMin, widget.durationMax);
   const durationSpan = Math.max(1e-6, durationMax - durationMin);
-  const holdToMaxMs = Math.max(2200, widget.holdToMaxMs * 1.9);
-  const chargeGraceMs = 280;
-  const chargeFrictionExponent = 2.2;
+  const hasAlphaControl = typeof widget.alphaTopic === "string" && widget.alphaTopic.trim().length > 0;
+  const alphaMin = Math.min(widget.alphaMin ?? 0, widget.alphaMax ?? 40);
+  const alphaMax = Math.max(widget.alphaMin ?? 0, widget.alphaMax ?? 40);
+  const alphaSpan = Math.max(1e-6, alphaMax - alphaMin);
+  const alphaSafeMax = widget.alphaSafeMax ?? 20;
+  const holdToHighPowerMs = Math.max(3400, widget.holdToMaxMs * 2.7);
+  const holdTailMs = Math.max(2200, widget.holdToMaxMs * 1.9);
+  const chargeGraceMs = 360;
+  const chargeSaturationGain = 3.6;
+  const chargeCurveGamma = 1.28;
+  const maxEasyPowerPercent = 94;
   const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
   // Expand the drawable sector for accessibility while preserving real command range.
   const drawAngleScale = 3.6;
@@ -708,20 +720,42 @@ export function ThrowDrawWidget({
     clamp(((durationMax - duration) / durationSpan) * 100, 0, 100);
   const toDuration = (powerPercent: number) =>
     clamp(durationMax - (clamp(powerPercent, 0, 100) / 100) * durationSpan, durationMin, durationMax);
+  const toChargedPowerPercent = (elapsedMs: number) => {
+    const activeMs = Math.max(0, elapsedMs - chargeGraceMs);
+    const primaryProgress = clamp(activeMs / holdToHighPowerMs, 0, 1);
+    const normalizedSaturation =
+      (1 - Math.exp(-chargeSaturationGain * primaryProgress)) / (1 - Math.exp(-chargeSaturationGain));
+    const basePower = maxEasyPowerPercent * Math.pow(normalizedSaturation, chargeCurveGamma);
+    if (activeMs <= holdToHighPowerMs) {
+      return clamp(basePower, 0, maxEasyPowerPercent);
+    }
+    // Extra hold time adds power more slowly near the maximum.
+    const tailProgress = clamp((activeMs - holdToHighPowerMs) / holdTailMs, 0, 1);
+    const tailPower =
+      (100 - maxEasyPowerPercent) * ((1 - Math.exp(-4 * tailProgress)) / (1 - Math.exp(-4)));
+    return clamp(basePower + tailPower, 0, 100);
+  };
 
   const [angle, setAngle] = useState(() => clamp(angleValue, angleMin, angleMax));
   const initialPowerPercent = toPowerPercent(durationValue);
   const [powerPercent, setPowerPercent] = useState(() => initialPowerPercent);
+  const [alpha, setAlpha] = useState(() =>
+    clamp(typeof alphaValue === "number" ? alphaValue : alphaMin, alphaMin, alphaMax)
+  );
   const [padSize, setPadSize] = useState({ w: 640, h: 360 });
+  const [alphaPadSize, setAlphaPadSize] = useState({ w: 170, h: 280 });
   const [isDraggingAngle, setIsDraggingAngle] = useState(false);
   const [isChargingPower, setIsChargingPower] = useState(false);
+  const [isDraggingAlpha, setIsDraggingAlpha] = useState(false);
   const [hasAngleSelection, setHasAngleSelection] = useState(false);
   const [isArcLocked, setIsArcLocked] = useState(false);
   const [gestureTrail, setGestureTrail] = useState<Array<{ x: number; y: number }>>([]);
   const [throwHistory, setThrowHistory] = useState<ThrowHistoryEntry[]>([]);
   const [selectedHistoryId, setSelectedHistoryId] = useState<string | null>(null);
   const [activePointerId, setActivePointerId] = useState<number | null>(null);
+  const [activeAlphaPointerId, setActiveAlphaPointerId] = useState<number | null>(null);
   const padRef = useRef<HTMLDivElement | null>(null);
+  const alphaPadRef = useRef<HTMLDivElement | null>(null);
   const chargeStartRef = useRef<number | null>(null);
   const chargeRafRef = useRef<number | null>(null);
   const powerPercentRef = useRef(initialPowerPercent);
@@ -731,14 +765,24 @@ export function ThrowDrawWidget({
     powerPercentRef.current = nextPowerPercent;
     setPowerPercent(nextPowerPercent);
   };
+  const toAlphaDrawAngle = (value: number) =>
+    clamp(((clamp(value, alphaMin, alphaMax) - alphaMin) / alphaSpan) * (Math.PI / 2), 0, Math.PI / 2);
+  const drawAngleToAlpha = (drawAngle: number) =>
+    clamp(alphaMin + (clamp(drawAngle, 0, Math.PI / 2) / (Math.PI / 2)) * alphaSpan, alphaMin, alphaMax);
   const setArcLocked = (nextLocked: boolean) => {
     arcLockedRef.current = nextLocked;
     setIsArcLocked(nextLocked);
   };
 
   const originX = padSize.w / 2;
-  const originY = padSize.h * 0.84;
-  const radius = Math.max(48, Math.min(padSize.w * 0.45, padSize.h * 0.74));
+  const originY = padSize.h * 0.9;
+  const radius = Math.max(56, Math.min(padSize.w * 0.47, padSize.h * 0.88));
+  const alphaPadOriginX = Math.max(18, alphaPadSize.w * 0.18);
+  const alphaPadOriginY = alphaPadSize.h * 0.9;
+  const alphaRadius = Math.max(
+    34,
+    Math.min(alphaPadSize.w - alphaPadOriginX - 12, alphaPadOriginY - 14)
+  );
   const nearArcThreshold = radius * 0.9;
 
   useEffect(() => {
@@ -746,6 +790,13 @@ export function ThrowDrawWidget({
       setAngle(clamp(angleValue, angleMin, angleMax));
     }
   }, [angleValue, angleMin, angleMax, isDraggingAngle]);
+
+  useEffect(() => {
+    if (isDraggingAlpha) return;
+    if (typeof alphaValue === "number") {
+      setAlpha(clamp(alphaValue, alphaMin, alphaMax));
+    }
+  }, [alphaMax, alphaMin, alphaValue, isDraggingAlpha]);
 
   useEffect(() => {
     if (hasAngleSelection || isDraggingAngle) return;
@@ -776,6 +827,21 @@ export function ThrowDrawWidget({
   }, []);
 
   useEffect(() => {
+    const node = alphaPadRef.current;
+    if (!node || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      setAlphaPadSize({
+        w: Math.max(110, entry.contentRect.width),
+        h: Math.max(180, entry.contentRect.height),
+      });
+    });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [hasAlphaControl]);
+
+  useEffect(() => {
     return () => {
       if (chargeRafRef.current !== null) {
         window.cancelAnimationFrame(chargeRafRef.current);
@@ -793,19 +859,36 @@ export function ThrowDrawWidget({
     const step = (now: number) => {
       if (chargeStartRef.current === null) return;
       const elapsedMs = now - chargeStartRef.current;
-      const normalized = clamp((elapsedMs - chargeGraceMs) / holdToMaxMs, 0, 1);
-      const withFriction = 1 - Math.pow(1 - normalized, chargeFrictionExponent);
-      const nextPowerPercent = clamp(withFriction * 100, 0, 100);
+      const nextPowerPercent = toChargedPowerPercent(elapsedMs);
       setPowerPercentValue(nextPowerPercent);
       onValueChange({
         duration: toDuration(nextPowerPercent),
         powerPercent: nextPowerPercent,
       });
-      if (nextPowerPercent < 100 && chargeStartRef.current !== null) {
+      if (nextPowerPercent < 99.95 && chargeStartRef.current !== null) {
         chargeRafRef.current = window.requestAnimationFrame(step);
       }
     };
     chargeRafRef.current = window.requestAnimationFrame(step);
+  };
+
+  const updateAlphaFromPointer = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!hasAlphaControl || !onAlphaChange) return;
+    const rect = alphaPadRef.current?.getBoundingClientRect() ?? event.currentTarget.getBoundingClientRect();
+    const scaleX = alphaPadSize.w / Math.max(1, rect.width);
+    const scaleY = alphaPadSize.h / Math.max(1, rect.height);
+    const localX = clamp((event.clientX - rect.left) * scaleX, 0, alphaPadSize.w);
+    const localY = clamp((event.clientY - rect.top) * scaleY, 0, alphaPadSize.h);
+    const dx = localX - alphaPadOriginX;
+    const dy = alphaPadOriginY - localY;
+    const drawAngle = clamp(Math.atan2(dy, Math.max(1e-6, dx)), 0, Math.PI / 2);
+    const nextAlpha = drawAngleToAlpha(drawAngle);
+    setAlpha(nextAlpha);
+    onAlphaChange(nextAlpha);
+    onValueChange({
+      alpha: nextAlpha,
+      powerPercent: powerPercentRef.current,
+    });
   };
 
   const updateGestureFromPointer = (
@@ -874,6 +957,7 @@ export function ThrowDrawWidget({
       angle: finalAngle,
       duration: finalDuration,
       powerPercent: finalPowerPercent,
+      alpha: hasAlphaControl ? alpha : undefined,
     };
     setThrowHistory((prev) => [historyEntry, ...prev].slice(0, 5));
     setSelectedHistoryId(historyEntry.id);
@@ -881,6 +965,7 @@ export function ThrowDrawWidget({
       angle: finalAngle,
       duration: finalDuration,
       powerPercent: finalPowerPercent,
+      alpha: hasAlphaControl ? alpha : undefined,
       throwRequested: true,
     });
   };
@@ -894,6 +979,18 @@ export function ThrowDrawWidget({
   const currentPoint = pointForAngle(mapActualAngleToDraw(angle), 0.9);
   const arcPath = `M ${minPoint.x} ${minPoint.y} A ${radius} ${radius} 0 0 1 ${maxPoint.x} ${maxPoint.y}`;
   const trailPoints = gestureTrail.map((point) => `${point.x},${point.y}`).join(" ");
+  const alphaPointForDrawAngle = (drawAngle: number, scale = 0.9) => ({
+    x: alphaPadOriginX + Math.cos(drawAngle) * alphaRadius * scale,
+    y: alphaPadOriginY - Math.sin(drawAngle) * alphaRadius * scale,
+  });
+  const alphaMinPoint = alphaPointForDrawAngle(0, 1);
+  const alphaMaxPoint = alphaPointForDrawAngle(Math.PI / 2, 1);
+  const alphaSafePoint = alphaPointForDrawAngle(
+    toAlphaDrawAngle(clamp(alphaSafeMax, alphaMin, alphaMax)),
+    0.96
+  );
+  const alphaCurrentPoint = alphaPointForDrawAngle(toAlphaDrawAngle(alpha), 0.92);
+  const alphaArcPath = `M ${alphaMinPoint.x} ${alphaMinPoint.y} A ${alphaRadius} ${alphaRadius} 0 0 0 ${alphaMaxPoint.x} ${alphaMaxPoint.y}`;
   const showLockedLine = hasAngleSelection && (!isDraggingAngle || isArcLocked);
   const applyHistoryPreset = (entry: ThrowHistoryEntry) => {
     stopPowerCharge();
@@ -905,16 +1002,27 @@ export function ThrowDrawWidget({
     setSelectedHistoryId(entry.id);
     setAngle(clamp(entry.angle, angleMin, angleMax));
     setPowerPercentValue(clamp(entry.powerPercent, 0, 100));
+    if (hasAlphaControl && typeof entry.alpha === "number") {
+      const nextAlpha = clamp(entry.alpha, alphaMin, alphaMax);
+      setAlpha(nextAlpha);
+      onAlphaChange?.(nextAlpha);
+    }
     onValueChange({
       angle: clamp(entry.angle, angleMin, angleMax),
       duration: clamp(entry.duration, durationMin, durationMax),
       powerPercent: clamp(entry.powerPercent, 0, 100),
+      alpha:
+        hasAlphaControl && typeof entry.alpha === "number"
+          ? clamp(entry.alpha, alphaMin, alphaMax)
+          : undefined,
     });
   };
   const hintText = isChargingPower
-    ? "Hold to increase power, then lacher to throw."
+      ? "Hold to increase power, then lacher to throw."
     : isDraggingAngle && !isArcLocked
       ? "Draw path until the arc to lock angle."
+      : hasAlphaControl && !hasAngleSelection
+        ? "Draw alpha on the left, then draw to throw."
       : selectedHistoryId
         ? "Preset selected. You can test then draw+hold to throw."
       : hasAngleSelection
@@ -935,44 +1043,139 @@ export function ThrowDrawWidget({
       className="controls-throw-draw-item"
     >
       <div className="controls-throw-draw-widget">
-        <div className="controls-throw-draw-header">
-          <InlineEditableText value={widget.label} onCommit={onLabelChange} className="controls-inline-label" />
-          <div className="controls-throw-draw-header-actions">
-            <div className="controls-throw-draw-readout">
-              <span>{((angle * 180) / Math.PI).toFixed(1)}°</span>
-              <span>{Math.round(powerPercent)}%</span>
-            </div>
-            <button
-              type="button"
-              className="controls-throw-draw-reset"
-              data-canvas-interactive="true"
-              onPointerDown={(event) => {
-                event.stopPropagation();
-              }}
-              onClick={(event) => {
-                event.stopPropagation();
-                stopPowerCharge();
-                setHasAngleSelection(false);
-                setArcLocked(false);
-                setIsDraggingAngle(false);
-                setActivePointerId(null);
-                setGestureTrail([]);
-                setSelectedHistoryId(null);
-                const resetAngle = clamp(0, angleMin, angleMax);
-                setAngle(resetAngle);
-                setPowerPercentValue(0);
-                onValueChange({
-                  angle: resetAngle,
-                  duration: toDuration(0),
-                  powerPercent: 0,
-                });
-              }}
-            >
-              Reset
-            </button>
+        <div className="controls-throw-draw-toolbar">
+          <div className="controls-throw-draw-readout">
+            <span>{((angle * 180) / Math.PI).toFixed(1)}°</span>
+            <span>{Math.round(powerPercent)}%</span>
           </div>
+          <button
+            type="button"
+            className="controls-throw-draw-reset"
+            data-canvas-interactive="true"
+            onPointerDown={(event) => {
+              event.stopPropagation();
+            }}
+            onClick={(event) => {
+              event.stopPropagation();
+              stopPowerCharge();
+              setHasAngleSelection(false);
+              setArcLocked(false);
+              setIsDraggingAngle(false);
+              setIsDraggingAlpha(false);
+              setActivePointerId(null);
+              setActiveAlphaPointerId(null);
+              setGestureTrail([]);
+              setSelectedHistoryId(null);
+              const resetAngle = clamp(0, angleMin, angleMax);
+              setAngle(resetAngle);
+              setPowerPercentValue(0);
+              onValueChange({
+                angle: resetAngle,
+                duration: toDuration(0),
+                powerPercent: 0,
+              });
+            }}
+          >
+            Reset
+          </button>
         </div>
-        <div className="controls-throw-draw-main">
+        <div className={`controls-throw-draw-main ${hasAlphaControl ? "has-alpha" : ""}`.trim()}>
+          {hasAlphaControl ? (
+            <div className="controls-throw-draw-alpha" data-canvas-interactive="true">
+              <div
+                ref={alphaPadRef}
+                className="controls-throw-draw-alpha-pad"
+                onPointerDown={(event) => {
+                  event.stopPropagation();
+                  event.preventDefault();
+                  event.currentTarget.setPointerCapture(event.pointerId);
+                  setIsDraggingAlpha(true);
+                  setActiveAlphaPointerId(event.pointerId);
+                  updateAlphaFromPointer(event);
+                }}
+                onPointerMove={(event) => {
+                  if (!isDraggingAlpha) return;
+                  if (activeAlphaPointerId !== null && event.pointerId !== activeAlphaPointerId) return;
+                  event.stopPropagation();
+                  updateAlphaFromPointer(event);
+                }}
+                onPointerUp={(event) => {
+                  if (activeAlphaPointerId !== null && event.pointerId !== activeAlphaPointerId) return;
+                  event.stopPropagation();
+                  setIsDraggingAlpha(false);
+                  setActiveAlphaPointerId(null);
+                }}
+                onPointerCancel={(event) => {
+                  if (activeAlphaPointerId !== null && event.pointerId !== activeAlphaPointerId) return;
+                  event.stopPropagation();
+                  setIsDraggingAlpha(false);
+                  setActiveAlphaPointerId(null);
+                }}
+              >
+                <svg
+                  className="controls-throw-draw-alpha-svg"
+                  viewBox={`0 0 ${alphaPadSize.w} ${alphaPadSize.h}`}
+                  preserveAspectRatio="none"
+                >
+                  <path className="controls-throw-draw-alpha-sector" d={alphaArcPath} />
+                  <line
+                    className="controls-throw-draw-alpha-axis"
+                    x1={alphaPadOriginX}
+                    y1={alphaPadOriginY}
+                    x2={alphaMinPoint.x}
+                    y2={alphaMinPoint.y}
+                  />
+                  <line
+                    className="controls-throw-draw-alpha-axis"
+                    x1={alphaPadOriginX}
+                    y1={alphaPadOriginY}
+                    x2={alphaMaxPoint.x}
+                    y2={alphaMaxPoint.y}
+                  />
+                  <line
+                    className="controls-throw-draw-alpha-safe-vector"
+                    x1={alphaPadOriginX}
+                    y1={alphaPadOriginY}
+                    x2={alphaSafePoint.x}
+                    y2={alphaSafePoint.y}
+                  />
+                  <line
+                    className="controls-throw-draw-alpha-vector"
+                    x1={alphaPadOriginX}
+                    y1={alphaPadOriginY}
+                    x2={alphaCurrentPoint.x}
+                    y2={alphaCurrentPoint.y}
+                  />
+                  <circle className="controls-throw-draw-alpha-origin" cx={alphaPadOriginX} cy={alphaPadOriginY} r={6} />
+                  <circle
+                    className="controls-throw-draw-alpha-target"
+                    cx={alphaCurrentPoint.x}
+                    cy={alphaCurrentPoint.y}
+                    r={Math.max(8, alphaRadius * 0.08)}
+                  />
+                  <text
+                    className="controls-throw-draw-alpha-label controls-throw-draw-alpha-label-pointer"
+                    x={Math.max(8, alphaMaxPoint.x - 10)}
+                    y={Math.max(16, alphaMaxPoint.y - 10)}
+                    textAnchor="start"
+                  >
+                    Pointer
+                  </text>
+                  <text
+                    className="controls-throw-draw-alpha-label controls-throw-draw-alpha-label-pointer"
+                    x={alphaPadSize.w - 10}
+                    y={alphaPadSize.h - 12}
+                    textAnchor="end"
+                  >
+                    Tirer
+                  </text>
+                </svg>
+              </div>
+              <div className={`controls-throw-draw-alpha-value ${alpha > alphaSafeMax ? "is-unsafe" : ""}`.trim()}>
+                {alpha.toFixed(1)}°
+              </div>
+            </div>
+          ) : null}
           <div className="controls-throw-draw-left">
             <div
               ref={padRef}
@@ -1076,6 +1279,9 @@ export function ThrowDrawWidget({
                     <span className="controls-throw-draw-history-rank">{index + 1}</span>
                     <span className="controls-throw-draw-history-angle">
                       {((entry.angle * 180) / Math.PI).toFixed(1)}°
+                    </span>
+                    <span className="controls-throw-draw-history-alpha">
+                      {typeof entry.alpha === "number" ? `${entry.alpha.toFixed(0)}°a` : "--"}
                     </span>
                     <span className="controls-throw-draw-history-power">
                       {entry.powerPercent.toFixed(0)}%

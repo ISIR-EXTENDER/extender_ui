@@ -229,6 +229,7 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
   const [throwDrawWidgetValues, setThrowDrawWidgetValues] = useState<
     Record<string, { angle: number; duration: number }>
   >({});
+  const [throwDrawAlphaValues, setThrowDrawAlphaValues] = useState<Record<string, number>>({});
   const [freshnessClock, setFreshnessClock] = useState<number>(() => Date.now());
   const [rosbagRecording, setRosbagRecording] = useState(false);
   const [rosbagStatus, setRosbagStatus] = useState("idle");
@@ -334,6 +335,22 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
       const currentIds = new Set(widgets.map((widget) => widget.id));
       let changed = false;
       const next: Record<string, { angle: number; duration: number }> = {};
+      for (const [widgetId, value] of Object.entries(prev)) {
+        if (currentIds.has(widgetId)) {
+          next[widgetId] = value;
+          continue;
+        }
+        changed = true;
+      }
+      return changed ? next : prev;
+    });
+  }, [widgets]);
+
+  useEffect(() => {
+    setThrowDrawAlphaValues((prev) => {
+      const currentIds = new Set(widgets.map((widget) => widget.id));
+      let changed = false;
+      const next: Record<string, number> = {};
       for (const [widgetId, value] of Object.entries(prev)) {
         if (currentIds.has(widgetId)) {
           next[widgetId] = value;
@@ -1331,6 +1348,10 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
       const angleMax = Math.max(widget.angleMin, widget.angleMax);
       const durationMin = Math.min(widget.durationMin, widget.durationMax);
       const durationMax = Math.max(widget.durationMin, widget.durationMax);
+      const hasAlphaControl =
+        typeof widget.alphaTopic === "string" && widget.alphaTopic.trim().length > 0;
+      const alphaMin = Math.min(widget.alphaMin ?? 0, widget.alphaMax ?? 40);
+      const alphaMax = Math.max(widget.alphaMin ?? 0, widget.alphaMax ?? 40);
       const defaultDuration =
         widget.powerTopic === PETANQUE_TOTAL_DURATION_TOPIC
           ? PETANQUE_DEFAULT_TOTAL_DURATION_S
@@ -1339,6 +1360,9 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
         angle: Math.max(angleMin, Math.min(angleMax, 0)),
         duration: Math.max(durationMin, Math.min(durationMax, defaultDuration)),
       };
+      const drawAlphaValue = hasAlphaControl
+        ? Math.max(alphaMin, Math.min(alphaMax, throwDrawAlphaValues[widget.id] ?? alphaMin))
+        : undefined;
       return (
         <ThrowDrawWidget
           key={widget.id}
@@ -1346,13 +1370,20 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
           selected={selected}
           onSelect={() => setSelectedWidgetId(widget.id)}
           onRectChange={(next) => handleWidgetRectChange(widget.id, next)}
-          onLabelChange={(nextLabel) =>
-            updateWidget(widget.id, (current) =>
-              current.kind === "throw-draw" ? { ...current, label: nextLabel } : current
-            )
-          }
           angleValue={drawValue.angle}
           durationValue={drawValue.duration}
+          alphaValue={drawAlphaValue}
+          onAlphaChange={
+            hasAlphaControl
+              ? (nextAlpha) => {
+                  setThrowDrawAlphaValues((prev) => ({
+                    ...prev,
+                    [widget.id]: Math.max(alphaMin, Math.min(alphaMax, nextAlpha)),
+                  }));
+                  markWidgetPulse(widget.id);
+                }
+              : undefined
+          }
           onValueChange={(next) => {
             const resolvedAngle =
               typeof next.angle === "number"
@@ -1369,6 +1400,13 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
                 duration: resolvedDuration,
               },
             }));
+            if (typeof next.alpha === "number" && hasAlphaControl) {
+              const resolvedAlpha = Math.max(alphaMin, Math.min(alphaMax, next.alpha));
+              setThrowDrawAlphaValues((prev) => ({
+                ...prev,
+                [widget.id]: resolvedAlpha,
+              }));
+            }
             markWidgetPulse(widget.id);
           }}
         />
@@ -2847,6 +2885,70 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
                             }
                           />
                         </label>
+                      </div>
+                      <div className="controls-field-row controls-field-row--single">
+                        <label className="controls-field">
+                          <span>Alpha Topic (optional)</span>
+                          <input
+                            className="editor-input"
+                            value={selectedWidget.alphaTopic ?? ""}
+                            onChange={(event) =>
+                              updateSelectedThrowDraw((widget) => ({
+                                ...widget,
+                                alphaTopic: event.target.value,
+                              }))
+                            }
+                          />
+                        </label>
+                      </div>
+                      <div className="controls-field-row controls-field-row--3">
+                        <label className="controls-field">
+                          <span>Alpha Min</span>
+                          <input
+                            type="number"
+                            step={0.1}
+                            className="editor-input"
+                            value={selectedWidget.alphaMin ?? 0}
+                            onChange={(event) =>
+                              updateSelectedThrowDraw((widget) => ({
+                                ...widget,
+                                alphaMin: readNumber(event.target.value, widget.alphaMin ?? 0),
+                              }))
+                            }
+                          />
+                        </label>
+                        <label className="controls-field">
+                          <span>Alpha Max</span>
+                          <input
+                            type="number"
+                            step={0.1}
+                            className="editor-input"
+                            value={selectedWidget.alphaMax ?? 40}
+                            onChange={(event) =>
+                              updateSelectedThrowDraw((widget) => ({
+                                ...widget,
+                                alphaMax: readNumber(event.target.value, widget.alphaMax ?? 40),
+                              }))
+                            }
+                          />
+                        </label>
+                        <label className="controls-field">
+                          <span>Alpha Safe Max</span>
+                          <input
+                            type="number"
+                            step={0.1}
+                            className="editor-input"
+                            value={selectedWidget.alphaSafeMax ?? 20}
+                            onChange={(event) =>
+                              updateSelectedThrowDraw((widget) => ({
+                                ...widget,
+                                alphaSafeMax: readNumber(event.target.value, widget.alphaSafeMax ?? 20),
+                              }))
+                            }
+                          />
+                        </label>
+                      </div>
+                      <div className="controls-field-row">
                         <label className="controls-field">
                           <span>Charge Time (ms)</span>
                           <input

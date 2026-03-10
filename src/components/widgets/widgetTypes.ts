@@ -162,6 +162,10 @@ export type ThrowDrawWidget = WidgetBase & {
   kind: "throw-draw";
   angleTopic: string;
   powerTopic: string;
+  alphaTopic?: string;
+  alphaMin?: number;
+  alphaMax?: number;
+  alphaSafeMax?: number;
   angleMin: number;
   angleMax: number;
   durationMin: number;

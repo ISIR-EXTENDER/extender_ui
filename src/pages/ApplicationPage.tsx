@@ -210,6 +210,7 @@ export function ApplicationPage({
   const [throwDrawWidgetValues, setThrowDrawWidgetValues] = useState<
     Record<string, { angle: number; duration: number }>
   >({});
+  const [throwDrawAlphaValues, setThrowDrawAlphaValues] = useState<Record<string, number>>({});
   const [measureViewMode, setMeasureViewMode] = useState<MeasureViewMode>("live");
   const [capturedMeasureImageDataUrl, setCapturedMeasureImageDataUrl] = useState<string | null>(
     null
@@ -720,6 +721,15 @@ export function ApplicationPage({
     if (clamped <= PETANQUE_ALPHA_SAFE_MAX) {
       alphaUnsafeValidatedRef.current = false;
     }
+    setThrowDrawAlphaValues((prev) => {
+      const next = { ...prev };
+      for (const widget of widgets) {
+        if (widget.kind === "throw-draw" && widget.alphaTopic === PETANQUE_ALPHA_TOPIC) {
+          next[widget.id] = clamped;
+        }
+      }
+      return next;
+    });
     setMaxVelocityWidgetValues((prev) => {
       const next = { ...prev };
       for (const widget of widgets) {
@@ -1172,6 +1182,28 @@ export function ApplicationPage({
       const angleMax = Math.max(widget.angleMin, widget.angleMax);
       const durationMin = Math.min(widget.durationMin, widget.durationMax);
       const durationMax = Math.max(widget.durationMin, widget.durationMax);
+      const hasAlphaControl =
+        typeof widget.alphaTopic === "string" && widget.alphaTopic.trim().length > 0;
+      const alphaMin = Math.min(widget.alphaMin ?? 0, widget.alphaMax ?? PETANQUE_ALPHA_MAX);
+      const alphaMax = Math.max(widget.alphaMin ?? 0, widget.alphaMax ?? PETANQUE_ALPHA_MAX);
+      const alphaWidget =
+        hasAlphaControl
+          ? widgets.find(
+              (candidate) =>
+                candidate.kind === "max-velocity" && candidate.topic === widget.alphaTopic
+            ) ?? null
+          : null;
+      const drawAlphaValueFromState = throwDrawAlphaValues[widget.id];
+      const alphaWidgetValue = alphaWidget ? maxVelocityWidgetValues[alphaWidget.id] : undefined;
+      const drawAlphaValue = hasAlphaControl
+        ? typeof drawAlphaValueFromState === "number"
+          ? drawAlphaValueFromState
+          : typeof alphaWidgetValue === "number"
+          ? alphaWidgetValue
+          : widget.alphaTopic === PETANQUE_ALPHA_TOPIC
+            ? PETANQUE_DEFAULT_ALPHA
+            : alphaMin
+        : undefined;
       const defaultDuration =
         widget.powerTopic === PETANQUE_TOTAL_DURATION_TOPIC
           ? PETANQUE_DEFAULT_TOTAL_DURATION_S
@@ -1182,6 +1214,46 @@ export function ApplicationPage({
       };
       const clampedAngle = Math.max(angleMin, Math.min(angleMax, drawValue.angle));
       const clampedDuration = Math.max(durationMin, Math.min(durationMax, drawValue.duration));
+      const applyDrawAlpha = (rawNextAlpha: number) => {
+        if (!hasAlphaControl) return;
+        let resolvedAlpha = Math.max(alphaMin, Math.min(alphaMax, rawNextAlpha));
+        setThrowDrawAlphaValues((prev) => ({
+          ...prev,
+          [widget.id]: resolvedAlpha,
+        }));
+        if (widget.alphaTopic === PETANQUE_ALPHA_TOPIC) {
+          if (resolvedAlpha > PETANQUE_ALPHA_SAFE_MAX) {
+            if (!alphaUnsafeValidatedRef.current) {
+              const confirmed = window.confirm(
+                `Alpha above ${PETANQUE_ALPHA_SAFE_MAX} is not safe. Validate this value?`
+              );
+              if (!confirmed) {
+                resolvedAlpha = PETANQUE_ALPHA_SAFE_MAX;
+              } else {
+                alphaUnsafeValidatedRef.current = true;
+              }
+            }
+          } else {
+            alphaUnsafeValidatedRef.current = false;
+          }
+          setThrowDrawAlphaValues((prev) => ({
+            ...prev,
+            [widget.id]: resolvedAlpha,
+          }));
+          setPetanqueAlpha(resolvedAlpha);
+          return;
+        }
+        setMaxVelocityWidgetValues((prev) => {
+          const nextValues = { ...prev };
+          for (const candidate of widgets) {
+            if (candidate.kind !== "max-velocity") continue;
+            if (candidate.topic === widget.alphaTopic) {
+              nextValues[candidate.id] = resolvedAlpha;
+            }
+          }
+          return nextValues;
+        });
+      };
       return (
         <ThrowDrawWidget
           key={widget.id}
@@ -1189,9 +1261,10 @@ export function ApplicationPage({
           selected={false}
           onSelect={() => {}}
           onRectChange={NOOP_RECT_CHANGE}
-          onLabelChange={NOOP_TEXT_CHANGE}
           angleValue={clampedAngle}
           durationValue={clampedDuration}
+          alphaValue={drawAlphaValue}
+          onAlphaChange={hasAlphaControl ? (nextAlpha) => applyDrawAlpha(nextAlpha) : undefined}
           onValueChange={(next) => {
             const resolvedAngle =
               typeof next.angle === "number"
@@ -1242,6 +1315,9 @@ export function ApplicationPage({
                 type: "petanque_cfg",
                 ...cfg,
               });
+            }
+            if (typeof next.alpha === "number") {
+              applyDrawAlpha(next.alpha);
             }
             if (next.throwRequested) {
               sendPetanqueStateCommand("throw");

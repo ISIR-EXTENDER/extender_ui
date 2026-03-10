@@ -79,7 +79,11 @@
         "y": 109,
         "w": 308,
         "h": 108
-      }
+      },
+      "reverseDirection": true,
+      "endpointLeftLabel": "Slow",
+      "endpointRightLabel": "Fast",
+      "bubbleMode": "power"
     },
     {
       "id": "widget-1772022467451-82a89",
@@ -206,7 +210,10 @@
         "y": 109,
         "w": 208,
         "h": 108
-      }
+      },
+      "endpointLeftLabel": "Left",
+      "endpointRightLabel": "Right",
+      "bubbleMode": "degrees"
     },
     {
       "id": "pet-magnet",
@@ -241,5 +248,5 @@
     "presetId": "hd",
     "runtimeMode": "fit"
   },
-  "updatedAt": "2026-03-10T20:40:41.294Z"
+  "updatedAt": "2026-03-10T22:12:37.167Z"
 }

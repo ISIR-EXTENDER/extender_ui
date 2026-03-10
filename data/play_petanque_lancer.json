@@ -70,7 +70,11 @@
         "y": 178,
         "w": 490,
         "h": 157
-      }
+      },
+      "reverseDirection": true,
+      "endpointLeftLabel": "Slow",
+      "endpointRightLabel": "Fast",
+      "bubbleMode": "power"
     },
     {
       "id": "play-lancer-angle",
@@ -85,7 +89,10 @@
         "y": 178,
         "w": 309,
         "h": 157
-      }
+      },
+      "endpointLeftLabel": "Left",
+      "endpointRightLabel": "Right",
+      "bubbleMode": "degrees"
     },
     {
       "id": "play-lancer-rviz",
@@ -118,7 +125,11 @@
         "y": 178,
         "w": 401,
         "h": 157
-      }
+      },
+      "unsafeThreshold": 20,
+      "endpointLeftLabel": "Tirer",
+      "endpointRightLabel": "Pointer",
+      "bubbleMode": "degrees-unit"
     },
     {
       "id": "widget-1773160339405-ed04c",
@@ -182,5 +193,5 @@
     "presetId": "hd",
     "runtimeMode": "fit"
   },
-  "updatedAt": "2026-03-10T20:45:58.404Z"
+  "updatedAt": "2026-03-10T21:58:34.699Z"
 }
