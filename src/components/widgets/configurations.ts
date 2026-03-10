@@ -698,7 +698,7 @@ export const DEFAULT_DEMO_CONFIGURATIONS: WidgetConfiguration[] = [
       label: "Alpha",
       topic: "/petanque_throw/alpha",
       min: 0,
-      max: 1,
+      max: 20,
       step: 0.01,
       rect: { w: 220, h: 92 },
     }),
@@ -1056,7 +1056,10 @@ const normalizePetanqueSliderRanges = (
   configurations: WidgetConfiguration[]
 ): WidgetConfiguration[] => {
   return configurations.map((configuration) => {
-    if (configuration.name !== "petanque") return configuration;
+    const isPetanqueConfig =
+      configuration.name === "petanque" ||
+      configuration.name === "play_petanque_lancer";
+    if (!isPetanqueConfig) return configuration;
 
     let changed = false;
     const nextWidgets = configuration.widgets.map((widget) => {
@@ -1085,6 +1088,23 @@ const normalizePetanqueSliderRanges = (
           min: -0.26,
           max: 0.26,
           step: 0.005,
+        };
+        if (
+          widget.min !== normalized.min ||
+          widget.max !== normalized.max ||
+          widget.step !== normalized.step
+        ) {
+          changed = true;
+        }
+        return normalized;
+      }
+
+      if (widget.topic === "/petanque_throw/alpha") {
+        const normalized = {
+          ...widget,
+          min: 0,
+          max: 20,
+          step: 0.01,
         };
         if (
           widget.min !== normalized.min ||
