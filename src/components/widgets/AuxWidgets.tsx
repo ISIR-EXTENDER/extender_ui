@@ -607,6 +607,7 @@ export function StreamDisplayWidget({
   const webcamPickerId = `stream-webcam-picker-${widget.id}`;
   const trimmedStreamUrl = widget.streamUrl.trim();
   const isHttpStream = /^https?:\/\//i.test(trimmedStreamUrl);
+  const isInlineImageStream = /^data:image\//i.test(trimmedStreamUrl);
   const wantsWebcam =
     widget.source === "webcam" || /^webcam:\/\//i.test(trimmedStreamUrl);
   const canEmbedVisualization =
@@ -948,6 +949,7 @@ export function StreamDisplayWidget({
                   autoPlay
                   playsInline
                   muted
+                  data-stream-widget-id={widget.id}
                   style={{
                     objectFit: widget.fitMode,
                     display: webcamFrameReady ? "block" : "none",
@@ -962,12 +964,13 @@ export function StreamDisplayWidget({
               title={`${widget.label} visualization`}
               loading="lazy"
             />
-          ) : isHttpStream && !remoteImageFailed ? (
+          ) : (isHttpStream || isInlineImageStream) && !remoteImageFailed ? (
             <img
               className="controls-stream-media"
               src={widget.streamUrl}
               alt={`${widget.label} stream`}
               loading="lazy"
+              data-stream-widget-id={widget.id}
               style={{ objectFit: widget.fitMode }}
               onError={() => setRemoteImageFailed(true)}
             />

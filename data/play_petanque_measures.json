@@ -1,0 +1,146 @@
+{
+  "name": "play_petanque_measures",
+  "widgets": [
+    {
+      "id": "play-measure-title",
+      "kind": "text",
+      "label": "Text",
+      "topic": "/ui/text/play-measure-title",
+      "text": "PlayPetanque MEASURES",
+      "fontSize": 26,
+      "align": "left",
+      "rect": {
+        "x": 20,
+        "y": 20,
+        "w": 460,
+        "h": 56
+      }
+    },
+    {
+      "id": "play-measure-capture",
+      "kind": "button",
+      "label": "Capture Image",
+      "topic": "/petanque_measure/capture",
+      "payload": "capture",
+      "tone": "accent",
+      "rect": {
+        "x": 20,
+        "y": 90,
+        "w": 180,
+        "h": 58
+      }
+    },
+    {
+      "id": "play-measure-request",
+      "kind": "button",
+      "label": "Measure",
+      "topic": "/petanque_measure/request",
+      "payload": "measure",
+      "tone": "success",
+      "rect": {
+        "x": 210,
+        "y": 90,
+        "w": 180,
+        "h": 58
+      }
+    },
+    {
+      "id": "play-measure-refresh",
+      "kind": "button",
+      "label": "Refresh",
+      "topic": "/petanque_measure/refresh",
+      "payload": "refresh",
+      "tone": "default",
+      "rect": {
+        "x": 400,
+        "y": 90,
+        "w": 180,
+        "h": 58
+      }
+    },
+    {
+      "id": "play-measure-live",
+      "kind": "button",
+      "label": "Live Feed",
+      "topic": "/petanque_measure/view_live",
+      "payload": "live",
+      "tone": "default",
+      "rect": {
+        "x": 590,
+        "y": 90,
+        "w": 150,
+        "h": 58
+      }
+    },
+    {
+      "id": "play-measure-last",
+      "kind": "button",
+      "label": "Last Measure",
+      "topic": "/petanque_measure/view_result",
+      "payload": "result",
+      "tone": "default",
+      "rect": {
+        "x": 750,
+        "y": 90,
+        "w": 190,
+        "h": 58
+      }
+    },
+    {
+      "id": "play-measure-stream",
+      "kind": "stream-display",
+      "label": "Measure Camera",
+      "topic": "/camera/measures",
+      "source": "webcam",
+      "streamUrl": "webcam:///dev/video2",
+      "fitMode": "cover",
+      "showStatus": false,
+      "showUrl": false,
+      "overlayText": "live webcam",
+      "showHeader": false,
+      "showSourceBadge": false,
+      "showWebcamPicker": false,
+      "rect": {
+        "x": 20,
+        "y": 170,
+        "w": 900,
+        "h": 500
+      }
+    },
+    {
+      "id": "play-measure-vectors",
+      "kind": "textarea",
+      "label": "Measure Vectors",
+      "topic": "/petanque_measure/vectors",
+      "text": "No vectors yet.",
+      "fontSize": 15,
+      "rect": {
+        "x": 940,
+        "y": 170,
+        "w": 320,
+        "h": 500
+      }
+    },
+    {
+      "id": "play-measure-status",
+      "kind": "text",
+      "label": "Text",
+      "topic": "/petanque_measure/status",
+      "text": "Live feed active",
+      "fontSize": 18,
+      "align": "left",
+      "rect": {
+        "x": 20,
+        "y": 680,
+        "w": 1240,
+        "h": 30
+      }
+    }
+  ],
+  "poses": [],
+  "canvas": {
+    "presetId": "hd",
+    "runtimeMode": "fit"
+  },
+  "updatedAt": "2026-03-10T00:00:00.000Z"
+}
