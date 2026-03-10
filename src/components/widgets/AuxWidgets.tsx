@@ -105,7 +105,12 @@ type ThrowDrawWidgetProps = BaseWidgetProps & {
   onLabelChange: (nextLabel: string) => void;
   angleValue: number;
   durationValue: number;
-  onValueChange: (next: { angle?: number; duration?: number; powerPercent: number }) => void;
+  onValueChange: (next: {
+    angle?: number;
+    duration?: number;
+    powerPercent: number;
+    throwRequested?: boolean;
+  }) => void;
 };
 
 type GripperControlWidgetProps = BaseWidgetProps & {
@@ -665,24 +670,54 @@ export function ThrowDrawWidget({
 }: ThrowDrawWidgetProps) {
   const angleMin = Math.min(widget.angleMin, widget.angleMax);
   const angleMax = Math.max(widget.angleMin, widget.angleMax);
+  const angleSpan = Math.max(1e-6, angleMax - angleMin);
   const durationMin = Math.min(widget.durationMin, widget.durationMax);
   const durationMax = Math.max(widget.durationMin, widget.durationMax);
   const durationSpan = Math.max(1e-6, durationMax - durationMin);
   const holdToMaxMs = Math.max(250, widget.holdToMaxMs);
   const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
+  // Expand the drawable sector for accessibility while preserving real command range.
+  const drawAngleScale = 3.6;
+  const drawAngleHalfSpan = Math.min(
+    Math.PI * 0.48,
+    Math.max(Math.abs(angleMin), Math.abs(angleMax), 0.02) * drawAngleScale
+  );
+  const drawAngleMin = -drawAngleHalfSpan;
+  const drawAngleMax = drawAngleHalfSpan;
+  const drawAngleSpan = Math.max(1e-6, drawAngleMax - drawAngleMin);
+  const mapDrawAngleToActual = (drawAngle: number) => {
+    const clampedDrawAngle = clamp(drawAngle, drawAngleMin, drawAngleMax);
+    const t = (clampedDrawAngle - drawAngleMin) / drawAngleSpan;
+    return clamp(angleMin + t * angleSpan, angleMin, angleMax);
+  };
+  const mapActualAngleToDraw = (actualAngle: number) => {
+    const clampedActualAngle = clamp(actualAngle, angleMin, angleMax);
+    const t = (clampedActualAngle - angleMin) / angleSpan;
+    return clamp(drawAngleMin + t * drawAngleSpan, drawAngleMin, drawAngleMax);
+  };
   const toPowerPercent = (duration: number) =>
     clamp(((durationMax - duration) / durationSpan) * 100, 0, 100);
   const toDuration = (powerPercent: number) =>
     clamp(durationMax - (clamp(powerPercent, 0, 100) / 100) * durationSpan, durationMin, durationMax);
 
   const [angle, setAngle] = useState(() => clamp(angleValue, angleMin, angleMax));
-  const [powerPercent, setPowerPercent] = useState(() => toPowerPercent(durationValue));
+  const initialPowerPercent = toPowerPercent(durationValue);
+  const [powerPercent, setPowerPercent] = useState(() => initialPowerPercent);
   const [padSize, setPadSize] = useState({ w: 640, h: 360 });
   const [isDraggingAngle, setIsDraggingAngle] = useState(false);
   const [isChargingPower, setIsChargingPower] = useState(false);
+  const [hasAngleSelection, setHasAngleSelection] = useState(false);
+  const [activePointerId, setActivePointerId] = useState<number | null>(null);
   const padRef = useRef<HTMLDivElement | null>(null);
   const chargeStartRef = useRef<number | null>(null);
   const chargeRafRef = useRef<number | null>(null);
+  const powerPercentRef = useRef(initialPowerPercent);
+  const selectionDistanceThresholdPx = 24;
+
+  const setPowerPercentValue = (nextPowerPercent: number) => {
+    powerPercentRef.current = nextPowerPercent;
+    setPowerPercent(nextPowerPercent);
+  };
 
   useEffect(() => {
     if (!isDraggingAngle) {
@@ -691,8 +726,15 @@ export function ThrowDrawWidget({
   }, [angleValue, angleMin, angleMax, isDraggingAngle]);
 
   useEffect(() => {
+    if (hasAngleSelection || isDraggingAngle) return;
+    if (Math.abs(angleValue) > 1e-4) {
+      setHasAngleSelection(true);
+    }
+  }, [angleValue, hasAngleSelection, isDraggingAngle]);
+
+  useEffect(() => {
     if (!isChargingPower) {
-      setPowerPercent(toPowerPercent(durationValue));
+      setPowerPercentValue(toPowerPercent(durationValue));
     }
   }, [durationValue, durationMin, durationMax, isChargingPower]);
 
@@ -719,39 +761,18 @@ export function ThrowDrawWidget({
     };
   }, []);
 
-  const updateAngleFromPointer = (event: ReactPointerEvent<HTMLDivElement>) => {
-    const rect = padRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const originXPx = rect.width / 2;
-    const originYPx = rect.height * 0.84;
-    const dx = event.clientX - rect.left - originXPx;
-    const dy = originYPx - (event.clientY - rect.top);
-    const rawAngle = Math.atan2(dx, Math.max(1e-6, dy));
-    const clampedAngle = clamp(rawAngle, angleMin, angleMax);
-    setAngle(clampedAngle);
-    onValueChange({ angle: clampedAngle, powerPercent });
-  };
-
-  const stopPowerCharge = () => {
-    chargeStartRef.current = null;
-    if (chargeRafRef.current !== null) {
-      window.cancelAnimationFrame(chargeRafRef.current);
-      chargeRafRef.current = null;
-    }
-    setIsChargingPower(false);
-  };
-
-  const startPowerCharge = () => {
+  const startPowerInference = () => {
+    if (chargeStartRef.current !== null) return;
     chargeStartRef.current = performance.now();
     setIsChargingPower(true);
-    setPowerPercent(0);
+    setPowerPercentValue(0);
     onValueChange({ duration: toDuration(0), powerPercent: 0 });
 
     const step = (now: number) => {
       if (chargeStartRef.current === null) return;
       const elapsedMs = now - chargeStartRef.current;
       const nextPowerPercent = clamp((elapsedMs / holdToMaxMs) * 100, 0, 100);
-      setPowerPercent(nextPowerPercent);
+      setPowerPercentValue(nextPowerPercent);
       onValueChange({
         duration: toDuration(nextPowerPercent),
         powerPercent: nextPowerPercent,
@@ -763,6 +784,45 @@ export function ThrowDrawWidget({
     chargeRafRef.current = window.requestAnimationFrame(step);
   };
 
+  const updateAngleFromPointer = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const rect = padRef.current?.getBoundingClientRect();
+    if (!rect) return false;
+    const originXPx = rect.width / 2;
+    const originYPx = rect.height * 0.84;
+    const dx = event.clientX - rect.left - originXPx;
+    const dy = originYPx - (event.clientY - rect.top);
+    const dragDistance = Math.hypot(dx, dy);
+    if (dragDistance < selectionDistanceThresholdPx) return false;
+    const rawDrawAngle = Math.atan2(dx, Math.max(1e-6, dy));
+    const mappedAngle = mapDrawAngleToActual(rawDrawAngle);
+    setHasAngleSelection(true);
+    setAngle(mappedAngle);
+    startPowerInference();
+    onValueChange({ angle: mappedAngle, powerPercent });
+    return true;
+  };
+
+  const stopPowerCharge = () => {
+    chargeStartRef.current = null;
+    if (chargeRafRef.current !== null) {
+      window.cancelAnimationFrame(chargeRafRef.current);
+      chargeRafRef.current = null;
+    }
+    setIsChargingPower(false);
+  };
+
+  const finishPowerInference = (triggerThrow: boolean) => {
+    const wasCharging = chargeStartRef.current !== null;
+    stopPowerCharge();
+    if (!triggerThrow || !wasCharging) return;
+    const finalPowerPercent = clamp(powerPercentRef.current, 0, 100);
+    onValueChange({
+      duration: toDuration(finalPowerPercent),
+      powerPercent: finalPowerPercent,
+      throwRequested: true,
+    });
+  };
+
   const originX = padSize.w / 2;
   const originY = padSize.h * 0.84;
   const radius = Math.max(48, Math.min(padSize.w * 0.45, padSize.h * 0.74));
@@ -770,9 +830,9 @@ export function ThrowDrawWidget({
     x: originX + Math.sin(angleValueRad) * radius * scale,
     y: originY - Math.cos(angleValueRad) * radius * scale,
   });
-  const minPoint = pointForAngle(angleMin);
-  const maxPoint = pointForAngle(angleMax);
-  const currentPoint = pointForAngle(angle, 0.9);
+  const minPoint = pointForAngle(drawAngleMin);
+  const maxPoint = pointForAngle(drawAngleMax);
+  const currentPoint = pointForAngle(mapActualAngleToDraw(angle), 0.9);
   const arcPath = `M ${minPoint.x} ${minPoint.y} A ${radius} ${radius} 0 0 1 ${maxPoint.x} ${maxPoint.y}`;
 
   return (
@@ -790,9 +850,36 @@ export function ThrowDrawWidget({
       <div className="controls-throw-draw-widget">
         <div className="controls-throw-draw-header">
           <InlineEditableText value={widget.label} onCommit={onLabelChange} className="controls-inline-label" />
-          <div className="controls-throw-draw-readout">
-            <span>{((angle * 180) / Math.PI).toFixed(1)}°</span>
-            <span>{Math.round(powerPercent)}%</span>
+          <div className="controls-throw-draw-header-actions">
+            <div className="controls-throw-draw-readout">
+              <span>{((angle * 180) / Math.PI).toFixed(1)}°</span>
+              <span>{Math.round(powerPercent)}%</span>
+            </div>
+            <button
+              type="button"
+              className="controls-throw-draw-reset"
+              data-canvas-interactive="true"
+              onPointerDown={(event) => {
+                event.stopPropagation();
+              }}
+              onClick={(event) => {
+                event.stopPropagation();
+                stopPowerCharge();
+                setHasAngleSelection(false);
+                setIsDraggingAngle(false);
+                setActivePointerId(null);
+                const resetAngle = clamp(0, angleMin, angleMax);
+                setAngle(resetAngle);
+                setPowerPercentValue(0);
+                onValueChange({
+                  angle: resetAngle,
+                  duration: toDuration(0),
+                  powerPercent: 0,
+                });
+              }}
+            >
+              Reset
+            </button>
           </div>
         </div>
         <div
@@ -804,18 +891,28 @@ export function ThrowDrawWidget({
             event.preventDefault();
             event.currentTarget.setPointerCapture(event.pointerId);
             setIsDraggingAngle(true);
+            setActivePointerId(event.pointerId);
             updateAngleFromPointer(event);
           }}
           onPointerMove={(event) => {
             if (!isDraggingAngle) return;
+            if (activePointerId !== null && event.pointerId !== activePointerId) return;
             event.stopPropagation();
             updateAngleFromPointer(event);
           }}
           onPointerUp={(event) => {
+            if (activePointerId !== null && event.pointerId !== activePointerId) return;
             event.stopPropagation();
             setIsDraggingAngle(false);
+            setActivePointerId(null);
+            finishPowerInference(true);
           }}
-          onPointerCancel={() => setIsDraggingAngle(false)}
+          onPointerCancel={(event) => {
+            if (activePointerId !== null && event.pointerId !== activePointerId) return;
+            setIsDraggingAngle(false);
+            setActivePointerId(null);
+            finishPowerInference(false);
+          }}
         >
           <svg
             className="controls-throw-draw-svg"
@@ -838,35 +935,19 @@ export function ThrowDrawWidget({
               y1={originY}
               x2={currentPoint.x}
               y2={currentPoint.y}
+              style={{ opacity: hasAngleSelection ? 1 : 0 }}
             />
             <circle
               className="controls-throw-draw-target"
               cx={currentPoint.x}
               cy={currentPoint.y}
               r={Math.max(10, radius * 0.04)}
+              style={{ opacity: hasAngleSelection ? 1 : 0 }}
             />
           </svg>
-          <button
-            type="button"
-            className={`controls-throw-draw-charge ${isChargingPower ? "is-active" : ""}`.trim()}
-            data-canvas-interactive="true"
-            onPointerDown={(event) => {
-              event.stopPropagation();
-              event.preventDefault();
-              event.currentTarget.setPointerCapture(event.pointerId);
-              startPowerCharge();
-            }}
-            onPointerUp={(event) => {
-              event.stopPropagation();
-              stopPowerCharge();
-            }}
-            onPointerCancel={(event) => {
-              event.stopPropagation();
-              stopPowerCharge();
-            }}
-          >
-            Hold
-          </button>
+          {!hasAngleSelection ? (
+            <div className="controls-throw-draw-hint">Draw angle, keep pressed to charge, release to throw.</div>
+          ) : null}
         </div>
         <div className="controls-throw-draw-power-row">
           <span>Power</span>

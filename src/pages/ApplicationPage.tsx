@@ -1243,6 +1243,9 @@ export function ApplicationPage({
                 ...cfg,
               });
             }
+            if (next.throwRequested) {
+              sendPetanqueStateCommand("throw");
+            }
             markWidgetPulse(widget.id);
           }}
         />
