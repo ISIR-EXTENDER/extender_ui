@@ -10,7 +10,9 @@ export function useWsConnection() {
   useEffect(() => {
     const unsubscribeStatus = wsClient.onStatus(setWsStatus);
     const unsubscribeMessage = wsClient.onMessage((msg) => {
-      setWsState(msg);
+      if (msg.type === "state") {
+        setWsState(msg);
+      }
     });
 
     wsClient.connect();

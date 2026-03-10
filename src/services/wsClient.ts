@@ -51,7 +51,7 @@ export class WsClient {
     };
     this.socket.onmessage = (event) => {
       const msg = this.safeParse(event.data);
-      if (msg && msg.type === "state") {
+      if (msg) {
         this.emitMessage(msg);
       }
     };
@@ -92,7 +92,12 @@ export class WsClient {
   private safeParse(raw: string): WsIncoming | null {
     try {
       const parsed = JSON.parse(raw) as WsIncoming;
-      if (parsed && parsed.type === "state") {
+      if (
+        parsed &&
+        (parsed.type === "state" ||
+          parsed.type === "event" ||
+          parsed.type === "measure_result")
+      ) {
         return parsed;
       }
       return null;

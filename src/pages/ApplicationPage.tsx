@@ -54,6 +54,15 @@ const PETANQUE_TOTAL_DURATION_MIN_S = 0.9;
 const PETANQUE_TOTAL_DURATION_MAX_S = 3.0;
 const PETANQUE_DEFAULT_TOTAL_DURATION_S = 1.1;
 const PETANQUE_DEFAULT_ALPHA = 0;
+const PLAY_PETANQUE_MEASURES_SCREEN_ID = "play_petanque_measures";
+const PLAY_PETANQUE_MEASURE_STREAM_WIDGET_ID = "play-measure-stream";
+const PLAY_PETANQUE_MEASURE_STATUS_TOPIC = "/petanque_measure/status";
+const PLAY_PETANQUE_MEASURE_VECTORS_TOPIC = "/petanque_measure/vectors";
+const PLAY_PETANQUE_MEASURE_CAPTURE_TOPIC = "/petanque_measure/capture";
+const PLAY_PETANQUE_MEASURE_REQUEST_TOPIC = "/petanque_measure/request";
+const PLAY_PETANQUE_MEASURE_REFRESH_TOPIC = "/petanque_measure/refresh";
+const PLAY_PETANQUE_MEASURE_VIEW_LIVE_TOPIC = "/petanque_measure/view_live";
+const PLAY_PETANQUE_MEASURE_VIEW_RESULT_TOPIC = "/petanque_measure/view_result";
 const TELEOP_CONFIG_TRANSLATION_GAIN_TOPIC = "/teleop_config/translation_gain";
 const TELEOP_CONFIG_ROTATION_GAIN_TOPIC = "/teleop_config/rotation_gain";
 const TELEOP_CONFIG_LINEAR_SCALE_X_TOPIC = "/teleop_config/linear_scale_x";
@@ -85,6 +94,7 @@ const PETANQUE_COMMANDS = [
 type PetanqueStateCommand = (typeof PETANQUE_COMMANDS)[number];
 type PetanqueFlowStage = "teleop" | "start_ready";
 type SliderChannel = "z" | "rz";
+type MeasureViewMode = "live" | "result";
 type TeleopConfigButtonState = {
   active: boolean;
   tone: "default" | "accent" | "success" | "danger";
@@ -177,6 +187,17 @@ export function ApplicationPage({
   const [rosbagStatus, setRosbagStatus] = useState("idle");
   const [petanqueFlowStage, setPetanqueFlowStage] = useState<PetanqueFlowStage>("teleop");
   const [maxVelocityWidgetValues, setMaxVelocityWidgetValues] = useState<Record<string, number>>({});
+  const [measureViewMode, setMeasureViewMode] = useState<MeasureViewMode>("live");
+  const [capturedMeasureImageDataUrl, setCapturedMeasureImageDataUrl] = useState<string | null>(
+    null
+  );
+  const [measureResultImageDataUrl, setMeasureResultImageDataUrl] = useState<string | null>(
+    null
+  );
+  const [measureVectorsJson, setMeasureVectorsJson] = useState<string | null>(null);
+  const [measureStatusText, setMeasureStatusText] = useState("Live feed active");
+  const [measureLastUpdatedAtMs, setMeasureLastUpdatedAtMs] = useState<number | null>(null);
+  const [measureRequestPending, setMeasureRequestPending] = useState(false);
   const hasSentPetanqueDurationDefaultRef = useRef(false);
   const canvasViewportRef = useRef<HTMLDivElement | null>(null);
   const [canvasViewportSize, setCanvasViewportSize] = useState<{ width: number; height: number }>({
@@ -278,6 +299,39 @@ export function ApplicationPage({
     onNavigateToScreen(activeScreenId);
   }, [activeScreenId, onNavigateToScreen, routeScreenId]);
 
+  useEffect(() => {
+    const unsubscribe = wsClient.onMessage((message) => {
+      if (message.type === "measure_result") {
+        if (message.image_data_url) {
+          setMeasureResultImageDataUrl(message.image_data_url);
+        }
+        if (typeof message.vectors_json === "string") {
+          setMeasureVectorsJson(message.vectors_json);
+        }
+        setMeasureLastUpdatedAtMs(message.updated_at_ms ?? Date.now());
+        setMeasureStatusText("Measure result updated");
+        setMeasureRequestPending(false);
+        setMeasureViewMode("result");
+        return;
+      }
+
+      if (
+        message.type === "event" &&
+        message.code.startsWith("MEASURE_") &&
+        message.message.trim()
+      ) {
+        setMeasureStatusText(message.message.trim());
+        if (message.code === "MEASURE_REQUEST_FAILED") {
+          setMeasureRequestPending(false);
+        }
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, []);
+
   const allowedScreenIds = useMemo(
     () => new Set(activeApplication?.screenIds ?? []),
     [activeApplication]
@@ -327,6 +381,82 @@ export function ApplicationPage({
 
   const isWidgetFresh = (widgetId: string) =>
     freshnessClock - (widgetPulseMap[widgetId] ?? 0) <= TOPIC_FRESHNESS_MS;
+
+  const isMeasureScreen =
+    activeScreenId === PLAY_PETANQUE_MEASURES_SCREEN_ID;
+
+  const isMeasureButtonTopic = (topic: string) =>
+    topic === PLAY_PETANQUE_MEASURE_CAPTURE_TOPIC ||
+    topic === PLAY_PETANQUE_MEASURE_REQUEST_TOPIC ||
+    topic === PLAY_PETANQUE_MEASURE_REFRESH_TOPIC ||
+    topic === PLAY_PETANQUE_MEASURE_VIEW_LIVE_TOPIC ||
+    topic === PLAY_PETANQUE_MEASURE_VIEW_RESULT_TOPIC;
+
+  const resolveMeasureStreamWidgetId = () => {
+    const configured = widgets.find(
+      (item) =>
+        item.kind === "stream-display" &&
+        item.id === PLAY_PETANQUE_MEASURE_STREAM_WIDGET_ID
+    );
+    if (configured) return configured.id;
+
+    const fallback = widgets.find(
+      (item) => item.kind === "stream-display" && item.source === "webcam"
+    );
+    return fallback?.id ?? null;
+  };
+
+  const captureImageDataUrlFromStreamWidget = (widgetId: string): string | null => {
+    if (typeof document === "undefined") return null;
+
+    const videoEl =
+      Array.from(
+        document.querySelectorAll<HTMLVideoElement>("video[data-stream-widget-id]")
+      ).find((node) => node.dataset.streamWidgetId === widgetId) ?? null;
+    if (videoEl && videoEl.videoWidth > 0 && videoEl.videoHeight > 0) {
+      const canvas = document.createElement("canvas");
+      canvas.width = videoEl.videoWidth;
+      canvas.height = videoEl.videoHeight;
+      const context = canvas.getContext("2d");
+      if (!context) return null;
+      try {
+        context.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+        return canvas.toDataURL("image/jpeg", 0.92);
+      } catch {
+        return null;
+      }
+    }
+
+    const imageEl =
+      Array.from(
+        document.querySelectorAll<HTMLImageElement>("img[data-stream-widget-id]")
+      ).find((node) => node.dataset.streamWidgetId === widgetId) ?? null;
+    if (imageEl && imageEl.naturalWidth > 0 && imageEl.naturalHeight > 0) {
+      const canvas = document.createElement("canvas");
+      canvas.width = imageEl.naturalWidth;
+      canvas.height = imageEl.naturalHeight;
+      const context = canvas.getContext("2d");
+      if (!context) return null;
+      try {
+        context.drawImage(imageEl, 0, 0, canvas.width, canvas.height);
+        return canvas.toDataURL("image/jpeg", 0.92);
+      } catch {
+        return null;
+      }
+    }
+
+    return null;
+  };
+
+  const formatMeasureVectorsText = () => {
+    if (!measureVectorsJson || !measureVectorsJson.trim()) return "No vectors yet.";
+    try {
+      const parsed = JSON.parse(measureVectorsJson);
+      return JSON.stringify(parsed, null, 2);
+    } catch {
+      return measureVectorsJson;
+    }
+  };
 
   const resolveSliderChannel = (
     widget: Extract<CanvasWidget, { kind: "slider" }>
@@ -709,10 +839,22 @@ export function ApplicationPage({
     }
 
     if (widget.kind === "text") {
+      const runtimeTextWidget =
+        isMeasureScreen && widget.topic === PLAY_PETANQUE_MEASURE_STATUS_TOPIC
+          ? {
+              ...widget,
+              text:
+                measureLastUpdatedAtMs != null
+                  ? `${measureStatusText} (updated ${new Date(
+                      measureLastUpdatedAtMs
+                    ).toLocaleTimeString()})`
+                  : measureStatusText,
+            }
+          : widget;
       return (
         <TextWidget
           key={widget.id}
-          widget={widget}
+          widget={runtimeTextWidget}
           selected={false}
           onSelect={() => {}}
           onRectChange={NOOP_RECT_CHANGE}
@@ -722,10 +864,17 @@ export function ApplicationPage({
     }
 
     if (widget.kind === "textarea") {
+      const runtimeTextareaWidget =
+        isMeasureScreen && widget.topic === PLAY_PETANQUE_MEASURE_VECTORS_TOPIC
+          ? {
+              ...widget,
+              text: formatMeasureVectorsText(),
+            }
+          : widget;
       return (
         <TextareaWidget
           key={widget.id}
-          widget={widget}
+          widget={runtimeTextareaWidget}
           selected={false}
           onSelect={() => {}}
           onRectChange={NOOP_RECT_CHANGE}
@@ -739,15 +888,37 @@ export function ApplicationPage({
       const isStateMachineButton =
         widget.topic === PETANQUE_STATE_TOPIC && petanqueCommand !== null;
       const isTeleopConfigButton = isTeleopConfigButtonTopic(widget.topic);
+      const isMeasureButton =
+        isMeasureScreen && isMeasureButtonTopic(widget.topic);
       const petanqueButtonState = isStateMachineButton && petanqueCommand
         ? getPetanqueButtonState(petanqueCommand)
         : null;
       const teleopConfigButtonState = isTeleopConfigButton
         ? getTeleopConfigButtonState(widget.topic)
         : null;
+      const measureButtonActive =
+        widget.topic === PLAY_PETANQUE_MEASURE_VIEW_LIVE_TOPIC
+          ? measureViewMode === "live"
+          : widget.topic === PLAY_PETANQUE_MEASURE_VIEW_RESULT_TOPIC
+            ? measureViewMode === "result"
+            : false;
+      const measureButtonTone =
+        widget.topic === PLAY_PETANQUE_MEASURE_REQUEST_TOPIC
+          ? "success"
+          : widget.topic === PLAY_PETANQUE_MEASURE_CAPTURE_TOPIC
+            ? "accent"
+            : widget.topic === PLAY_PETANQUE_MEASURE_VIEW_RESULT_TOPIC && measureButtonActive
+              ? "accent"
+              : widget.topic === PLAY_PETANQUE_MEASURE_VIEW_LIVE_TOPIC && measureButtonActive
+                ? "accent"
+                : widget.tone ?? "default";
+      const measureButtonDisabled =
+        widget.topic === PLAY_PETANQUE_MEASURE_REQUEST_TOPIC && measureRequestPending;
       const runtimeButtonWidget = isTeleopConfigButton
         ? { ...widget, label: getTeleopConfigButtonLabel(widget) }
-        : widget;
+        : isMeasureButton && widget.topic === PLAY_PETANQUE_MEASURE_REQUEST_TOPIC && measureRequestPending
+          ? { ...widget, label: "Measuring..." }
+          : widget;
 
       return (
         <ActionButtonWidget
@@ -757,15 +928,99 @@ export function ApplicationPage({
           onSelect={() => {}}
           onRectChange={NOOP_RECT_CHANGE}
           onLabelChange={NOOP_TEXT_CHANGE}
-          disabled={petanqueButtonState?.disabled ?? false}
-          active={petanqueButtonState?.active ?? teleopConfigButtonState?.active ?? false}
+          disabled={
+            isMeasureButton
+              ? measureButtonDisabled
+              : (petanqueButtonState?.disabled ?? false)
+          }
+          active={
+            isMeasureButton
+              ? measureButtonActive
+              : (petanqueButtonState?.active ?? teleopConfigButtonState?.active ?? false)
+          }
           tone={
-            petanqueButtonState?.tone ??
-            teleopConfigButtonState?.tone ??
-            widget.tone ??
-            "default"
+            isMeasureButton
+              ? measureButtonTone
+              : (
+                  petanqueButtonState?.tone ??
+                  teleopConfigButtonState?.tone ??
+                  widget.tone ??
+                  "default"
+                )
           }
           onTrigger={() => {
+            if (isMeasureButton) {
+              if (widget.topic === PLAY_PETANQUE_MEASURE_VIEW_LIVE_TOPIC) {
+                setMeasureViewMode("live");
+                setMeasureStatusText("Live feed active");
+                markWidgetPulse(widget.id);
+                return;
+              }
+
+              if (widget.topic === PLAY_PETANQUE_MEASURE_VIEW_RESULT_TOPIC) {
+                setMeasureViewMode("result");
+                setMeasureStatusText(
+                  measureResultImageDataUrl
+                    ? "Showing cached measure result"
+                    : "No measure result available yet"
+                );
+                markWidgetPulse(widget.id);
+                return;
+              }
+
+              if (widget.topic === PLAY_PETANQUE_MEASURE_CAPTURE_TOPIC) {
+                const streamWidgetId = resolveMeasureStreamWidgetId();
+                const captured =
+                  streamWidgetId == null
+                    ? null
+                    : captureImageDataUrlFromStreamWidget(streamWidgetId);
+                if (!captured) {
+                  setMeasureStatusText("Capture failed: no visible frame");
+                  markWidgetPulse(widget.id);
+                  return;
+                }
+                setCapturedMeasureImageDataUrl(captured);
+                setMeasureStatusText("Image captured");
+                markWidgetPulse(widget.id);
+                return;
+              }
+
+              if (widget.topic === PLAY_PETANQUE_MEASURE_REQUEST_TOPIC) {
+                let imageToSend = capturedMeasureImageDataUrl;
+                if (!imageToSend) {
+                  const streamWidgetId = resolveMeasureStreamWidgetId();
+                  imageToSend =
+                    streamWidgetId == null
+                      ? null
+                      : captureImageDataUrlFromStreamWidget(streamWidgetId);
+                }
+                if (!imageToSend) {
+                  setMeasureStatusText(
+                    "Measure failed: capture an image first or switch to live feed"
+                  );
+                  markWidgetPulse(widget.id);
+                  return;
+                }
+                setCapturedMeasureImageDataUrl(imageToSend);
+                wsClient.send({
+                  type: "measure_request",
+                  image_data_url: imageToSend,
+                });
+                setMeasureRequestPending(true);
+                setMeasureStatusText("Measure request sent");
+                markWidgetPulse(widget.id);
+                return;
+              }
+
+              if (widget.topic === PLAY_PETANQUE_MEASURE_REFRESH_TOPIC) {
+                wsClient.send({ type: "measure_refresh" });
+                setMeasureViewMode("result");
+                setMeasureStatusText("Requested latest measure result");
+                markWidgetPulse(widget.id);
+                return;
+              }
+            }
+
             if (isStateMachineButton && petanqueCommand) {
               if (petanqueButtonState?.disabled) return;
               wsClient.send({
@@ -980,32 +1235,46 @@ export function ApplicationPage({
     }
 
     if (widget.kind === "stream-display") {
+      const runtimeStreamWidget =
+        isMeasureScreen &&
+        widget.id === PLAY_PETANQUE_MEASURE_STREAM_WIDGET_ID &&
+        measureViewMode === "result"
+          ? {
+              ...widget,
+              source: "visualization" as const,
+              streamUrl: measureResultImageDataUrl ?? "",
+              showWebcamPicker: false,
+              overlayText: measureResultImageDataUrl
+                ? "latest measure"
+                : "no measured image yet",
+            }
+          : widget;
       const url =
-        widget.source === "camera"
+        runtimeStreamWidget.source === "camera"
           ? cameraStreamUrl
-          : widget.source === "rviz"
+          : runtimeStreamWidget.source === "rviz"
             ? rvizStreamUrl
-            : widget.source === "visualization"
-              ? resolveVisualizationUrlForRuntime(widget.streamUrl)
-              : widget.streamUrl;
+            : runtimeStreamWidget.source === "visualization"
+              ? resolveVisualizationUrlForRuntime(runtimeStreamWidget.streamUrl)
+              : runtimeStreamWidget.streamUrl;
       const sourceStatus =
-        widget.source === "rviz"
+        runtimeStreamWidget.source === "rviz"
           ? "RViz stream"
-          : widget.source === "visualization"
+          : runtimeStreamWidget.source === "visualization"
             ? "Visualization stream"
-            : widget.source === "webcam"
+            : runtimeStreamWidget.source === "webcam"
               ? "Webcam stream"
               : "Camera stream";
       return (
         <StreamDisplayWidget
           key={widget.id}
           widget={{
-            ...widget,
-            streamUrl: url || widget.streamUrl,
-            fitMode: widget.fitMode ?? "contain",
-            showStatus: widget.showStatus ?? true,
-            showUrl: widget.showUrl ?? true,
-            overlayText: widget.overlayText ?? "stream preview",
+            ...runtimeStreamWidget,
+            streamUrl: url || runtimeStreamWidget.streamUrl,
+            fitMode: runtimeStreamWidget.fitMode ?? "contain",
+            showStatus: runtimeStreamWidget.showStatus ?? true,
+            showUrl: runtimeStreamWidget.showUrl ?? true,
+            overlayText: runtimeStreamWidget.overlayText ?? "stream preview",
           }}
           selected={false}
           onSelect={() => {}}

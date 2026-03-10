@@ -18,6 +18,25 @@ export type WsState = {
   joint_torques?: number[];
 };
 
-export type WsIncoming = WsState & {
+export type WsStateMessage = WsState & {
   type: "state";
 };
+
+export type WsEventMessage = {
+  type: "event";
+  severity: "info" | "warning" | "error";
+  code: string;
+  message: string;
+};
+
+export type WsMeasureResultMessage = {
+  type: "measure_result";
+  image_data_url: string | null;
+  vectors_json: string | null;
+  updated_at_ms: number | null;
+};
+
+export type WsIncoming =
+  | WsStateMessage
+  | WsEventMessage
+  | WsMeasureResultMessage;

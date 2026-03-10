@@ -812,6 +812,77 @@ export const DEFAULT_DEMO_CONFIGURATIONS: WidgetConfiguration[] = [
     }),
   ]),
 
+  createDemoConfiguration("play_petanque_measures", [
+    createDemoWidget("play-measure-title", "text", 20, 20, {
+      text: "PlayPetanque MEASURES",
+      fontSize: 26,
+      rect: { w: 460, h: 56 },
+    }),
+    createDemoWidget("play-measure-capture", "button", 20, 90, {
+      label: "Capture Image",
+      topic: "/petanque_measure/capture",
+      payload: "capture",
+      tone: "accent",
+      rect: { w: 180, h: 58 },
+    }),
+    createDemoWidget("play-measure-request", "button", 210, 90, {
+      label: "Measure",
+      topic: "/petanque_measure/request",
+      payload: "measure",
+      tone: "success",
+      rect: { w: 180, h: 58 },
+    }),
+    createDemoWidget("play-measure-refresh", "button", 400, 90, {
+      label: "Refresh",
+      topic: "/petanque_measure/refresh",
+      payload: "refresh",
+      tone: "default",
+      rect: { w: 180, h: 58 },
+    }),
+    createDemoWidget("play-measure-live", "button", 590, 90, {
+      label: "Live Feed",
+      topic: "/petanque_measure/view_live",
+      payload: "live",
+      tone: "default",
+      rect: { w: 150, h: 58 },
+    }),
+    createDemoWidget("play-measure-last", "button", 750, 90, {
+      label: "Last Measure",
+      topic: "/petanque_measure/view_result",
+      payload: "result",
+      tone: "default",
+      rect: { w: 190, h: 58 },
+    }),
+    createDemoWidget("play-measure-stream", "stream-display", 20, 170, {
+      label: "Measure Camera",
+      topic: "/camera/measures",
+      source: "webcam",
+      streamUrl: "webcam:///dev/video2",
+      fitMode: "cover",
+      showStatus: false,
+      showUrl: false,
+      overlayText: "live webcam",
+      showHeader: false,
+      showSourceBadge: false,
+      showWebcamPicker: false,
+      rect: { w: 900, h: 500 },
+    }),
+    createDemoWidget("play-measure-vectors", "textarea", 940, 170, {
+      label: "Measure Vectors",
+      topic: "/petanque_measure/vectors",
+      text: "No vectors yet.",
+      fontSize: 15,
+      rect: { w: 320, h: 500 },
+    }),
+    createDemoWidget("play-measure-status", "text", 20, 680, {
+      text: "Live feed active",
+      topic: "/petanque_measure/status",
+      fontSize: 18,
+      align: "left",
+      rect: { w: 1240, h: 30 },
+    }),
+  ]),
+
   createDemoConfiguration("curves", [
     createDemoWidget("curves-title", "text", 20, 20, {
       text: "Curves & Metrics",
