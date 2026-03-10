@@ -49,9 +49,19 @@ export default function App() {
       if (target.closest("input, textarea, select, [contenteditable='true']")) return;
       event.preventDefault();
     };
+    const handleContextMenu = (event: MouseEvent) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+      if (!target.closest(".application-runtime-page")) return;
+      event.preventDefault();
+    };
 
     document.addEventListener("dblclick", handleDoubleClick, true);
-    return () => document.removeEventListener("dblclick", handleDoubleClick, true);
+    document.addEventListener("contextmenu", handleContextMenu, true);
+    return () => {
+      document.removeEventListener("dblclick", handleDoubleClick, true);
+      document.removeEventListener("contextmenu", handleContextMenu, true);
+    };
   }, [route.kind]);
 
   const guardedNavigate = (nextRoute: AppRoute) => {

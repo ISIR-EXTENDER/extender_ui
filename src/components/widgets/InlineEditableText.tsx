@@ -9,6 +9,8 @@ type InlineEditableTextProps = {
   emptyFallback?: ReactNode;
 };
 
+type ReadonlyAwareCommitHandler = ((nextValue: string) => void) & { __readonly?: boolean };
+
 export function InlineEditableText({
   value,
   onCommit,
@@ -19,6 +21,7 @@ export function InlineEditableText({
 }: InlineEditableTextProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState(value);
+  const isEditable = !(onCommit as ReadonlyAwareCommitHandler).__readonly;
 
   useEffect(() => {
     if (!isEditing) {
@@ -71,12 +74,16 @@ export function InlineEditableText({
     <Tag
       data-canvas-interactive="true"
       className={className}
-      onDoubleClick={(event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        setIsEditing(true);
-      }}
-      title="Double click to edit"
+      onDoubleClick={
+        isEditable
+          ? (event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              setIsEditing(true);
+            }
+          : undefined
+      }
+      title={isEditable ? "Double click to edit" : undefined}
     >
       {value || emptyFallback}
     </Tag>

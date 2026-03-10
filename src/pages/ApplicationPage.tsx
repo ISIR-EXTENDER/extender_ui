@@ -37,6 +37,7 @@ import {
 import { wsClient } from "../services/wsClient";
 import { useTeleopStore } from "../store/teleopStore";
 import { useUiStore } from "../store/uiStore";
+import defaultMeasureDemoImage from "../assets/image_measures.png";
 
 type ApplicationPageProps = {
   applicationId: string;
@@ -70,6 +71,15 @@ const PLAY_PETANQUE_MEASURE_REQUEST_TOPIC = "/petanque_measure/request";
 const PLAY_PETANQUE_MEASURE_REFRESH_TOPIC = "/petanque_measure/refresh";
 const PLAY_PETANQUE_MEASURE_VIEW_LIVE_TOPIC = "/petanque_measure/view_live";
 const PLAY_PETANQUE_MEASURE_VIEW_RESULT_TOPIC = "/petanque_measure/view_result";
+const MEASURE_DEMO_HISTORY_ID = "measure-demo-image-measures";
+const MEASURE_DEMO_VECTORS_JSON = JSON.stringify(
+  {
+    source: "image_measures_demo",
+    distances_cm: [27.9],
+  },
+  null,
+  2
+);
 const TELEOP_CONFIG_TRANSLATION_GAIN_TOPIC = "/teleop_config/translation_gain";
 const TELEOP_CONFIG_ROTATION_GAIN_TOPIC = "/teleop_config/rotation_gain";
 const TELEOP_CONFIG_LINEAR_SCALE_X_TOPIC = "/teleop_config/linear_scale_x";
@@ -104,6 +114,13 @@ type PetanqueFlowStage = "teleop" | "start_ready";
 type SliderChannel = "z" | "rz";
 type PetanqueAlphaPreset = "pointer" | "tirer";
 type MeasureViewMode = "live" | "result";
+type MeasureResultHistoryEntry = {
+  id: string;
+  imageDataUrl: string;
+  vectorsJson: string | null;
+  updatedAtMs: number | null;
+  source: "demo" | "opencv";
+};
 type TeleopConfigButtonState = {
   active: boolean;
   tone: "default" | "accent" | "success" | "danger";
@@ -125,7 +142,10 @@ const formatMaxVelocityPowerPercent = (
 };
 
 const NOOP_RECT_CHANGE: (next: CanvasRect) => void = () => {};
-const NOOP_TEXT_CHANGE: (next: string) => void = () => {};
+const NOOP_TEXT_CHANGE = Object.assign(
+  (_next: string) => {},
+  { __readonly: true as const }
+);
 const toScreenClassToken = (screenId: string) =>
   screenId.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-");
 const resolveVisualizationUrlForRuntime = (rawUrl: string) => {
@@ -140,6 +160,14 @@ const resolveVisualizationUrlForRuntime = (rawUrl: string) => {
   } catch {
     return rawUrl;
   }
+};
+
+const MEASURE_DEMO_HISTORY_ENTRY: MeasureResultHistoryEntry = {
+  id: MEASURE_DEMO_HISTORY_ID,
+  imageDataUrl: defaultMeasureDemoImage,
+  vectorsJson: MEASURE_DEMO_VECTORS_JSON,
+  updatedAtMs: null,
+  source: "demo",
 };
 
 export function ApplicationPage({
@@ -216,12 +244,15 @@ export function ApplicationPage({
     null
   );
   const [measureResultImageDataUrl, setMeasureResultImageDataUrl] = useState<string | null>(
-    null
+    () => MEASURE_DEMO_HISTORY_ENTRY.imageDataUrl
   );
-  const [measureVectorsJson, setMeasureVectorsJson] = useState<string | null>(null);
-  const [measureStatusText, setMeasureStatusText] = useState("Live feed active");
+  const [measureVectorsJson, setMeasureVectorsJson] = useState<string | null>(
+    () => MEASURE_DEMO_HISTORY_ENTRY.vectorsJson
+  );
+  const [measureStatusText, setMeasureStatusText] = useState("Live feed active (demo available)");
   const [measureLastUpdatedAtMs, setMeasureLastUpdatedAtMs] = useState<number | null>(null);
   const [measureRequestPending, setMeasureRequestPending] = useState(false);
+  const measureResultHistoryRef = useRef<MeasureResultHistoryEntry[]>([MEASURE_DEMO_HISTORY_ENTRY]);
   const hasSentPetanqueDurationDefaultRef = useRef(false);
   const alphaUnsafeValidatedRef = useRef(false);
   const canvasViewportRef = useRef<HTMLDivElement | null>(null);
@@ -327,11 +358,21 @@ export function ApplicationPage({
   useEffect(() => {
     const unsubscribe = wsClient.onMessage((message) => {
       if (message.type === "measure_result") {
-        if (message.image_data_url) {
-          setMeasureResultImageDataUrl(message.image_data_url);
+        const resultImageDataUrl = message.image_data_url;
+        const resultVectorsJson =
+          typeof message.vectors_json === "string" ? message.vectors_json : null;
+        if (resultImageDataUrl) {
+          setMeasureResultImageDataUrl(resultImageDataUrl);
+          pushMeasureResultHistory({
+            id: `measure-${message.updated_at_ms ?? Date.now()}`,
+            imageDataUrl: resultImageDataUrl,
+            vectorsJson: resultVectorsJson,
+            updatedAtMs: message.updated_at_ms ?? Date.now(),
+            source: "opencv",
+          });
         }
-        if (typeof message.vectors_json === "string") {
-          setMeasureVectorsJson(message.vectors_json);
+        if (resultVectorsJson) {
+          setMeasureVectorsJson(resultVectorsJson);
         }
         setMeasureLastUpdatedAtMs(message.updated_at_ms ?? Date.now());
         setMeasureStatusText("Measure result updated");
@@ -471,6 +512,18 @@ export function ApplicationPage({
     }
 
     return null;
+  };
+
+  const pushMeasureResultHistory = (entry: MeasureResultHistoryEntry) => {
+    const demoEntry =
+      measureResultHistoryRef.current.find((item) => item.id === MEASURE_DEMO_HISTORY_ID) ??
+      MEASURE_DEMO_HISTORY_ENTRY;
+    const nonDemo = measureResultHistoryRef.current.filter(
+      (item) =>
+        item.id !== MEASURE_DEMO_HISTORY_ID &&
+        item.imageDataUrl !== entry.imageDataUrl
+    );
+    measureResultHistoryRef.current = [entry, ...nonDemo].slice(0, 7).concat(demoEntry);
   };
 
   const formatMeasureVectorsText = () => {
@@ -1066,9 +1119,11 @@ export function ApplicationPage({
               if (widget.topic === PLAY_PETANQUE_MEASURE_VIEW_RESULT_TOPIC) {
                 setMeasureViewMode("result");
                 setMeasureStatusText(
-                  measureResultImageDataUrl
-                    ? "Showing cached measure result"
-                    : "No measure result available yet"
+                  measureResultImageDataUrl === MEASURE_DEMO_HISTORY_ENTRY.imageDataUrl
+                    ? "Showing demo measure image"
+                    : measureResultImageDataUrl
+                      ? "Showing cached measure result"
+                      : "No measure result available yet"
                 );
                 markWidgetPulse(widget.id);
                 return;
@@ -1556,9 +1611,12 @@ export function ApplicationPage({
               source: "visualization" as const,
               streamUrl: measureResultImageDataUrl ?? "",
               showWebcamPicker: false,
-              overlayText: measureResultImageDataUrl
-                ? "latest measure"
-                : "no measured image yet",
+              overlayText:
+                measureResultImageDataUrl === MEASURE_DEMO_HISTORY_ENTRY.imageDataUrl
+                  ? "demo measure"
+                  : measureResultImageDataUrl
+                    ? "latest measure"
+                    : "no measured image yet",
             }
           : widget;
       const url =
