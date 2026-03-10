@@ -488,7 +488,7 @@ export function ApplicationPage({
     }
     if (command === "pick_up") {
       return {
-        disabled: petanqueFlowStage !== "start_ready",
+        disabled: false,
         active: false,
         tone: "accent" as const,
       };

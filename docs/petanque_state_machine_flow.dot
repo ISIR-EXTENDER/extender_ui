@@ -55,11 +55,12 @@ digraph PetanqueFlow {
     color="#6b7280";
     style="rounded,dashed";
 
-    UI_TELEOP [fillcolor="#dcfce7", label="UI Stage: TELEOP\nEnabled: Teleop, Start\nDisabled: Home, Throw, Pick Up, Stop"];
+    UI_TELEOP [fillcolor="#dcfce7", label="UI Stage: TELEOP\nEnabled: Teleop, Start, Pick Up\nDisabled: Home, Throw, Stop"];
     UI_THROW_READY [fillcolor="#fde68a", label="UI Stage: THROW_READY\nEnabled: Teleop, Start, Home, Throw, Pick Up, Stop"];
 
     UI_TELEOP -> UI_THROW_READY [label="Start (activate_throw)"];
     UI_THROW_READY -> UI_THROW_READY [label="Home | Throw | Start"];
+    UI_TELEOP -> UI_TELEOP [label="Pick Up"];
     UI_THROW_READY -> UI_TELEOP [label="Teleop | Pick Up | Stop"];
   }
 }
