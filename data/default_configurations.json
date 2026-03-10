@@ -36,7 +36,7 @@
       "label": "Max Velocity",
       "topic": "/cmd/max_velocity",
       "min": 0,
-      "max": 2,
+      "max": 3,
       "step": 0.01,
       "rect": {
         "x": 40,
@@ -91,5 +91,5 @@
     "presetId": "hd",
     "runtimeMode": "left"
   },
-  "updatedAt": "2026-02-13T22:59:18.069Z"
+  "updatedAt": "2026-03-04T13:59:27.442Z"
 }

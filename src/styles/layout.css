@@ -1650,10 +1650,6 @@ body,
   gap: 0.45rem;
 }
 
-.controls-stream-widget.has-webcam-picker {
-  grid-template-rows: auto auto 1fr auto auto;
-}
-
 .controls-stream-title {
   font-weight: 800;
   font-size: 0.92rem;

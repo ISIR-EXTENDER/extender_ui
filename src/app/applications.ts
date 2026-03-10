@@ -21,6 +21,8 @@ const PEPR_PETANQUE_APP_NAME = "PEPR-Petanque";
 const PLAY_PETANQUE_APP_ID = "application-play-petanque";
 const PLAY_PETANQUE_APP_NAME = "PlayPetanque";
 const PLAY_PETANQUE_CAMERA_SCREEN_ID = "play_petanque_camera";
+const PLAY_PETANQUE_LANCER_SCREEN_ID = "play_petanque_lancer";
+const PLAY_PETANQUE_RAMASSAGE_SCREEN_ID = "play_petanque_ramassage";
 
 type DirectoryPickerHandle = {
   values: () => AsyncIterable<FileSystemHandle>;
@@ -112,7 +114,12 @@ const ensurePlayPetanqueApplication = (
   if (!source && !target) return applications;
 
   const baseScreenIds = source?.screenIds ?? target?.screenIds ?? [];
-  const nextScreenIds = uniqStrings([...baseScreenIds, PLAY_PETANQUE_CAMERA_SCREEN_ID]);
+  const nextScreenIds = uniqStrings([
+    ...baseScreenIds,
+    PLAY_PETANQUE_CAMERA_SCREEN_ID,
+    PLAY_PETANQUE_LANCER_SCREEN_ID,
+    PLAY_PETANQUE_RAMASSAGE_SCREEN_ID,
+  ]);
   const nextHomeScreenId =
     source?.homeScreenId && nextScreenIds.includes(source.homeScreenId)
       ? source.homeScreenId

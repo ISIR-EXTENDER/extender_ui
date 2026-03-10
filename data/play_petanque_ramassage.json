@@ -1,0 +1,146 @@
+{
+  "name": "play_petanque_ramassage",
+  "widgets": [
+    {
+      "id": "play-ram-pick-up",
+      "kind": "button",
+      "label": "Pick Up Ball",
+      "topic": "/petanque_state_machine/change_state",
+      "payload": "pick_up",
+      "tone": "accent",
+      "rect": {
+        "x": 1068,
+        "y": 53,
+        "w": 190,
+        "h": 58
+      }
+    },
+    {
+      "id": "play-ram-magnet",
+      "kind": "magnet-control",
+      "label": "Magnet",
+      "topic": "/hub/digital_output",
+      "onPayload": "electromagnet_on",
+      "offPayload": "electromagnet_off",
+      "rect": {
+        "x": 1045,
+        "y": 134,
+        "w": 220,
+        "h": 92
+      }
+    },
+    {
+      "id": "play-ram-camera",
+      "kind": "stream-display",
+      "label": "Ramassage Camera",
+      "topic": "/camera/ramassage",
+      "source": "webcam",
+      "streamUrl": "webcam:///dev/video2",
+      "fitMode": "cover",
+      "showStatus": false,
+      "showUrl": false,
+      "overlayText": "",
+      "rect": {
+        "x": 20,
+        "y": 25,
+        "w": 453,
+        "h": 349
+      },
+      "showHeader": false,
+      "showSourceBadge": false,
+      "showWebcamPicker": false
+    },
+    {
+      "id": "play-ram-rz",
+      "kind": "slider",
+      "binding": "rz",
+      "label": "RZ",
+      "topic": "/cmd/joystick_rz",
+      "direction": "horizontal",
+      "showLabel": true,
+      "showTopicInfo": false,
+      "labelAlign": "center",
+      "min": -1,
+      "max": 1,
+      "step": 0.01,
+      "rect": {
+        "x": 935,
+        "y": 288,
+        "w": 323,
+        "h": 86
+      }
+    },
+    {
+      "id": "play-ram-translation",
+      "kind": "joystick",
+      "binding": "joy",
+      "label": "Translation",
+      "topic": "/cmd/joystick",
+      "showTopicInfo": true,
+      "color": "#4a9eff",
+      "deadzone": 0.1,
+      "diskSize": 80,
+      "labels": {
+        "top": "Y+",
+        "right": "X+",
+        "bottom": "Y-",
+        "left": "X-"
+      },
+      "rect": {
+        "x": 584,
+        "y": 390,
+        "w": 329,
+        "h": 330
+      }
+    },
+    {
+      "id": "play-ram-rotation",
+      "kind": "joystick",
+      "binding": "rot",
+      "label": "Rotation",
+      "topic": "/cmd/joystick_rxry",
+      "showTopicInfo": true,
+      "color": "#ff4d67",
+      "deadzone": 0.1,
+      "diskSize": 80,
+      "labels": {
+        "top": "RY+",
+        "right": "RX+",
+        "bottom": "RY-",
+        "left": "RX-"
+      },
+      "rect": {
+        "x": 928,
+        "y": 390,
+        "w": 337,
+        "h": 330
+      }
+    },
+    {
+      "id": "play-ram-z",
+      "kind": "slider",
+      "binding": "z",
+      "label": "Z",
+      "topic": "/cmd/joystick_z",
+      "direction": "vertical",
+      "showLabel": true,
+      "showTopicInfo": false,
+      "labelAlign": "center",
+      "min": -1,
+      "max": 1,
+      "step": 0.01,
+      "rect": {
+        "x": 473,
+        "y": 390,
+        "w": 99,
+        "h": 330
+      }
+    }
+  ],
+  "poses": [],
+  "canvas": {
+    "presetId": "hd",
+    "runtimeMode": "fit"
+  },
+  "updatedAt": "2026-03-10T13:54:24.795Z"
+}
