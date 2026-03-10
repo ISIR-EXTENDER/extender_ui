@@ -1,0 +1,14 @@
+{
+  "id": "application-play-petanque",
+  "name": "PlayPetanque",
+  "screenIds": [
+    "petanque",
+    "petanque_teleop_config",
+    "play_petanque_camera",
+    "play_petanque_lancer",
+    "play_petanque_ramassage",
+    "play_petanque_measures"
+  ],
+  "homeScreenId": "petanque",
+  "updatedAt": "2026-03-10T16:32:02.637Z"
+}

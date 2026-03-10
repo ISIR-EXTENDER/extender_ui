@@ -9,10 +9,10 @@
       "payload": "pick_up",
       "tone": "accent",
       "rect": {
-        "x": 1068,
-        "y": 53,
-        "w": 190,
-        "h": 58
+        "x": 1019,
+        "y": 15,
+        "w": 243,
+        "h": 84
       }
     },
     {
@@ -23,10 +23,10 @@
       "onPayload": "electromagnet_on",
       "offPayload": "electromagnet_off",
       "rect": {
-        "x": 1045,
-        "y": 134,
-        "w": 220,
-        "h": 92
+        "x": 1027,
+        "y": 145,
+        "w": 235,
+        "h": 116
       }
     },
     {
@@ -41,34 +41,14 @@
       "showUrl": false,
       "overlayText": "",
       "rect": {
-        "x": 20,
-        "y": 25,
-        "w": 453,
-        "h": 349
+        "x": 0,
+        "y": 15,
+        "w": 709,
+        "h": 676
       },
       "showHeader": false,
       "showSourceBadge": false,
       "showWebcamPicker": false
-    },
-    {
-      "id": "play-ram-rz",
-      "kind": "slider",
-      "binding": "rz",
-      "label": "RZ",
-      "topic": "/cmd/joystick_rz",
-      "direction": "horizontal",
-      "showLabel": true,
-      "showTopicInfo": false,
-      "labelAlign": "center",
-      "min": -1,
-      "max": 1,
-      "step": 0.01,
-      "rect": {
-        "x": 935,
-        "y": 288,
-        "w": 323,
-        "h": 86
-      }
     },
     {
       "id": "play-ram-translation",
@@ -87,33 +67,10 @@
         "left": "X-"
       },
       "rect": {
-        "x": 584,
-        "y": 390,
-        "w": 329,
-        "h": 330
-      }
-    },
-    {
-      "id": "play-ram-rotation",
-      "kind": "joystick",
-      "binding": "rot",
-      "label": "Rotation",
-      "topic": "/cmd/joystick_rxry",
-      "showTopicInfo": true,
-      "color": "#ff4d67",
-      "deadzone": 0.1,
-      "diskSize": 80,
-      "labels": {
-        "top": "RY+",
-        "right": "RX+",
-        "bottom": "RY-",
-        "left": "RX-"
-      },
-      "rect": {
-        "x": 928,
-        "y": 390,
-        "w": 337,
-        "h": 330
+        "x": 881,
+        "y": 316,
+        "w": 399,
+        "h": 404
       }
     },
     {
@@ -130,10 +87,10 @@
       "max": 1,
       "step": 0.01,
       "rect": {
-        "x": 473,
-        "y": 390,
-        "w": 99,
-        "h": 330
+        "x": 734,
+        "y": 316,
+        "w": 133,
+        "h": 391
       }
     }
   ],
@@ -142,5 +99,5 @@
     "presetId": "hd",
     "runtimeMode": "fit"
   },
-  "updatedAt": "2026-03-10T13:54:24.795Z"
+  "updatedAt": "2026-03-10T14:10:20.006Z"
 }

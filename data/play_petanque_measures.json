@@ -5,7 +5,7 @@
       "id": "play-measure-title",
       "kind": "text",
       "label": "Text",
-      "topic": "/ui/text/play-measure-title",
+      "topic": "/ui/text",
       "text": "PlayPetanque MEASURES",
       "fontSize": 26,
       "align": "left",
@@ -97,15 +97,15 @@
       "showStatus": false,
       "showUrl": false,
       "overlayText": "live webcam",
-      "showHeader": false,
-      "showSourceBadge": false,
-      "showWebcamPicker": false,
       "rect": {
         "x": 20,
         "y": 170,
         "w": 900,
         "h": 500
-      }
+      },
+      "showHeader": false,
+      "showSourceBadge": false,
+      "showWebcamPicker": false
     },
     {
       "id": "play-measure-vectors",
@@ -142,5 +142,5 @@
     "presetId": "hd",
     "runtimeMode": "fit"
   },
-  "updatedAt": "2026-03-10T00:00:00.000Z"
+  "updatedAt": "2026-02-24T00:00:00.000Z"
 }

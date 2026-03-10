@@ -87,20 +87,6 @@
       }
     },
     {
-      "id": "play-lancer-drink",
-      "kind": "drink",
-      "label": "Drink",
-      "topic": "/ui/drink",
-      "videoUrl": "https://www.youtube.com/shorts/JQbLM2BUcLg",
-      "autoCloseOnEnd": true,
-      "rect": {
-        "x": 840,
-        "y": 90,
-        "w": 190,
-        "h": 58
-      }
-    },
-    {
       "id": "play-lancer-speed",
       "kind": "max-velocity",
       "label": "Throw Speed",
@@ -131,21 +117,6 @@
       }
     },
     {
-      "id": "play-lancer-alpha",
-      "kind": "max-velocity",
-      "label": "Alpha",
-      "topic": "/petanque_throw/alpha",
-      "min": 0,
-      "max": 20,
-      "step": 0.01,
-      "rect": {
-        "x": 830,
-        "y": 170,
-        "w": 220,
-        "h": 92
-      }
-    },
-    {
       "id": "play-lancer-rviz",
       "kind": "stream-display",
       "label": "Throw Visualization",
@@ -162,6 +133,35 @@
         "w": 1240,
         "h": 430
       }
+    },
+    {
+      "id": "widget-1773151004387-65104",
+      "kind": "max-velocity",
+      "label": "Alpha",
+      "topic": "/petanque_throw/alpha",
+      "min": 0,
+      "max": 20,
+      "step": 0.01,
+      "rect": {
+        "x": 852,
+        "y": 172,
+        "w": 373,
+        "h": 90
+      }
+    },
+    {
+      "id": "widget-1773160339405-ed04c",
+      "kind": "drink",
+      "label": "Drink",
+      "topic": "/ui/drink",
+      "videoUrl": "https://www.youtube.com/shorts/JQbLM2BUcLg",
+      "autoCloseOnEnd": true,
+      "rect": {
+        "x": 1063,
+        "y": 18,
+        "w": 197,
+        "h": 72
+      }
     }
   ],
   "poses": [],
@@ -169,5 +169,5 @@
     "presetId": "hd",
     "runtimeMode": "fit"
   },
-  "updatedAt": "2026-02-24T00:00:00.000Z"
+  "updatedAt": "2026-03-10T16:32:36.356Z"
 }
