@@ -146,6 +146,9 @@ export type StreamDisplayWidget = WidgetBase & {
   showStatus: boolean;
   showUrl: boolean;
   overlayText: string;
+  showHeader?: boolean;
+  showSourceBadge?: boolean;
+  showWebcamPicker?: boolean;
 };
 
 export type CurvesWidget = WidgetBase & {

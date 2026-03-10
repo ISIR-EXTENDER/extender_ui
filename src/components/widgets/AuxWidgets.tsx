@@ -716,6 +716,20 @@ export function StreamDisplayWidget({
         : widget.source === "webcam"
           ? "Webcam"
         : "Camera";
+  const showHeader = widget.showHeader ?? true;
+  const showSourceBadge = widget.showSourceBadge ?? true;
+  const showStatusRow = widget.showStatus ?? true;
+  const showUrlRow = widget.showUrl ?? true;
+  const showWebcamPicker = wantsWebcam && (widget.showWebcamPicker ?? true);
+  const streamGridTemplateRows = [
+    showHeader ? "auto" : null,
+    showWebcamPicker ? "auto" : null,
+    "1fr",
+    showStatusRow ? "auto" : null,
+    showUrlRow ? "auto" : null,
+  ]
+    .filter((row): row is string => row !== null)
+    .join(" ");
 
   useEffect(() => {
     setRemoteImageFailed(false);
@@ -884,14 +898,16 @@ export function StreamDisplayWidget({
       minSize={{ w: 220, h: 160 }}
       className="controls-stream-item"
     >
-      <div className={`controls-stream-widget ${wantsWebcam ? "has-webcam-picker" : ""}`.trim()}>
-        <div className="controls-stream-title-row">
-          <div className="controls-stream-title">
-            <InlineEditableText value={widget.label} onCommit={onLabelChange} className="controls-inline-label" />
+      <div className="controls-stream-widget" style={{ gridTemplateRows: streamGridTemplateRows }}>
+        {showHeader ? (
+          <div className="controls-stream-title-row">
+            <div className="controls-stream-title">
+              <InlineEditableText value={widget.label} onCommit={onLabelChange} className="controls-inline-label" />
+            </div>
+            {showSourceBadge ? <span className="controls-stream-source">{sourceLabel}</span> : null}
           </div>
-          <span className="controls-stream-source">{sourceLabel}</span>
-        </div>
-        {wantsWebcam ? (
+        ) : null}
+        {showWebcamPicker ? (
           <div className="controls-stream-picker-row">
             <label className="controls-stream-picker-label" htmlFor={webcamPickerId}>
               Camera
@@ -961,8 +977,8 @@ export function StreamDisplayWidget({
             </div>
           )}
         </div>
-        {widget.showStatus ? <div className="controls-stream-status">{statusText}</div> : null}
-        {widget.showUrl ? <div className="controls-stream-url">{widget.streamUrl || "no stream url"}</div> : null}
+        {showStatusRow ? <div className="controls-stream-status">{statusText}</div> : null}
+        {showUrlRow ? <div className="controls-stream-url">{widget.streamUrl || "no stream url"}</div> : null}
       </div>
     </CanvasItem>
   );

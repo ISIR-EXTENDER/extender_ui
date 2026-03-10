@@ -1,0 +1,159 @@
+{
+  "name": "play_petanque_lancer",
+  "widgets": [
+    {
+      "id": "play-lancer-title",
+      "kind": "text",
+      "label": "Text",
+      "topic": "/ui/text",
+      "text": "PlayPetanque LANCER",
+      "fontSize": 26,
+      "align": "left",
+      "rect": {
+        "x": 20,
+        "y": 20,
+        "w": 420,
+        "h": 56
+      }
+    },
+    {
+      "id": "play-lancer-teleop",
+      "kind": "button",
+      "label": "Teleop",
+      "topic": "/petanque_state_machine/change_state",
+      "payload": "teleop",
+      "tone": "default",
+      "rect": {
+        "x": 20,
+        "y": 90,
+        "w": 150,
+        "h": 58
+      }
+    },
+    {
+      "id": "play-lancer-start",
+      "kind": "button",
+      "label": "Start",
+      "topic": "/petanque_state_machine/change_state",
+      "payload": "activate_throw",
+      "tone": "accent",
+      "rect": {
+        "x": 180,
+        "y": 90,
+        "w": 170,
+        "h": 58
+      }
+    },
+    {
+      "id": "play-lancer-home",
+      "kind": "button",
+      "label": "Home",
+      "topic": "/petanque_state_machine/change_state",
+      "payload": "go_to_start",
+      "tone": "success",
+      "rect": {
+        "x": 360,
+        "y": 90,
+        "w": 150,
+        "h": 58
+      }
+    },
+    {
+      "id": "play-lancer-throw",
+      "kind": "button",
+      "label": "Throw",
+      "topic": "/petanque_state_machine/change_state",
+      "payload": "throw",
+      "tone": "danger",
+      "rect": {
+        "x": 520,
+        "y": 90,
+        "w": 150,
+        "h": 58
+      }
+    },
+    {
+      "id": "play-lancer-stop",
+      "kind": "button",
+      "label": "Stop",
+      "topic": "/petanque_state_machine/change_state",
+      "payload": "stop",
+      "tone": "danger",
+      "rect": {
+        "x": 680,
+        "y": 90,
+        "w": 150,
+        "h": 58
+      }
+    },
+    {
+      "id": "play-lancer-speed",
+      "kind": "max-velocity",
+      "label": "Throw Speed",
+      "topic": "/petanque_throw/total_duration",
+      "min": 0.9,
+      "max": 3,
+      "step": 0.1,
+      "rect": {
+        "x": 20,
+        "y": 170,
+        "w": 500,
+        "h": 92
+      }
+    },
+    {
+      "id": "play-lancer-angle",
+      "kind": "max-velocity",
+      "label": "Throw Angle",
+      "topic": "/petanque_throw/angle_between_start_and_finish",
+      "min": -0.26,
+      "max": 0.26,
+      "step": 0.005,
+      "rect": {
+        "x": 540,
+        "y": 170,
+        "w": 280,
+        "h": 92
+      }
+    },
+    {
+      "id": "play-lancer-alpha",
+      "kind": "max-velocity",
+      "label": "Alpha",
+      "topic": "/petanque_throw/alpha",
+      "min": 0,
+      "max": 1,
+      "step": 0.01,
+      "rect": {
+        "x": 830,
+        "y": 170,
+        "w": 220,
+        "h": 92
+      }
+    },
+    {
+      "id": "play-lancer-rviz",
+      "kind": "stream-display",
+      "label": "Throw Visualization",
+      "topic": "/petanque/rviz",
+      "source": "rviz",
+      "streamUrl": "webrtc://localhost:8001/stream",
+      "fitMode": "contain",
+      "showStatus": false,
+      "showUrl": false,
+      "overlayText": "throw trajectory",
+      "rect": {
+        "x": 20,
+        "y": 276,
+        "w": 1240,
+        "h": 430
+      }
+    }
+  ],
+  "poses": [],
+  "canvas": {
+    "presetId": "hd",
+    "runtimeMode": "fit"
+  },
+  "updatedAt": "2026-02-24T00:00:00.000Z"
+}

@@ -1,0 +1,44 @@
+{
+  "name": "play_petanque_camera",
+  "widgets": [
+    {
+      "id": "play-cam-title",
+      "kind": "text",
+      "label": "Text",
+      "topic": "/ui/text",
+      "text": "PlayPetanque Camera",
+      "fontSize": 26,
+      "align": "left",
+      "rect": {
+        "x": 20,
+        "y": 20,
+        "w": 420,
+        "h": 56
+      }
+    },
+    {
+      "id": "play-cam-feed",
+      "kind": "stream-display",
+      "label": "Webcam /dev/video2",
+      "topic": "/camera/play_petanque",
+      "source": "webcam",
+      "streamUrl": "webcam:///dev/video2",
+      "fitMode": "cover",
+      "showStatus": true,
+      "showUrl": true,
+      "overlayText": "webcam feed",
+      "rect": {
+        "x": 20,
+        "y": 90,
+        "w": 1240,
+        "h": 620
+      }
+    }
+  ],
+  "poses": [],
+  "canvas": {
+    "presetId": "hd",
+    "runtimeMode": "fit"
+  },
+  "updatedAt": "2026-02-24T00:00:00.000Z"
+}

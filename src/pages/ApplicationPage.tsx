@@ -49,9 +49,11 @@ const TOPIC_FRESHNESS_TICK_MS = 100;
 const PETANQUE_STATE_TOPIC = "/petanque_state_machine/change_state";
 const PETANQUE_TOTAL_DURATION_TOPIC = "/petanque_throw/total_duration";
 const PETANQUE_ANGLE_TOPIC = "/petanque_throw/angle_between_start_and_finish";
+const PETANQUE_ALPHA_TOPIC = "/petanque_throw/alpha";
 const PETANQUE_TOTAL_DURATION_MIN_S = 0.9;
 const PETANQUE_TOTAL_DURATION_MAX_S = 3.0;
 const PETANQUE_DEFAULT_TOTAL_DURATION_S = 1.1;
+const PETANQUE_DEFAULT_ALPHA = 0;
 const TELEOP_CONFIG_TRANSLATION_GAIN_TOPIC = "/teleop_config/translation_gain";
 const TELEOP_CONFIG_ROTATION_GAIN_TOPIC = "/teleop_config/rotation_gain";
 const TELEOP_CONFIG_LINEAR_SCALE_X_TOPIC = "/teleop_config/linear_scale_x";
@@ -486,7 +488,7 @@ export function ApplicationPage({
     }
     if (command === "pick_up") {
       return {
-        disabled: petanqueFlowStage !== "start_ready",
+        disabled: false,
         active: false,
         tone: "accent" as const,
       };
@@ -838,6 +840,8 @@ export function ApplicationPage({
                 ? PETANQUE_DEFAULT_TOTAL_DURATION_S
                 : widget.topic === PETANQUE_ANGLE_TOPIC
                   ? 0
+                  : widget.topic === PETANQUE_ALPHA_TOPIC
+                    ? PETANQUE_DEFAULT_ALPHA
                   : widget.topic === "/cmd/max_velocity"
                     ? maxVelocity
                     : 1;
@@ -910,6 +914,12 @@ export function ApplicationPage({
               wsClient.send({
                 type: "petanque_cfg",
                 angle_between_start_and_finish: nextValue,
+              });
+            }
+            if (widget.topic === PETANQUE_ALPHA_TOPIC) {
+              wsClient.send({
+                type: "petanque_cfg",
+                alpha: nextValue,
               });
             }
             markWidgetPulse(widget.id);
