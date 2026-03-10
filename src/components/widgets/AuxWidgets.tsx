@@ -590,14 +590,287 @@ export function StreamDisplayWidget({
   onLabelChange,
   statusText,
 }: StreamDisplayWidgetProps) {
+  type WebcamOption = {
+    deviceId: string;
+    label: string;
+  };
+  const [remoteImageFailed, setRemoteImageFailed] = useState(false);
+  const [webcamLoading, setWebcamLoading] = useState(false);
+  const [webcamError, setWebcamError] = useState<string | null>(null);
+  const [webcamFrameReady, setWebcamFrameReady] = useState(false);
+  const [webcamOptions, setWebcamOptions] = useState<WebcamOption[]>([]);
+  const [activeWebcamDeviceId, setActiveWebcamDeviceId] = useState("");
+  const [preferredWebcamDeviceId, setPreferredWebcamDeviceId] = useState("");
+  const webcamVideoRef = useRef<HTMLVideoElement | null>(null);
+  const webcamStreamRef = useRef<MediaStream | null>(null);
+  const webcamPreferenceKey = `extender.controls.webcam.device.${widget.id}`;
+  const webcamPickerId = `stream-webcam-picker-${widget.id}`;
+  const trimmedStreamUrl = widget.streamUrl.trim();
+  const isHttpStream = /^https?:\/\//i.test(trimmedStreamUrl);
+  const wantsWebcam =
+    widget.source === "webcam" || /^webcam:\/\//i.test(trimmedStreamUrl);
   const canEmbedVisualization =
-    widget.source === "visualization" && /^https?:\/\//i.test(widget.streamUrl);
+    widget.source === "visualization" && isHttpStream;
+  type WebcamSelector =
+    | { mode: "default" }
+    | { mode: "device_id"; value: string }
+    | { mode: "label_hint"; value: string };
+  const parseWebcamSelector = (rawUrl: string): WebcamSelector => {
+    const prefix = "webcam://";
+    if (!rawUrl.toLowerCase().startsWith(prefix)) return { mode: "default" };
+    const encodedSelector = rawUrl.slice(prefix.length).trim();
+    if (!encodedSelector || encodedSelector.toLowerCase() === "default") {
+      return { mode: "default" };
+    }
+
+    let decodedSelector = encodedSelector;
+    try {
+      decodedSelector = decodeURIComponent(encodedSelector);
+    } catch {
+      decodedSelector = encodedSelector;
+    }
+    const normalizedSelector = decodedSelector.trim().toLowerCase();
+    if (
+      normalizedSelector.startsWith("/dev/video") ||
+      /^video\d+$/i.test(normalizedSelector)
+    ) {
+      return { mode: "label_hint", value: normalizedSelector };
+    }
+    return { mode: "device_id", value: decodedSelector.trim() };
+  };
+  const normalizeVideoLabelHint = (value: string) =>
+    value.trim().toLowerCase().replace(/^\/dev\//, "");
+  const parseVideoNodeIndex = (hint: string): number | null => {
+    const match = hint.trim().toLowerCase().match(/(?:^|\/)video(\d+)$/);
+    if (!match) return null;
+    const index = Number.parseInt(match[1], 10);
+    return Number.isFinite(index) ? index : null;
+  };
+  const resolveVideoInputDeviceIdByLabelHint = async (hint: string) => {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+      return null;
+    }
+    const hintLower = hint.toLowerCase();
+    const normalizedHint = normalizeVideoLabelHint(hintLower);
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const videoInputs = devices.filter((device) => device.kind === "videoinput");
+
+    for (const device of devices) {
+      if (device.kind !== "videoinput" || !device.label) continue;
+      const labelLower = device.label.toLowerCase();
+      const normalizedLabel = normalizeVideoLabelHint(labelLower);
+      if (
+        labelLower.includes(hintLower) ||
+        normalizedLabel.includes(normalizedHint)
+      ) {
+        return device.deviceId;
+      }
+    }
+
+    const nodeIndex = parseVideoNodeIndex(hintLower);
+    if (nodeIndex != null && videoInputs.length) {
+      const indexCandidates = [nodeIndex, Math.floor(nodeIndex / 2), nodeIndex - 1];
+      const uniqueIndices = [...new Set(indexCandidates)];
+      for (const candidate of uniqueIndices) {
+        if (candidate >= 0 && candidate < videoInputs.length) {
+          const mapped = videoInputs[candidate];
+          if (mapped) return mapped.deviceId;
+        }
+      }
+    }
+    return null;
+  };
+  const describeWebcamError = (error: unknown) => {
+    if (error instanceof DOMException) {
+      if (error.name === "NotAllowedError") {
+        return "Webcam access denied.";
+      }
+      if (error.name === "NotFoundError") {
+        return "No webcam found.";
+      }
+      if (error.name === "NotReadableError") {
+        return "Webcam is busy.";
+      }
+      if (error.name === "OverconstrainedError") {
+        return "Requested webcam device is unavailable.";
+      }
+    }
+    return "Unable to start webcam.";
+  };
+  const listWebcamOptions = async (): Promise<WebcamOption[]> => {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+      return [];
+    }
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const videoInputs = devices.filter((device) => device.kind === "videoinput");
+    return videoInputs.map((device, index) => ({
+      deviceId: device.deviceId,
+      label: device.label?.trim() || `Camera ${index + 1}`,
+    }));
+  };
   const sourceLabel =
     widget.source === "rviz"
       ? "RViz"
       : widget.source === "visualization"
         ? "Visualization"
+        : widget.source === "webcam"
+          ? "Webcam"
         : "Camera";
+
+  useEffect(() => {
+    setRemoteImageFailed(false);
+  }, [widget.source, widget.streamUrl]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const saved = window.localStorage.getItem(webcamPreferenceKey) ?? "";
+      setPreferredWebcamDeviceId(saved);
+    } catch {
+      setPreferredWebcamDeviceId("");
+    }
+  }, [webcamPreferenceKey]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      if (!preferredWebcamDeviceId) {
+        window.localStorage.removeItem(webcamPreferenceKey);
+        return;
+      }
+      window.localStorage.setItem(webcamPreferenceKey, preferredWebcamDeviceId);
+    } catch {
+      // ignore storage errors
+    }
+  }, [preferredWebcamDeviceId, webcamPreferenceKey]);
+
+  useEffect(() => {
+    const stopCurrentStream = () => {
+      if (webcamVideoRef.current) {
+        webcamVideoRef.current.srcObject = null;
+      }
+      if (!webcamStreamRef.current) return;
+      for (const track of webcamStreamRef.current.getTracks()) {
+        track.stop();
+      }
+      webcamStreamRef.current = null;
+    };
+
+    if (!wantsWebcam) {
+      stopCurrentStream();
+      setWebcamLoading(false);
+      setWebcamError(null);
+      setWebcamFrameReady(false);
+      setWebcamOptions([]);
+      setActiveWebcamDeviceId("");
+      return;
+    }
+
+    let cancelled = false;
+    const startWebcam = async () => {
+      if (
+        typeof navigator === "undefined" ||
+        !navigator.mediaDevices ||
+        !navigator.mediaDevices.getUserMedia
+      ) {
+        setWebcamError("Webcam API not available in this browser.");
+        setWebcamLoading(false);
+        return;
+      }
+
+      setWebcamLoading(true);
+      setWebcamError(null);
+      setWebcamFrameReady(false);
+      stopCurrentStream();
+
+      try {
+        const selector = preferredWebcamDeviceId
+          ? ({ mode: "device_id", value: preferredWebcamDeviceId } as const)
+          : parseWebcamSelector(trimmedStreamUrl);
+        let stream: MediaStream;
+        if (selector.mode === "default") {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: false,
+          });
+        } else if (selector.mode === "device_id") {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { deviceId: { exact: selector.value } },
+            audio: false,
+          });
+        } else {
+          const probeStream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: false,
+          });
+          const hintedDeviceId = await resolveVideoInputDeviceIdByLabelHint(
+            selector.value
+          );
+          if (!hintedDeviceId) {
+            stream = probeStream;
+          } else {
+            const probeDeviceId =
+              probeStream.getVideoTracks()[0]?.getSettings().deviceId ?? null;
+            if (probeDeviceId === hintedDeviceId) {
+              stream = probeStream;
+            } else {
+              for (const track of probeStream.getTracks()) {
+                track.stop();
+              }
+              stream = await navigator.mediaDevices.getUserMedia({
+                video: { deviceId: { exact: hintedDeviceId } },
+                audio: false,
+              });
+            }
+          }
+        }
+        if (cancelled) {
+          for (const track of stream.getTracks()) {
+            track.stop();
+          }
+          return;
+        }
+        webcamStreamRef.current = stream;
+        const streamDeviceId =
+          stream.getVideoTracks()[0]?.getSettings().deviceId ?? "";
+        setActiveWebcamDeviceId(streamDeviceId);
+        const options = await listWebcamOptions();
+        if (!cancelled) {
+          setWebcamOptions(options);
+        }
+        if (webcamVideoRef.current) {
+          webcamVideoRef.current.srcObject = stream;
+          webcamVideoRef.current.onloadedmetadata = () => {
+            void webcamVideoRef.current?.play().catch(() => {
+              // autoplay can fail until user interaction; browser controls this.
+            });
+          };
+          webcamVideoRef.current.onplaying = () => {
+            setWebcamFrameReady(true);
+            setWebcamLoading(false);
+          };
+        }
+      } catch (error) {
+        if (cancelled) return;
+        setWebcamError(describeWebcamError(error));
+        setWebcamLoading(false);
+        setWebcamFrameReady(false);
+      }
+    };
+
+    void startWebcam();
+
+    return () => {
+      cancelled = true;
+      stopCurrentStream();
+    };
+  }, [preferredWebcamDeviceId, trimmedStreamUrl, wantsWebcam]);
+
+  const hasPreferredOption = webcamOptions.some(
+    (option) => option.deviceId === preferredWebcamDeviceId
+  );
+  const webcamPickerValue =
+    preferredWebcamDeviceId || activeWebcamDeviceId || "";
 
   return (
     <CanvasItem
@@ -611,20 +884,76 @@ export function StreamDisplayWidget({
       minSize={{ w: 220, h: 160 }}
       className="controls-stream-item"
     >
-      <div className="controls-stream-widget">
+      <div className={`controls-stream-widget ${wantsWebcam ? "has-webcam-picker" : ""}`.trim()}>
         <div className="controls-stream-title-row">
           <div className="controls-stream-title">
             <InlineEditableText value={widget.label} onCommit={onLabelChange} className="controls-inline-label" />
           </div>
           <span className="controls-stream-source">{sourceLabel}</span>
         </div>
+        {wantsWebcam ? (
+          <div className="controls-stream-picker-row">
+            <label className="controls-stream-picker-label" htmlFor={webcamPickerId}>
+              Camera
+            </label>
+            <select
+              id={webcamPickerId}
+              className="controls-stream-picker"
+              value={webcamPickerValue}
+              onChange={(event) => setPreferredWebcamDeviceId(event.target.value)}
+              data-canvas-interactive="true"
+            >
+              <option value="">Auto</option>
+              {preferredWebcamDeviceId && !hasPreferredOption ? (
+                <option value={preferredWebcamDeviceId}>
+                  Saved camera (unavailable)
+                </option>
+              ) : null}
+              {webcamOptions.map((option) => (
+                <option key={option.deviceId} value={option.deviceId}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : null}
         <div className={`controls-stream-view controls-stream-fit-${widget.fitMode}`}>
-          {canEmbedVisualization ? (
+          {wantsWebcam ? (
+            webcamError ? (
+              <div className="stream-placeholder">{webcamError}</div>
+            ) : (
+              <>
+                {!webcamFrameReady || webcamLoading ? (
+                  <div className="stream-placeholder">Starting webcam stream...</div>
+                ) : null}
+                <video
+                  ref={webcamVideoRef}
+                  className="controls-stream-media"
+                  autoPlay
+                  playsInline
+                  muted
+                  style={{
+                    objectFit: widget.fitMode,
+                    display: webcamFrameReady ? "block" : "none",
+                  }}
+                />
+              </>
+            )
+          ) : canEmbedVisualization ? (
             <iframe
               className="controls-stream-iframe"
               src={widget.streamUrl}
               title={`${widget.label} visualization`}
               loading="lazy"
+            />
+          ) : isHttpStream && !remoteImageFailed ? (
+            <img
+              className="controls-stream-media"
+              src={widget.streamUrl}
+              alt={`${widget.label} stream`}
+              loading="lazy"
+              style={{ objectFit: widget.fitMode }}
+              onError={() => setRemoteImageFailed(true)}
             />
           ) : (
             <div className="stream-placeholder">

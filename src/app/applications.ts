@@ -16,6 +16,11 @@ export type ApplicationConfig = {
 const STORAGE_KEY = "extender.controls.applications.v1";
 const PETANQUE_SCREEN_ID = "petanque";
 const PETANQUE_TELEOP_CONFIG_SCREEN_ID = "petanque_teleop_config";
+const PEPR_PETANQUE_APP_ID = "application-a50f";
+const PEPR_PETANQUE_APP_NAME = "PEPR-Petanque";
+const PLAY_PETANQUE_APP_ID = "application-play-petanque";
+const PLAY_PETANQUE_APP_NAME = "PlayPetanque";
+const PLAY_PETANQUE_CAMERA_SCREEN_ID = "play_petanque_camera";
 
 type DirectoryPickerHandle = {
   values: () => AsyncIterable<FileSystemHandle>;
@@ -49,6 +54,9 @@ const uniqStrings = (values: string[]) => {
   return result;
 };
 
+const arraysEqual = (left: string[], right: string[]) =>
+  left.length === right.length && left.every((value, index) => value === right[index]);
+
 const ensurePetanqueTeleopConfigScreen = (application: ApplicationConfig): ApplicationConfig => {
   if (!application.screenIds.includes(PETANQUE_SCREEN_ID)) return application;
   if (application.screenIds.includes(PETANQUE_TELEOP_CONFIG_SCREEN_ID)) return application;
@@ -72,6 +80,76 @@ const ensurePetanqueTeleopConfigScreen = (application: ApplicationConfig): Appli
     screenIds: normalizedScreenIds,
     homeScreenId: nextHomeScreenId,
   };
+};
+
+const ensurePlayPetanqueApplication = (
+  applications: ApplicationConfig[]
+): ApplicationConfig[] => {
+  const exactPeprSource = applications.find(
+    (application) =>
+      application.id === PEPR_PETANQUE_APP_ID ||
+      application.name === PEPR_PETANQUE_APP_NAME
+  );
+  const heuristicPeprSource = applications.find(
+    (application) =>
+      application.id !== ADMIN_DEMO_APP_ID &&
+      application.id !== PLAY_PETANQUE_APP_ID &&
+      application.screenIds.length <= 3 &&
+      application.screenIds.includes(PETANQUE_SCREEN_ID) &&
+      application.screenIds.includes(PETANQUE_TELEOP_CONFIG_SCREEN_ID)
+  );
+  const source =
+    exactPeprSource ??
+    heuristicPeprSource ??
+    null;
+  const targetIndex = applications.findIndex(
+    (application) =>
+      application.id === PLAY_PETANQUE_APP_ID ||
+      application.name.trim().toLowerCase() === PLAY_PETANQUE_APP_NAME.toLowerCase()
+  );
+  const target = targetIndex >= 0 ? applications[targetIndex] : null;
+
+  if (!source && !target) return applications;
+
+  const baseScreenIds = source?.screenIds ?? target?.screenIds ?? [];
+  const nextScreenIds = uniqStrings([...baseScreenIds, PLAY_PETANQUE_CAMERA_SCREEN_ID]);
+  const nextHomeScreenId =
+    source?.homeScreenId && nextScreenIds.includes(source.homeScreenId)
+      ? source.homeScreenId
+      : target?.homeScreenId && nextScreenIds.includes(target.homeScreenId)
+        ? target.homeScreenId
+        : nextScreenIds[0] ?? null;
+
+  if (target) {
+    const unchanged =
+      target.id === PLAY_PETANQUE_APP_ID &&
+      target.name === PLAY_PETANQUE_APP_NAME &&
+      target.homeScreenId === nextHomeScreenId &&
+      arraysEqual(target.screenIds, nextScreenIds);
+    if (unchanged) return applications;
+
+    const nextTarget: ApplicationConfig = {
+      ...target,
+      id: PLAY_PETANQUE_APP_ID,
+      name: PLAY_PETANQUE_APP_NAME,
+      screenIds: nextScreenIds,
+      homeScreenId: nextHomeScreenId,
+      updatedAt: new Date().toISOString(),
+    };
+
+    return applications.map((application, index) =>
+      index === targetIndex ? nextTarget : application
+    );
+  }
+
+  const nextApplication: ApplicationConfig = {
+    id: PLAY_PETANQUE_APP_ID,
+    name: PLAY_PETANQUE_APP_NAME,
+    screenIds: nextScreenIds,
+    homeScreenId: nextHomeScreenId,
+    updatedAt: new Date().toISOString(),
+  };
+  return [...applications, nextApplication].sort((a, b) => a.name.localeCompare(b.name));
 };
 
 const createDefaultAdminApplication = (): ApplicationConfig => ({
@@ -122,11 +200,13 @@ export function loadApplicationsFromLocalStorage(): ApplicationConfig[] {
     if (!raw) return [createDefaultAdminApplication()];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [createDefaultAdminApplication()];
-    const sanitized = parsed
-      .map(sanitizeApplication)
-      .filter((item): item is ApplicationConfig => item !== null)
-      .map(ensurePetanqueTeleopConfigScreen)
-      .sort((a, b) => a.name.localeCompare(b.name));
+    const sanitized = ensurePlayPetanqueApplication(
+      parsed
+        .map(sanitizeApplication)
+        .filter((item): item is ApplicationConfig => item !== null)
+        .map(ensurePetanqueTeleopConfigScreen)
+        .sort((a, b) => a.name.localeCompare(b.name))
+    );
     if (!sanitized.length) return [createDefaultAdminApplication()];
     if (sanitized.some((application) => application.id === ADMIN_DEMO_APP_ID)) {
       return sanitized;
@@ -230,5 +310,5 @@ export async function syncApplicationsFromFolder(
     merged = upsertApplication(merged, application);
   }
 
-  return merged;
+  return ensurePlayPetanqueApplication(merged);
 }
