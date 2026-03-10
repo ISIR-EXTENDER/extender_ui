@@ -2,20 +2,6 @@
   "name": "play_petanque_ramassage",
   "widgets": [
     {
-      "id": "play-ram-pick-up",
-      "kind": "button",
-      "label": "Pick Up Ball",
-      "topic": "/petanque_state_machine/change_state",
-      "payload": "pick_up",
-      "tone": "accent",
-      "rect": {
-        "x": 1019,
-        "y": 15,
-        "w": 243,
-        "h": 84
-      }
-    },
-    {
       "id": "play-ram-magnet",
       "kind": "magnet-control",
       "label": "Magnet",
@@ -92,6 +78,34 @@
         "w": 133,
         "h": 391
       }
+    },
+    {
+      "id": "widget-1773162473630-41019",
+      "kind": "button",
+      "label": "Teleop",
+      "topic": "/petanque_state_machine/change_state",
+      "payload": "teleop",
+      "tone": "default",
+      "rect": {
+        "x": 797,
+        "y": 31,
+        "w": 140,
+        "h": 52
+      }
+    },
+    {
+      "id": "widget-1773162503370-bef66",
+      "kind": "button",
+      "label": "Pick-up Pose",
+      "topic": "/petanque_state_machine/change_state",
+      "payload": "go_to_start",
+      "tone": "default",
+      "rect": {
+        "x": 989,
+        "y": 31,
+        "w": 140,
+        "h": 52
+      }
     }
   ],
   "poses": [],
@@ -99,5 +113,5 @@
     "presetId": "hd",
     "runtimeMode": "fit"
   },
-  "updatedAt": "2026-03-10T14:10:20.006Z"
+  "updatedAt": "2026-03-10T17:09:27.101Z"
 }

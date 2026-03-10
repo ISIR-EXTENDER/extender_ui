@@ -39,6 +39,21 @@ export default function App() {
     setIsEditorMode(route.kind === "canvas-design" && !focusMode);
   }, [focusMode, route.kind, setIsEditorMode]);
 
+  useEffect(() => {
+    if (route.kind !== "application") return;
+
+    const handleDoubleClick = (event: MouseEvent) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+      if (!target.closest(".application-runtime-page")) return;
+      if (target.closest("input, textarea, select, [contenteditable='true']")) return;
+      event.preventDefault();
+    };
+
+    document.addEventListener("dblclick", handleDoubleClick, true);
+    return () => document.removeEventListener("dblclick", handleDoubleClick, true);
+  }, [route.kind]);
+
   const guardedNavigate = (nextRoute: AppRoute) => {
     const leavingCanvasDesign = route.kind === "canvas-design" && nextRoute.kind !== "canvas-design";
     if (

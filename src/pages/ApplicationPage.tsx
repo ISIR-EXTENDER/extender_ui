@@ -51,6 +51,11 @@ const PETANQUE_STATE_TOPIC = "/petanque_state_machine/change_state";
 const PETANQUE_TOTAL_DURATION_TOPIC = "/petanque_throw/total_duration";
 const PETANQUE_ANGLE_TOPIC = "/petanque_throw/angle_between_start_and_finish";
 const PETANQUE_ALPHA_TOPIC = "/petanque_throw/alpha";
+const PETANQUE_ALPHA_PRESET_TOPIC = "/petanque_throw/alpha_preset";
+const PETANQUE_ALPHA_SAFE_MAX = 20;
+const PETANQUE_ALPHA_MAX = 40;
+const PETANQUE_ALPHA_POINTER = 20;
+const PETANQUE_ALPHA_TIRER = 0;
 const PETANQUE_TOTAL_DURATION_MIN_S = 0.9;
 const PETANQUE_TOTAL_DURATION_MAX_S = 3.0;
 const PETANQUE_DEFAULT_TOTAL_DURATION_S = 1.1;
@@ -91,10 +96,12 @@ const PETANQUE_COMMANDS = [
   "throw",
   "pick_up",
   "stop",
+  "test_loop",
 ] as const;
 type PetanqueStateCommand = (typeof PETANQUE_COMMANDS)[number];
 type PetanqueFlowStage = "teleop" | "start_ready";
 type SliderChannel = "z" | "rz";
+type PetanqueAlphaPreset = "pointer" | "tirer";
 type MeasureViewMode = "live" | "result";
 type TeleopConfigButtonState = {
   active: boolean;
@@ -200,6 +207,7 @@ export function ApplicationPage({
   const [measureLastUpdatedAtMs, setMeasureLastUpdatedAtMs] = useState<number | null>(null);
   const [measureRequestPending, setMeasureRequestPending] = useState(false);
   const hasSentPetanqueDurationDefaultRef = useRef(false);
+  const alphaUnsafeValidatedRef = useRef(false);
   const canvasViewportRef = useRef<HTMLDivElement | null>(null);
   const [canvasViewportSize, setCanvasViewportSize] = useState<{ width: number; height: number }>({
     width: 0,
@@ -481,6 +489,13 @@ export function ApplicationPage({
   const isPetanqueStateCommand = (value: string): value is PetanqueStateCommand =>
     (PETANQUE_COMMANDS as readonly string[]).includes(value);
 
+  const resolvePetanqueAlphaPreset = (value: string): PetanqueAlphaPreset | null => {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "pointer") return "pointer";
+    if (normalized === "tirer") return "tirer";
+    return null;
+  };
+
   const isTeleopConfigButtonTopic = (topic: string) =>
     topic === TELEOP_CONFIG_SWAP_XY_TOPIC ||
     topic === TELEOP_CONFIG_INVERT_LINEAR_X_TOPIC ||
@@ -631,6 +646,13 @@ export function ApplicationPage({
         tone: "danger" as const,
       };
     }
+    if (command === "test_loop") {
+      return {
+        disabled: false,
+        active: false,
+        tone: "accent" as const,
+      };
+    }
     return {
       disabled: false,
       active: false,
@@ -662,7 +684,46 @@ export function ApplicationPage({
     if (command === "throw") {
       // Throwing controller remains active after throw; keep throw-ready state.
       setPetanqueFlowStage("start_ready");
+      return;
     }
+    if (command === "test_loop") {
+      // test_loop is independent from the throw-ready UI flow.
+      return;
+    }
+  };
+
+  const sendPetanqueStateCommand = (command: PetanqueStateCommand) => {
+    wsClient.send({
+      type: "state_cmd",
+      command,
+    });
+    advancePetanqueFlow(command);
+  };
+
+  const setPetanqueAlpha = (nextValue: number) => {
+    const clamped = Math.max(0, Math.min(PETANQUE_ALPHA_MAX, nextValue));
+    if (clamped <= PETANQUE_ALPHA_SAFE_MAX) {
+      alphaUnsafeValidatedRef.current = false;
+    }
+    setMaxVelocityWidgetValues((prev) => {
+      const next = { ...prev };
+      for (const widget of widgets) {
+        if (widget.kind === "max-velocity" && widget.topic === PETANQUE_ALPHA_TOPIC) {
+          next[widget.id] = clamped;
+        }
+      }
+      return next;
+    });
+    wsClient.send({
+      type: "petanque_cfg",
+      alpha: clamped,
+    });
+  };
+
+  const triggerPetanqueAlphaPreset = (preset: PetanqueAlphaPreset) => {
+    const alpha = preset === "pointer" ? PETANQUE_ALPHA_POINTER : PETANQUE_ALPHA_TIRER;
+    setPetanqueAlpha(alpha);
+    sendPetanqueStateCommand("throw");
   };
 
   const upsertPose = (poses: PoseSnapshot[], pose: PoseSnapshot) => {
@@ -888,12 +949,25 @@ export function ApplicationPage({
       const petanqueCommand = isPetanqueStateCommand(widget.payload) ? widget.payload : null;
       const isStateMachineButton =
         widget.topic === PETANQUE_STATE_TOPIC && petanqueCommand !== null;
+      const petanqueAlphaPreset =
+        widget.topic === PETANQUE_ALPHA_PRESET_TOPIC
+          ? resolvePetanqueAlphaPreset(widget.payload)
+          : null;
+      const isPetanqueAlphaPresetButton = petanqueAlphaPreset !== null;
       const isTeleopConfigButton = isTeleopConfigButtonTopic(widget.topic);
       const isMeasureButton =
         isMeasureScreen && isMeasureButtonTopic(widget.topic);
       const petanqueButtonState = isStateMachineButton && petanqueCommand
         ? getPetanqueButtonState(petanqueCommand)
         : null;
+      const petanqueAlphaPresetDisabled =
+        isPetanqueAlphaPresetButton && petanqueFlowStage !== "start_ready";
+      const petanqueAlphaPresetTone =
+        petanqueAlphaPreset === "pointer"
+          ? "success"
+          : petanqueAlphaPreset === "tirer"
+            ? "danger"
+            : widget.tone ?? "default";
       const teleopConfigButtonState = isTeleopConfigButton
         ? getTeleopConfigButtonState(widget.topic)
         : null;
@@ -932,16 +1006,22 @@ export function ApplicationPage({
           disabled={
             isMeasureButton
               ? measureButtonDisabled
+              : isPetanqueAlphaPresetButton
+                ? petanqueAlphaPresetDisabled
               : (petanqueButtonState?.disabled ?? false)
           }
           active={
             isMeasureButton
               ? measureButtonActive
+              : isPetanqueAlphaPresetButton
+                ? false
               : (petanqueButtonState?.active ?? teleopConfigButtonState?.active ?? false)
           }
           tone={
             isMeasureButton
               ? measureButtonTone
+              : isPetanqueAlphaPresetButton
+                ? petanqueAlphaPresetTone
               : (
                   petanqueButtonState?.tone ??
                   teleopConfigButtonState?.tone ??
@@ -1022,13 +1102,16 @@ export function ApplicationPage({
               }
             }
 
+            if (isPetanqueAlphaPresetButton && petanqueAlphaPreset) {
+              if (petanqueAlphaPresetDisabled) return;
+              triggerPetanqueAlphaPreset(petanqueAlphaPreset);
+              markWidgetPulse(widget.id);
+              return;
+            }
+
             if (isStateMachineButton && petanqueCommand) {
               if (petanqueButtonState?.disabled) return;
-              wsClient.send({
-                type: "state_cmd",
-                command: petanqueCommand,
-              });
-              advancePetanqueFlow(petanqueCommand);
+              sendPetanqueStateCommand(petanqueCommand);
               markWidgetPulse(widget.id);
               return;
             }
@@ -1104,6 +1187,8 @@ export function ApplicationPage({
       const valueLabel =
         widget.topic === PETANQUE_TOTAL_DURATION_TOPIC
           ? `duration: ${widgetValue.toFixed(1)}s`
+          : widget.topic === PETANQUE_ALPHA_TOPIC
+            ? `alpha: ${widgetValue.toFixed(2)}`
           : undefined;
       return (
         <MaxVelocityWidget
@@ -1115,67 +1200,89 @@ export function ApplicationPage({
           onLabelChange={NOOP_TEXT_CHANGE}
           value={widgetValue}
           valueLabel={valueLabel}
+          unsafeThreshold={
+            widget.topic === PETANQUE_ALPHA_TOPIC
+              ? PETANQUE_ALPHA_SAFE_MAX
+              : undefined
+          }
           reverseDirection={
             widget.topic === PETANQUE_ANGLE_TOPIC ||
             widget.topic === PETANQUE_TOTAL_DURATION_TOPIC
           }
           onValueChange={(nextValue) => {
+            let resolvedNextValue = nextValue;
+            if (widget.topic === PETANQUE_ALPHA_TOPIC) {
+              if (nextValue > PETANQUE_ALPHA_SAFE_MAX) {
+                if (!alphaUnsafeValidatedRef.current) {
+                  const confirmed = window.confirm(
+                    "Alpha above 20 is not safe. Validate this value?"
+                  );
+                  if (!confirmed) {
+                    resolvedNextValue = PETANQUE_ALPHA_SAFE_MAX;
+                  } else {
+                    alphaUnsafeValidatedRef.current = true;
+                  }
+                }
+              } else {
+                alphaUnsafeValidatedRef.current = false;
+              }
+            }
             setMaxVelocityWidgetValues((prev) => ({
               ...prev,
-              [widget.id]: nextValue,
+              [widget.id]: resolvedNextValue,
             }));
             if (widget.topic === "/cmd/max_velocity") {
-              setMaxVelocity(nextValue);
+              setMaxVelocity(resolvedNextValue);
             }
             if (widget.topic === TELEOP_CONFIG_TRANSLATION_GAIN_TOPIC) {
-              setTranslationGain(nextValue);
+              setTranslationGain(resolvedNextValue);
             }
             if (widget.topic === TELEOP_CONFIG_ROTATION_GAIN_TOPIC) {
-              setRotationGain(nextValue);
+              setRotationGain(resolvedNextValue);
             }
             if (
               widget.topic === TELEOP_CONFIG_LINEAR_SCALE_X_TOPIC ||
               widget.topic === TELEOP_CONFIG_LEGACY_SCALE_X_TOPIC
             ) {
-              setScaleX(nextValue);
+              setScaleX(resolvedNextValue);
             }
             if (
               widget.topic === TELEOP_CONFIG_LINEAR_SCALE_Y_TOPIC ||
               widget.topic === TELEOP_CONFIG_LEGACY_SCALE_Y_TOPIC
             ) {
-              setScaleY(nextValue);
+              setScaleY(resolvedNextValue);
             }
             if (
               widget.topic === TELEOP_CONFIG_LINEAR_SCALE_Z_TOPIC ||
               widget.topic === TELEOP_CONFIG_LEGACY_SCALE_Z_TOPIC
             ) {
-              setScaleZ(nextValue);
+              setScaleZ(resolvedNextValue);
             }
             if (widget.topic === TELEOP_CONFIG_ANGULAR_SCALE_X_TOPIC) {
-              setAngularScaleX(nextValue);
+              setAngularScaleX(resolvedNextValue);
             }
             if (widget.topic === TELEOP_CONFIG_ANGULAR_SCALE_Y_TOPIC) {
-              setAngularScaleY(nextValue);
+              setAngularScaleY(resolvedNextValue);
             }
             if (widget.topic === TELEOP_CONFIG_ANGULAR_SCALE_Z_TOPIC) {
-              setAngularScaleZ(nextValue);
+              setAngularScaleZ(resolvedNextValue);
             }
             if (widget.topic === PETANQUE_TOTAL_DURATION_TOPIC) {
               wsClient.send({
                 type: "petanque_cfg",
-                total_duration: clampPetanqueDuration(nextValue),
+                total_duration: clampPetanqueDuration(resolvedNextValue),
               });
             }
             if (widget.topic === PETANQUE_ANGLE_TOPIC) {
               wsClient.send({
                 type: "petanque_cfg",
-                angle_between_start_and_finish: nextValue,
+                angle_between_start_and_finish: resolvedNextValue,
               });
             }
             if (widget.topic === PETANQUE_ALPHA_TOPIC) {
               wsClient.send({
                 type: "petanque_cfg",
-                alpha: nextValue,
+                alpha: resolvedNextValue,
               });
             }
             markWidgetPulse(widget.id);

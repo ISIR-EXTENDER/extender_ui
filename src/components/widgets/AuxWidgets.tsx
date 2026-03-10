@@ -14,6 +14,7 @@ import {
 } from "recharts";
 import { InlineEditableText } from "./InlineEditableText";
 import { selectModeLabel, useTeleopStore } from "../../store/teleopStore";
+import type { CSSProperties } from "react";
 import type {
   ButtonWidget as ButtonWidgetModel,
   CurvesWidget as CurvesWidgetModel,
@@ -90,6 +91,7 @@ type MaxVelocityWidgetProps = BaseWidgetProps & {
   onValueChange: (value: number) => void;
   valueLabel?: string;
   reverseDirection?: boolean;
+  unsafeThreshold?: number;
 };
 
 type GripperControlWidgetProps = BaseWidgetProps & {
@@ -552,7 +554,37 @@ export function MaxVelocityWidget({
   onValueChange,
   valueLabel,
   reverseDirection = false,
+  unsafeThreshold,
 }: MaxVelocityWidgetProps) {
+  const sliderSpan = Math.max(1e-6, widget.max - widget.min);
+  const normalizedValue = Math.max(0, Math.min(1, (value - widget.min) / sliderSpan));
+  const thumbRatio = reverseDirection ? 1 - normalizedValue : normalizedValue;
+  const thumbPercent = `${thumbRatio * 100}%`;
+  const leftEndpointValue = reverseDirection ? widget.max : widget.min;
+  const rightEndpointValue = reverseDirection ? widget.min : widget.max;
+  const formatCompactValue = (raw: number) => {
+    const rounded = Math.round(raw * 100) / 100;
+    if (Number.isInteger(rounded)) return `${rounded}`;
+    return rounded.toFixed(2).replace(/\.?0+$/, "");
+  };
+  const hasUnsafeSegment =
+    typeof unsafeThreshold === "number" &&
+    Number.isFinite(unsafeThreshold) &&
+    unsafeThreshold > widget.min &&
+    unsafeThreshold < widget.max;
+  const warningStartRatio = hasUnsafeSegment
+    ? (unsafeThreshold - widget.min) / (widget.max - widget.min)
+    : 0;
+  const warningStartPercent = `${Math.max(0, Math.min(1, warningStartRatio)) * 100}%`;
+  const trackStyle: CSSProperties | undefined = hasUnsafeSegment
+    ? ({
+        "--slider-warning-start": warningStartPercent,
+        "--slider-warning-direction": reverseDirection ? "to left" : "to right",
+      } as CSSProperties)
+    : undefined;
+  const isUnsafeValue =
+    typeof unsafeThreshold === "number" && Number.isFinite(unsafeThreshold) && value > unsafeThreshold;
+
   return (
     <CanvasItem
       x={widget.rect.x}
@@ -569,22 +601,34 @@ export function MaxVelocityWidget({
         <div className="controls-max-velocity-title">
           <InlineEditableText value={widget.label} onCommit={onLabelChange} className="controls-inline-label" />
         </div>
-        <Slider.Root
-          className="slider"
-          min={widget.min}
-          max={widget.max}
-          step={widget.step}
-          dir={reverseDirection ? "rtl" : "ltr"}
-          value={[value]}
-          onValueChange={(next) => onValueChange(next[0] ?? value)}
-        >
-          <Slider.Track className="slider-track">
-            <Slider.Range className="slider-range" />
-          </Slider.Track>
-          <Slider.Thumb className="slider-thumb" />
-        </Slider.Root>
-        <div className="controls-max-velocity-value">
+        <div className="controls-max-velocity-slider-shell">
+          <div className="controls-max-velocity-bubble" style={{ left: thumbPercent }}>
+            {formatCompactValue(value)}
+          </div>
+          <Slider.Root
+            className={`slider controls-max-velocity-slider ${hasUnsafeSegment ? "slider-with-unsafe-zone" : ""}`.trim()}
+            min={widget.min}
+            max={widget.max}
+            step={widget.step}
+            dir={reverseDirection ? "rtl" : "ltr"}
+            value={[value]}
+            onValueChange={(next) => onValueChange(next[0] ?? value)}
+          >
+            <Slider.Track className="slider-track controls-max-velocity-track" style={trackStyle}>
+              <Slider.Range className="slider-range controls-max-velocity-range" />
+            </Slider.Track>
+            <Slider.Thumb className="slider-thumb controls-max-velocity-thumb" />
+          </Slider.Root>
+          <div className="controls-max-velocity-endpoints">
+            <span>{formatCompactValue(leftEndpointValue)}</span>
+            <span>{formatCompactValue(rightEndpointValue)}</span>
+          </div>
+        </div>
+        <div className={`controls-max-velocity-value ${isUnsafeValue ? "is-unsafe" : ""}`.trim()}>
           {valueLabel ?? `gain: ${value.toFixed(2)}`}
+          {isUnsafeValue ? (
+            <span className="controls-max-velocity-warning">unsafe range</span>
+          ) : null}
         </div>
       </div>
     </CanvasItem>
@@ -603,6 +647,13 @@ export function GripperControlWidget({
 }: GripperControlWidgetProps) {
   const [localActiveSide, setLocalActiveSide] = useState<"open" | "close" | null>(null);
   const activeSide = activeState ?? localActiveSide;
+  const isOpen = activeSide === "open";
+  const statusLabel =
+    isOpen
+      ? "Open"
+      : activeSide === "close"
+        ? "Closed"
+        : "Unknown";
 
   return (
     <CanvasItem
@@ -620,28 +671,28 @@ export function GripperControlWidget({
         <div className="controls-gripper-title">
           <InlineEditableText value={widget.label} onCommit={onLabelChange} className="controls-inline-label" />
         </div>
-        <div className="controls-gripper-actions">
+        <div className="controls-switch-row">
+          <div className="controls-switch-meta" aria-live="polite">
+            <span className="controls-switch-caption">State</span>
+            <span className="controls-switch-state">{statusLabel}</span>
+          </div>
           <button
             type="button"
-            className={`action-button open ${activeSide === "open" ? "is-active" : ""}`.trim()}
-            aria-pressed={activeSide === "open"}
+            className={`controls-toggle-switch ${isOpen ? "is-on" : "is-off"}`.trim()}
+            role="switch"
+            aria-checked={isOpen}
+            aria-label={`${widget.label} toggle`}
             onClick={() => {
+              if (isOpen) {
+                setLocalActiveSide("close");
+                onClose();
+                return;
+              }
               setLocalActiveSide("open");
               onOpen();
             }}
           >
-            Open
-          </button>
-          <button
-            type="button"
-            className={`action-button close ${activeSide === "close" ? "is-active" : ""}`.trim()}
-            aria-pressed={activeSide === "close"}
-            onClick={() => {
-              setLocalActiveSide("close");
-              onClose();
-            }}
-          >
-            Close
+            <span className="controls-toggle-switch-thumb" />
           </button>
         </div>
       </div>
@@ -661,6 +712,8 @@ export function MagnetControlWidget({
 }: MagnetControlWidgetProps) {
   const [localActiveSide, setLocalActiveSide] = useState<"on" | "off" | null>(null);
   const activeSide = activeState ?? localActiveSide;
+  const isOn = activeSide === "on";
+  const statusLabel = isOn ? "ON" : activeSide === "off" ? "OFF" : "Unknown";
 
   return (
     <CanvasItem
@@ -678,28 +731,28 @@ export function MagnetControlWidget({
         <div className="controls-magnet-title">
           <InlineEditableText value={widget.label} onCommit={onLabelChange} className="controls-inline-label" />
         </div>
-        <div className="controls-magnet-actions">
+        <div className="controls-switch-row">
+          <div className="controls-switch-meta" aria-live="polite">
+            <span className="controls-switch-caption">State</span>
+            <span className="controls-switch-state">{statusLabel}</span>
+          </div>
           <button
             type="button"
-            className={`action-button on ${activeSide === "on" ? "is-active" : ""}`.trim()}
-            aria-pressed={activeSide === "on"}
+            className={`controls-toggle-switch ${isOn ? "is-on" : "is-off"}`.trim()}
+            role="switch"
+            aria-checked={isOn}
+            aria-label={`${widget.label} toggle`}
             onClick={() => {
+              if (isOn) {
+                setLocalActiveSide("off");
+                onDeactivate();
+                return;
+              }
               setLocalActiveSide("on");
               onActivate();
             }}
           >
-            ON
-          </button>
-          <button
-            type="button"
-            className={`action-button off ${activeSide === "off" ? "is-active" : ""}`.trim()}
-            aria-pressed={activeSide === "off"}
-            onClick={() => {
-              setLocalActiveSide("off");
-              onDeactivate();
-            }}
-          >
-            OFF
+            <span className="controls-toggle-switch-thumb" />
           </button>
         </div>
       </div>
