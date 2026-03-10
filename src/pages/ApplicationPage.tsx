@@ -170,16 +170,6 @@ const MEASURE_DEMO_HISTORY_ENTRY: MeasureResultHistoryEntry = {
   source: "demo",
 };
 
-const resolveMeasureVectorsSource = (vectorsJson: string | null): string | null => {
-  if (!vectorsJson) return null;
-  try {
-    const parsed = JSON.parse(vectorsJson) as { source?: unknown };
-    return typeof parsed.source === "string" ? parsed.source : null;
-  } catch {
-    return null;
-  }
-};
-
 export function ApplicationPage({
   applicationId,
   routeScreenId,
@@ -371,19 +361,6 @@ export function ApplicationPage({
         const resultImageDataUrl = message.image_data_url;
         const resultVectorsJson =
           typeof message.vectors_json === "string" ? message.vectors_json : null;
-        const vectorsSource = resolveMeasureVectorsSource(resultVectorsJson);
-        const isLegacyFakeMeasure = Boolean(
-          vectorsSource && vectorsSource.startsWith("fake_opencv")
-        );
-        if (isLegacyFakeMeasure) {
-          setMeasureResultImageDataUrl(MEASURE_DEMO_HISTORY_ENTRY.imageDataUrl);
-          setMeasureVectorsJson(MEASURE_DEMO_HISTORY_ENTRY.vectorsJson);
-          setMeasureLastUpdatedAtMs(null);
-          setMeasureStatusText("Using default demo measure image");
-          setMeasureRequestPending(false);
-          setMeasureViewMode("result");
-          return;
-        }
         if (resultImageDataUrl) {
           setMeasureResultImageDataUrl(resultImageDataUrl);
           pushMeasureResultHistory({
