@@ -55,7 +55,7 @@ export function ZSlider({
       ) : null}
       <div className="z-vertical-main">
         <Slider.Root
-          className="slider vertical z-slider"
+          className="slider vertical z-slider z-axis-slider"
           orientation="vertical"
           min={min}
           max={max}
@@ -65,10 +65,10 @@ export function ZSlider({
           onValueCommit={releaseToCenter}
           onPointerDown={(event) => event.stopPropagation()}
         >
-          <Slider.Track className="slider-track">
+          <Slider.Track className="slider-track z-axis-track">
             <Slider.Range className="slider-range" />
           </Slider.Track>
-          <Slider.Thumb className="slider-thumb" />
+          <Slider.Thumb className="slider-thumb z-axis-thumb" />
         </Slider.Root>
         {showReadout ? <div className="z-readout">z: {value.toFixed(2)}</div> : null}
       </div>
@@ -102,7 +102,7 @@ export function RzSlider({
         </label>
       )}
       <Slider.Root
-        className="slider rz-slider"
+        className="slider rz-slider rz-axis-slider"
         min={min}
         max={max}
         step={step}
@@ -111,10 +111,10 @@ export function RzSlider({
         onValueCommit={releaseToCenter}
         onPointerDown={(event) => event.stopPropagation()}
       >
-        <Slider.Track className="slider-track">
+        <Slider.Track className="slider-track rz-axis-track">
           <Slider.Range className="slider-range" />
         </Slider.Track>
-        <Slider.Thumb className="slider-thumb" />
+        <Slider.Thumb className="slider-thumb rz-axis-thumb" />
       </Slider.Root>
       {showReadout && <div className="z-readout">rz: {value.toFixed(2)}</div>}
     </div>

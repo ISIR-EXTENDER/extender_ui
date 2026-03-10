@@ -90,6 +90,11 @@ type MaxVelocityWidgetProps = BaseWidgetProps & {
   value: number;
   onValueChange: (value: number) => void;
   valueLabel?: string;
+  endpointLabels?: {
+    left?: string;
+    right?: string;
+  };
+  bubbleValueFormatter?: (value: number) => string;
   reverseDirection?: boolean;
   unsafeThreshold?: number;
 };
@@ -553,6 +558,8 @@ export function MaxVelocityWidget({
   value,
   onValueChange,
   valueLabel,
+  endpointLabels,
+  bubbleValueFormatter,
   reverseDirection = false,
   unsafeThreshold,
 }: MaxVelocityWidgetProps) {
@@ -603,7 +610,7 @@ export function MaxVelocityWidget({
         </div>
         <div className="controls-max-velocity-slider-shell">
           <div className="controls-max-velocity-bubble" style={{ left: thumbPercent }}>
-            {formatCompactValue(value)}
+            {bubbleValueFormatter ? bubbleValueFormatter(value) : formatCompactValue(value)}
           </div>
           <Slider.Root
             className={`slider controls-max-velocity-slider ${hasUnsafeSegment ? "slider-with-unsafe-zone" : ""}`.trim()}
@@ -620,16 +627,18 @@ export function MaxVelocityWidget({
             <Slider.Thumb className="slider-thumb controls-max-velocity-thumb" />
           </Slider.Root>
           <div className="controls-max-velocity-endpoints">
-            <span>{formatCompactValue(leftEndpointValue)}</span>
-            <span>{formatCompactValue(rightEndpointValue)}</span>
+            <span>{endpointLabels?.left || formatCompactValue(leftEndpointValue)}</span>
+            <span>{endpointLabels?.right || formatCompactValue(rightEndpointValue)}</span>
           </div>
         </div>
-        <div className={`controls-max-velocity-value ${isUnsafeValue ? "is-unsafe" : ""}`.trim()}>
-          {valueLabel ?? `gain: ${value.toFixed(2)}`}
-          {isUnsafeValue ? (
-            <span className="controls-max-velocity-warning">unsafe range</span>
-          ) : null}
-        </div>
+        {valueLabel || isUnsafeValue ? (
+          <div className={`controls-max-velocity-value ${isUnsafeValue ? "is-unsafe" : ""}`.trim()}>
+            {valueLabel ? <span>{valueLabel}</span> : null}
+            {isUnsafeValue ? (
+              <span className="controls-max-velocity-warning">unsafe range</span>
+            ) : null}
+          </div>
+        ) : null}
       </div>
     </CanvasItem>
   );

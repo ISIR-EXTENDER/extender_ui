@@ -126,6 +126,11 @@ export type MaxVelocityWidget = WidgetBase & {
   min: number;
   max: number;
   step: number;
+  reverseDirection?: boolean;
+  unsafeThreshold?: number;
+  endpointLeftLabel?: string;
+  endpointRightLabel?: string;
+  bubbleMode?: "number" | "degrees" | "degrees-unit" | "power";
 };
 
 export type GripperControlWidget = WidgetBase & {

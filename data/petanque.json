@@ -98,8 +98,8 @@
         "left": "RX-"
       },
       "rect": {
-        "x": 800,
-        "y": 235,
+        "x": 802,
+        "y": 268,
         "w": 435,
         "h": 441
       }
@@ -121,8 +121,8 @@
         "left": "X-"
       },
       "rect": {
-        "x": 257,
-        "y": 235,
+        "x": 255,
+        "y": 268,
         "w": 429,
         "h": 441
       }
@@ -156,21 +156,21 @@
     {
       "id": "widget-1772023042956-44680",
       "kind": "slider",
-      "binding": "z",
+      "binding": "rz",
       "label": "RZ",
       "topic": "/cmd/joystick_rz",
       "direction": "horizontal",
-      "showLabel": true,
+      "showLabel": false,
       "showTopicInfo": false,
       "labelAlign": "center",
       "min": -1,
       "max": 1,
       "step": 0.01,
       "rect": {
-        "x": 860,
+        "x": 802,
         "y": 124,
-        "w": 352,
-        "h": 93
+        "w": 435,
+        "h": 130
       }
     },
     {
@@ -180,17 +180,17 @@
       "label": "Z",
       "topic": "/cmd/joystick_z",
       "direction": "vertical",
-      "showLabel": true,
-      "showTopicInfo": true,
+      "showLabel": false,
+      "showTopicInfo": false,
       "labelAlign": "center",
       "min": -1,
       "max": 1,
       "step": 0.01,
       "rect": {
-        "x": 107,
-        "y": 286,
-        "w": 108,
-        "h": 369
+        "x": 75,
+        "y": 268,
+        "w": 162,
+        "h": 422
       }
     },
     {
@@ -241,5 +241,5 @@
     "presetId": "hd",
     "runtimeMode": "fit"
   },
-  "updatedAt": "2026-03-10T19:57:51.115Z"
+  "updatedAt": "2026-03-10T20:40:41.294Z"
 }

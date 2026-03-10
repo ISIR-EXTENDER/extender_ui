@@ -101,6 +101,10 @@ const DEFAULT_ADD_WIDGET_TYPE: WidgetCatalogType =
   (ENABLED_WIDGETS[0]?.type as WidgetCatalogType | undefined) ?? "joystick";
 const TOPIC_FRESHNESS_MS = 200;
 const TOPIC_FRESHNESS_TICK_MS = 100;
+const PETANQUE_TOTAL_DURATION_TOPIC = "/petanque_throw/total_duration";
+const PETANQUE_ANGLE_TOPIC = "/petanque_throw/angle_between_start_and_finish";
+const PETANQUE_ALPHA_TOPIC = "/petanque_throw/alpha";
+const PETANQUE_ALPHA_SAFE_MAX = 20;
 const SNAP_THRESHOLD_PX = 10;
 const SNAP_GUIDE_HIDE_DELAY_MS = 130;
 const MIN_EDITOR_ZOOM = 0.2;
@@ -115,6 +119,12 @@ const SNAP_MODE_LABEL: Record<SnapMode, string> = {
 const readNumber = (raw: string, fallback: number) => {
   const parsed = Number(raw);
   return Number.isFinite(parsed) ? parsed : fallback;
+};
+const readOptionalNumber = (raw: string): number | undefined => {
+  const trimmed = raw.trim();
+  if (!trimmed) return undefined;
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) ? parsed : undefined;
 };
 
 const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
@@ -137,6 +147,42 @@ const nextNavigationItemId = () =>
   `nav-item-${Date.now()}-${Math.random().toString(16).slice(2, 7)}`;
 const toScreenClassToken = (screenId: string) =>
   screenId.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-");
+const formatMaxVelocityPowerPercent = (
+  value: number,
+  min: number,
+  max: number,
+  reverseDirection: boolean
+) => {
+  const span = Math.max(1e-6, max - min);
+  const normalized = reverseDirection ? (max - value) / span : (value - min) / span;
+  const percent = Math.max(0, Math.min(100, normalized * 100));
+  return `Power ${percent.toFixed(0)}%`;
+};
+const resolveMaxVelocityBubbleFormatter = (
+  widget: MaxVelocityWidgetModel,
+  reverseDirection: boolean
+) => {
+  const mode =
+    widget.bubbleMode ??
+    (widget.topic === PETANQUE_ANGLE_TOPIC
+      ? "degrees"
+      : widget.topic === PETANQUE_ALPHA_TOPIC
+        ? "degrees-unit"
+        : widget.topic === PETANQUE_TOTAL_DURATION_TOPIC
+          ? "power"
+          : "number");
+  if (mode === "degrees") {
+    return (rawValue: number) => `${((rawValue * 180) / Math.PI).toFixed(1)}°`;
+  }
+  if (mode === "degrees-unit") {
+    return (rawValue: number) => `${rawValue.toFixed(1)}°`;
+  }
+  if (mode === "power") {
+    return (rawValue: number) =>
+      formatMaxVelocityPowerPercent(rawValue, widget.min, widget.max, reverseDirection);
+  }
+  return undefined;
+};
 
 export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageProps) {
   const joyX = useTeleopStore((s) => s.joyX);
@@ -1254,6 +1300,22 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
     }
 
     if (widget.kind === "max-velocity") {
+      const reverseDirection =
+        widget.reverseDirection ??
+        widget.topic === PETANQUE_TOTAL_DURATION_TOPIC;
+      const endpointLabels =
+        widget.endpointLeftLabel || widget.endpointRightLabel
+          ? {
+              left: widget.endpointLeftLabel,
+              right: widget.endpointRightLabel,
+            }
+          : widget.topic === PETANQUE_TOTAL_DURATION_TOPIC
+            ? { left: "Slow", right: "Fast" }
+            : widget.topic === PETANQUE_ANGLE_TOPIC
+              ? { left: "Left", right: "Right" }
+              : widget.topic === PETANQUE_ALPHA_TOPIC
+                ? { left: "Tirer", right: "Pointer" }
+                : undefined;
       return (
         <MaxVelocityWidget
           key={widget.id}
@@ -1267,6 +1329,16 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
             )
           }
           value={maxVelocity}
+          endpointLabels={endpointLabels}
+          bubbleValueFormatter={resolveMaxVelocityBubbleFormatter(widget, reverseDirection)}
+          unsafeThreshold={
+            typeof widget.unsafeThreshold === "number"
+              ? widget.unsafeThreshold
+              : widget.topic === PETANQUE_ALPHA_TOPIC
+                ? PETANQUE_ALPHA_SAFE_MAX
+                : undefined
+          }
+          reverseDirection={reverseDirection}
           onValueChange={setMaxVelocity}
         />
       );
@@ -2513,6 +2585,92 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
                               updateSelectedMaxVelocity((widget) => ({
                                 ...widget,
                                 step: Math.max(0.001, readNumber(event.target.value, widget.step)),
+                              }))
+                            }
+                          />
+                        </label>
+                      </div>
+                      <div className="controls-field-row">
+                        <label className="controls-field">
+                          <span>Left Endpoint</span>
+                          <input
+                            className="editor-input"
+                            value={selectedWidget.endpointLeftLabel ?? ""}
+                            onChange={(event) =>
+                              updateSelectedMaxVelocity((widget) => ({
+                                ...widget,
+                                endpointLeftLabel: event.target.value,
+                              }))
+                            }
+                          />
+                        </label>
+                        <label className="controls-field">
+                          <span>Right Endpoint</span>
+                          <input
+                            className="editor-input"
+                            value={selectedWidget.endpointRightLabel ?? ""}
+                            onChange={(event) =>
+                              updateSelectedMaxVelocity((widget) => ({
+                                ...widget,
+                                endpointRightLabel: event.target.value,
+                              }))
+                            }
+                          />
+                        </label>
+                      </div>
+                      <div className="controls-field-row">
+                        <label className="controls-field">
+                          <span>Bubble Mode</span>
+                          <select
+                            className="editor-input"
+                            value={selectedWidget.bubbleMode ?? "number"}
+                            onChange={(event) =>
+                              updateSelectedMaxVelocity((widget) => ({
+                                ...widget,
+                                bubbleMode:
+                                  event.target.value === "degrees"
+                                    ? "degrees"
+                                    : event.target.value === "degrees-unit"
+                                      ? "degrees-unit"
+                                      : event.target.value === "power"
+                                        ? "power"
+                                        : "number",
+                              }))
+                            }
+                          >
+                            <option value="number">number</option>
+                            <option value="degrees">degrees (rad -&gt; deg)</option>
+                            <option value="degrees-unit">degrees unit (value + deg)</option>
+                            <option value="power">power (%)</option>
+                          </select>
+                        </label>
+                        <label className="controls-field">
+                          <span>Direction</span>
+                          <select
+                            className="editor-input"
+                            value={selectedWidget.reverseDirection ? "reversed" : "normal"}
+                            onChange={(event) =>
+                              updateSelectedMaxVelocity((widget) => ({
+                                ...widget,
+                                reverseDirection: event.target.value === "reversed",
+                              }))
+                            }
+                          >
+                            <option value="normal">normal</option>
+                            <option value="reversed">reversed</option>
+                          </select>
+                        </label>
+                        <label className="controls-field">
+                          <span>Unsafe Threshold</span>
+                          <input
+                            type="number"
+                            step={0.01}
+                            className="editor-input"
+                            value={selectedWidget.unsafeThreshold ?? ""}
+                            onChange={(event) =>
+                              updateSelectedMaxVelocity((widget) => ({
+                                ...widget,
+                                unsafeThreshold: readOptionalNumber(event.target.value),
                               }))
                             }
                           />

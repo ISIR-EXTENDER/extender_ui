@@ -712,6 +712,10 @@ export const DEFAULT_DEMO_CONFIGURATIONS: WidgetConfiguration[] = [
       min: 0.9,
       max: 3.0,
       step: 0.1,
+      reverseDirection: true,
+      endpointLeftLabel: "Slow",
+      endpointRightLabel: "Fast",
+      bubbleMode: "power",
       rect: { w: 500, h: 92 },
     }),
     createDemoWidget("play-lancer-angle", "max-velocity", 540, 170, {
@@ -720,6 +724,9 @@ export const DEFAULT_DEMO_CONFIGURATIONS: WidgetConfiguration[] = [
       min: -0.26,
       max: 0.26,
       step: 0.005,
+      endpointLeftLabel: "Left",
+      endpointRightLabel: "Right",
+      bubbleMode: "degrees",
       rect: { w: 280, h: 92 },
     }),
     createDemoWidget("play-lancer-alpha", "max-velocity", 830, 214, {
@@ -728,6 +735,10 @@ export const DEFAULT_DEMO_CONFIGURATIONS: WidgetConfiguration[] = [
       min: 0,
       max: 40,
       step: 0.01,
+      unsafeThreshold: 20,
+      endpointLeftLabel: "Tirer",
+      endpointRightLabel: "Pointer",
+      bubbleMode: "degrees-unit",
       rect: { w: 400, h: 76 },
     }),
     createDemoWidget("play-lancer-rviz", "stream-display", 20, 302, {
@@ -1209,6 +1220,86 @@ const normalizePetanqueSliderRanges = (
           widget.min !== normalized.min ||
           widget.max !== normalized.max ||
           widget.step !== normalized.step
+        ) {
+          changed = true;
+        }
+        return normalized;
+      }
+
+      return widget;
+    });
+
+    if (!changed) return configuration;
+    return {
+      ...configuration,
+      widgets: nextWidgets,
+      updatedAt: new Date().toISOString(),
+    };
+  });
+};
+
+const normalizePetanqueSliderDisplayOptions = (
+  configurations: WidgetConfiguration[]
+): WidgetConfiguration[] => {
+  return configurations.map((configuration) => {
+    const isPetanqueConfig =
+      configuration.name === "petanque" ||
+      configuration.name === "play_petanque_lancer";
+    if (!isPetanqueConfig) return configuration;
+
+    let changed = false;
+    const nextWidgets = configuration.widgets.map((widget) => {
+      if (widget.kind !== "max-velocity") return widget;
+
+      if (widget.topic === "/petanque_throw/total_duration") {
+        const normalized = {
+          ...widget,
+          reverseDirection: widget.reverseDirection ?? true,
+          endpointLeftLabel: widget.endpointLeftLabel ?? "Slow",
+          endpointRightLabel: widget.endpointRightLabel ?? "Fast",
+          bubbleMode: widget.bubbleMode ?? "power",
+        };
+        if (
+          widget.reverseDirection !== normalized.reverseDirection ||
+          widget.endpointLeftLabel !== normalized.endpointLeftLabel ||
+          widget.endpointRightLabel !== normalized.endpointRightLabel ||
+          widget.bubbleMode !== normalized.bubbleMode
+        ) {
+          changed = true;
+        }
+        return normalized;
+      }
+
+      if (widget.topic === "/petanque_throw/angle_between_start_and_finish") {
+        const normalized = {
+          ...widget,
+          endpointLeftLabel: widget.endpointLeftLabel ?? "Left",
+          endpointRightLabel: widget.endpointRightLabel ?? "Right",
+          bubbleMode: widget.bubbleMode ?? "degrees",
+        };
+        if (
+          widget.endpointLeftLabel !== normalized.endpointLeftLabel ||
+          widget.endpointRightLabel !== normalized.endpointRightLabel ||
+          widget.bubbleMode !== normalized.bubbleMode
+        ) {
+          changed = true;
+        }
+        return normalized;
+      }
+
+      if (widget.topic === "/petanque_throw/alpha") {
+        const normalized = {
+          ...widget,
+          unsafeThreshold: widget.unsafeThreshold ?? 20,
+          endpointLeftLabel: widget.endpointLeftLabel ?? "Tirer",
+          endpointRightLabel: widget.endpointRightLabel ?? "Pointer",
+          bubbleMode: widget.bubbleMode ?? "degrees-unit",
+        };
+        if (
+          widget.unsafeThreshold !== normalized.unsafeThreshold ||
+          widget.endpointLeftLabel !== normalized.endpointLeftLabel ||
+          widget.endpointRightLabel !== normalized.endpointRightLabel ||
+          widget.bubbleMode !== normalized.bubbleMode
         ) {
           changed = true;
         }
@@ -1785,6 +1876,35 @@ const parsePoses = (value: unknown): PoseSnapshot[] => {
   return value.map(parsePose).filter((pose): pose is PoseSnapshot => pose !== null);
 };
 
+const applyConfigurationMigrations = (
+  configurations: WidgetConfiguration[]
+): WidgetConfiguration[] =>
+  normalizePetanqueTeleopButtonLayout(
+    normalizeTeleopVelocitySliderRange(
+      ensurePlayPetanqueLancerActionButtons(
+        normalizePetanqueSliderDisplayOptions(
+          normalizePetanqueSliderRanges(
+            ensurePetanqueGripperControl(
+              ensurePetanqueElectromagnetControl(
+                removePetanqueLegacyNavigationButtons(
+                  migratePetanqueTeleopConfigLayout(
+                    disablePetanqueViewerWidget(
+                      migrateLegacyPetanque(
+                        migrateLegacyDefaultControl(
+                          mergeMissingDemoConfigurations(configurations)
+                        )
+                      )
+                    )
+                  )
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+  );
+
 export function loadConfigurationsFromLocalStorage(): WidgetConfiguration[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -1803,29 +1923,7 @@ export function loadConfigurationsFromLocalStorage(): WidgetConfiguration[] {
         canvas: normalizeCanvasSettings(item.canvas),
         updatedAt: typeof item.updatedAt === "string" ? item.updatedAt : new Date().toISOString(),
       }));
-    return normalizePetanqueTeleopButtonLayout(
-      normalizeTeleopVelocitySliderRange(
-        ensurePlayPetanqueLancerActionButtons(
-          normalizePetanqueSliderRanges(
-            ensurePetanqueGripperControl(
-              ensurePetanqueElectromagnetControl(
-                removePetanqueLegacyNavigationButtons(
-                  migratePetanqueTeleopConfigLayout(
-                    disablePetanqueViewerWidget(
-                      migrateLegacyPetanque(
-                        migrateLegacyDefaultControl(
-                          mergeMissingDemoConfigurations(sanitized)
-                        )
-                      )
-                    )
-                  )
-                )
-              )
-            )
-          )
-        )
-      )
-    );
+    return applyConfigurationMigrations(sanitized);
   } catch {
     return cloneDefaultConfigurations();
   }
@@ -1938,5 +2036,5 @@ export async function syncConfigurationsFromFolder(
     );
   }
 
-  return merged;
+  return applyConfigurationMigrations(merged);
 }

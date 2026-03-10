@@ -2308,6 +2308,133 @@ body,
   font-weight: 800;
 }
 
+/* Runtime accessibility sizing for touch-first operation */
+:is(
+    .controls-design-page,
+    .application-runtime-page[class*="application-runtime-screen-"],
+    .controls-page-focus,
+    .controls-page[class*="controls-page-focus-screen-"]
+  )
+  .slider {
+  height: 52px;
+}
+
+:is(
+    .controls-design-page,
+    .application-runtime-page[class*="application-runtime-screen-"],
+    .controls-page-focus,
+    .controls-page[class*="controls-page-focus-screen-"]
+  )
+  .slider-track {
+  height: 16px;
+}
+
+:is(
+    .controls-design-page,
+    .application-runtime-page[class*="application-runtime-screen-"],
+    .controls-page-focus,
+    .controls-page[class*="controls-page-focus-screen-"]
+  )
+  .slider-thumb {
+  width: 52px;
+  height: 52px;
+}
+
+:is(
+    .controls-design-page,
+    .application-runtime-page[class*="application-runtime-screen-"],
+    .controls-page-focus,
+    .controls-page[class*="controls-page-focus-screen-"]
+  )
+  .controls-max-velocity-slider {
+  height: 58px;
+}
+
+:is(
+    .controls-design-page,
+    .application-runtime-page[class*="application-runtime-screen-"],
+    .controls-page-focus,
+    .controls-page[class*="controls-page-focus-screen-"]
+  )
+  .controls-max-velocity-track {
+  height: 18px;
+}
+
+:is(
+    .controls-design-page,
+    .application-runtime-page[class*="application-runtime-screen-"],
+    .controls-page-focus,
+    .controls-page[class*="controls-page-focus-screen-"]
+  )
+  .controls-max-velocity-thumb {
+  width: 22px;
+  height: 64px;
+}
+
+/* Z/Rz joystick sliders: center handle at least 3x larger */
+:is(
+    .controls-design-page,
+    .application-runtime-page[class*="application-runtime-screen-"],
+    .controls-page-focus,
+    .controls-page[class*="controls-page-focus-screen-"]
+  )
+  .z-axis-thumb,
+:is(
+    .controls-design-page,
+    .application-runtime-page[class*="application-runtime-screen-"],
+    .controls-page-focus,
+    .controls-page[class*="controls-page-focus-screen-"]
+  )
+  .rz-axis-thumb {
+  width: 84px;
+  height: 84px;
+  border-width: 6px;
+  box-shadow: 0 0 0 8px color-mix(in srgb, var(--accent) 24%, transparent);
+}
+
+:is(
+    .controls-design-page,
+    .application-runtime-page[class*="application-runtime-screen-"],
+    .controls-page-focus,
+    .controls-page[class*="controls-page-focus-screen-"]
+  )
+  .z-axis-slider.slider.vertical {
+  width: 108px;
+  min-width: 108px;
+}
+
+:is(
+    .controls-design-page,
+    .application-runtime-page[class*="application-runtime-screen-"],
+    .controls-page-focus,
+    .controls-page[class*="controls-page-focus-screen-"]
+  )
+  .z-axis-slider.slider.vertical
+  .z-axis-track {
+  width: 14px;
+}
+
+:is(
+    .controls-design-page,
+    .application-runtime-page[class*="application-runtime-screen-"],
+    .controls-page-focus,
+    .controls-page[class*="controls-page-focus-screen-"]
+  )
+  .rz-axis-slider {
+  height: 96px;
+}
+
+:is(
+    .controls-design-page,
+    .application-runtime-page[class*="application-runtime-screen-"],
+    .controls-page-focus,
+    .controls-page[class*="controls-page-focus-screen-"]
+  )
+  .rz-axis-slider
+  .rz-axis-track {
+  height: 14px;
+}
+
 @media (min-width: 1201px) {
   .controls-design-page {
     --design-aside-width: 360px;

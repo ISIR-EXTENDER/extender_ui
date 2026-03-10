@@ -167,7 +167,7 @@ function MaxVelocityWidget({ title }: { title: string }) {
         </Slider.Track>
         <Slider.Thumb className="slider-thumb" />
       </Slider.Root>
-      <div className="slider-value">gain: {maxVelocity.toFixed(2)}</div>
+      <div className="slider-value">{maxVelocity.toFixed(2)}</div>
     </section>
   );
 }

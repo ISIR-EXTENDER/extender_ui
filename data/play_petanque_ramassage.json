@@ -66,7 +66,7 @@
       "label": "Z",
       "topic": "/cmd/joystick_z",
       "direction": "vertical",
-      "showLabel": true,
+      "showLabel": false,
       "showTopicInfo": false,
       "labelAlign": "center",
       "min": -1,
@@ -113,5 +113,5 @@
     "presetId": "hd",
     "runtimeMode": "fit"
   },
-  "updatedAt": "2026-03-10T17:09:27.101Z"
+  "updatedAt": "2026-03-10T20:46:58.832Z"
 }

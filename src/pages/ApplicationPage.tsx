@@ -111,6 +111,17 @@ type TeleopConfigButtonState = {
 const clampSignedUnit = (value: number) => Math.max(-1, Math.min(1, value));
 const clampPetanqueDuration = (durationSeconds: number) =>
   Math.max(PETANQUE_TOTAL_DURATION_MIN_S, Math.min(PETANQUE_TOTAL_DURATION_MAX_S, durationSeconds));
+const formatMaxVelocityPowerPercent = (
+  value: number,
+  min: number,
+  max: number,
+  reverseDirection: boolean
+) => {
+  const span = Math.max(1e-6, max - min);
+  const normalized = reverseDirection ? (max - value) / span : (value - min) / span;
+  const percent = Math.max(0, Math.min(100, normalized * 100));
+  return `Power ${percent.toFixed(0)}%`;
+};
 
 const NOOP_RECT_CHANGE: (next: CanvasRect) => void = () => {};
 const NOOP_TEXT_CHANGE: (next: string) => void = () => {};
@@ -1184,12 +1195,46 @@ export function ApplicationPage({
                   : widget.topic === "/cmd/max_velocity"
                     ? maxVelocity
                     : 1;
-      const valueLabel =
-        widget.topic === PETANQUE_TOTAL_DURATION_TOPIC
-          ? `duration: ${widgetValue.toFixed(1)}s`
+      const reverseDirection =
+        widget.reverseDirection ??
+        widget.topic === PETANQUE_TOTAL_DURATION_TOPIC;
+      const endpointLabels =
+        widget.endpointLeftLabel || widget.endpointRightLabel
+          ? {
+              left: widget.endpointLeftLabel,
+              right: widget.endpointRightLabel,
+            }
+          : widget.topic === PETANQUE_TOTAL_DURATION_TOPIC
+            ? { left: "Slow", right: "Fast" }
+            : widget.topic === PETANQUE_ANGLE_TOPIC
+              ? { left: "Left", right: "Right" }
+              : widget.topic === PETANQUE_ALPHA_TOPIC
+                ? { left: "Tirer", right: "Pointer" }
+                : undefined;
+      const bubbleMode =
+        widget.bubbleMode ??
+        (widget.topic === PETANQUE_ANGLE_TOPIC
+          ? "degrees"
           : widget.topic === PETANQUE_ALPHA_TOPIC
-            ? `alpha: ${widgetValue.toFixed(2)}`
-          : undefined;
+            ? "degrees-unit"
+            : widget.topic === PETANQUE_TOTAL_DURATION_TOPIC
+              ? "power"
+              : "number");
+      const bubbleValueFormatter =
+        bubbleMode === "degrees"
+          ? (rawValue: number) => `${((rawValue * 180) / Math.PI).toFixed(1)}°`
+          : bubbleMode === "degrees-unit"
+            ? (rawValue: number) => `${rawValue.toFixed(1)}°`
+            : bubbleMode === "power"
+              ? (rawValue: number) =>
+                  formatMaxVelocityPowerPercent(rawValue, widget.min, widget.max, reverseDirection)
+              : undefined;
+      const unsafeThreshold =
+        typeof widget.unsafeThreshold === "number"
+          ? widget.unsafeThreshold
+          : widget.topic === PETANQUE_ALPHA_TOPIC
+            ? PETANQUE_ALPHA_SAFE_MAX
+            : undefined;
       return (
         <MaxVelocityWidget
           key={widget.id}
@@ -1199,26 +1244,20 @@ export function ApplicationPage({
           onRectChange={NOOP_RECT_CHANGE}
           onLabelChange={NOOP_TEXT_CHANGE}
           value={widgetValue}
-          valueLabel={valueLabel}
-          unsafeThreshold={
-            widget.topic === PETANQUE_ALPHA_TOPIC
-              ? PETANQUE_ALPHA_SAFE_MAX
-              : undefined
-          }
-          reverseDirection={
-            widget.topic === PETANQUE_ANGLE_TOPIC ||
-            widget.topic === PETANQUE_TOTAL_DURATION_TOPIC
-          }
+          endpointLabels={endpointLabels}
+          bubbleValueFormatter={bubbleValueFormatter}
+          unsafeThreshold={unsafeThreshold}
+          reverseDirection={reverseDirection}
           onValueChange={(nextValue) => {
             let resolvedNextValue = nextValue;
             if (widget.topic === PETANQUE_ALPHA_TOPIC) {
-              if (nextValue > PETANQUE_ALPHA_SAFE_MAX) {
+              if (typeof unsafeThreshold === "number" && nextValue > unsafeThreshold) {
                 if (!alphaUnsafeValidatedRef.current) {
                   const confirmed = window.confirm(
-                    "Alpha above 20 is not safe. Validate this value?"
+                    `Alpha above ${unsafeThreshold} is not safe. Validate this value?`
                   );
                   if (!confirmed) {
-                    resolvedNextValue = PETANQUE_ALPHA_SAFE_MAX;
+                    resolvedNextValue = unsafeThreshold;
                   } else {
                     alphaUnsafeValidatedRef.current = true;
                   }
