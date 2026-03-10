@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { CanvasItem } from "../layout/CanvasItem";
 import type { CanvasRect } from "../layout/CanvasItem";
 import * as Slider from "@radix-ui/react-slider";
@@ -17,6 +17,7 @@ import { selectModeLabel, useTeleopStore } from "../../store/teleopStore";
 import type {
   ButtonWidget as ButtonWidgetModel,
   CurvesWidget as CurvesWidgetModel,
+  DrinkWidget as DrinkWidgetModel,
   GripperControlWidget as GripperControlWidgetModel,
   LogsWidget as LogsWidgetModel,
   MagnetControlWidget as MagnetControlWidgetModel,
@@ -113,10 +114,45 @@ type StreamDisplayWidgetProps = BaseWidgetProps & {
   statusText: string;
 };
 
+type DrinkWidgetProps = BaseWidgetProps & {
+  widget: DrinkWidgetModel;
+  onLabelChange: (nextLabel: string) => void;
+};
+
 type CurvesWidgetProps = BaseWidgetProps & {
   widget: CurvesWidgetModel;
   onLabelChange: (nextLabel: string) => void;
 };
+
+type YouTubePlayerStateChangeEvent = {
+  data: number;
+};
+
+type YouTubePlayer = {
+  destroy: () => void;
+};
+
+type YouTubeApi = {
+  Player: new (
+    target: string | HTMLElement,
+    options?: {
+      events?: {
+        onStateChange?: (event: YouTubePlayerStateChangeEvent) => void;
+      };
+    }
+  ) => YouTubePlayer;
+  PlayerState: {
+    ENDED: number;
+  };
+};
+
+declare global {
+  interface Window {
+    YT?: YouTubeApi;
+    onYouTubeIframeAPIReady?: () => void;
+    __extenderYouTubeApiPromise?: Promise<YouTubeApi>;
+  }
+}
 
 type LogsWidgetProps = BaseWidgetProps & {
   widget: LogsWidgetModel;
@@ -148,6 +184,95 @@ const renderIcon = (icon: WidgetIcon) => {
       <path d="M13 6l6 6-6 6" />
     </svg>
   );
+};
+
+const YOUTUBE_IFRAME_API_URL = "https://www.youtube.com/iframe_api";
+
+const loadYouTubeApi = (): Promise<YouTubeApi> => {
+  if (typeof window === "undefined") {
+    return Promise.reject(new Error("Window unavailable"));
+  }
+  if (window.YT?.Player) {
+    return Promise.resolve(window.YT);
+  }
+  if (window.__extenderYouTubeApiPromise) {
+    return window.__extenderYouTubeApiPromise;
+  }
+
+  window.__extenderYouTubeApiPromise = new Promise<YouTubeApi>((resolve, reject) => {
+    const resolveIfReady = () => {
+      if (window.YT?.Player) {
+        resolve(window.YT);
+      }
+    };
+    const previousReadyCallback = window.onYouTubeIframeAPIReady;
+    window.onYouTubeIframeAPIReady = () => {
+      previousReadyCallback?.();
+      resolveIfReady();
+    };
+
+    const existingScript = document.querySelector<HTMLScriptElement>(
+      `script[src="${YOUTUBE_IFRAME_API_URL}"]`
+    );
+    if (!existingScript) {
+      const script = document.createElement("script");
+      script.src = YOUTUBE_IFRAME_API_URL;
+      script.async = true;
+      script.onerror = () => reject(new Error("Failed to load YouTube iframe API"));
+      document.head.appendChild(script);
+    }
+
+    if (window.YT?.Player) {
+      resolve(window.YT);
+    }
+  });
+
+  return window.__extenderYouTubeApiPromise;
+};
+
+const sanitizeYouTubeVideoId = (rawId: string): string | null => {
+  const match = rawId.trim().match(/^[A-Za-z0-9_-]{11}$/);
+  return match ? match[0] : null;
+};
+
+const extractYouTubeVideoId = (rawUrl: string): string | null => {
+  const trimmed = rawUrl.trim();
+  if (!trimmed) return null;
+  const directId = sanitizeYouTubeVideoId(trimmed);
+  if (directId) return directId;
+
+  try {
+    const parsed = new URL(trimmed);
+    const hostname = parsed.hostname.toLowerCase().replace(/^www\./, "");
+    const segments = parsed.pathname.split("/").filter(Boolean);
+    if (hostname === "youtu.be") {
+      return sanitizeYouTubeVideoId(segments[0] ?? "");
+    }
+
+    const vParam = parsed.searchParams.get("v");
+    if (vParam) return sanitizeYouTubeVideoId(vParam);
+
+    if (
+      hostname === "youtube.com" ||
+      hostname === "m.youtube.com" ||
+      hostname === "music.youtube.com" ||
+      hostname === "youtube-nocookie.com"
+    ) {
+      if (segments[0] === "shorts" || segments[0] === "embed" || segments[0] === "v") {
+        return sanitizeYouTubeVideoId(segments[1] ?? "");
+      }
+    }
+  } catch {
+    return null;
+  }
+  return null;
+};
+
+const resolveDrinkVideoEmbedUrl = (rawUrl: string, videoId: string | null) => {
+  if (!videoId) return rawUrl.trim();
+  const originQuery =
+    typeof window !== "undefined" ? `&origin=${encodeURIComponent(window.location.origin)}` : "";
+  return `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&playsinline=1&enablejsapi=1${originQuery}`;
 };
 
 export function TextWidget({
@@ -982,6 +1107,198 @@ export function StreamDisplayWidget({
         </div>
         {showStatusRow ? <div className="controls-stream-status">{statusText}</div> : null}
         {showUrlRow ? <div className="controls-stream-url">{widget.streamUrl || "no stream url"}</div> : null}
+      </div>
+    </CanvasItem>
+  );
+}
+
+type ViewerDragState = {
+  pointerId: number;
+  startX: number;
+  startY: number;
+  originX: number;
+  originY: number;
+};
+
+export function DrinkWidget({
+  widget,
+  selected,
+  onSelect,
+  onRectChange,
+  onLabelChange,
+}: DrinkWidgetProps) {
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [viewerPosition, setViewerPosition] = useState({ x: 12, y: 62 });
+  const [dragState, setDragState] = useState<ViewerDragState | null>(null);
+  const viewerHostRef = useRef<HTMLDivElement | null>(null);
+  const viewerPanelRef = useRef<HTMLDivElement | null>(null);
+  const youtubePlayerRef = useRef<YouTubePlayer | null>(null);
+  const iframeId = `drink-video-frame-${widget.id}`;
+  const videoId = useMemo(() => extractYouTubeVideoId(widget.videoUrl), [widget.videoUrl]);
+  const embedUrl = useMemo(
+    () => resolveDrinkVideoEmbedUrl(widget.videoUrl, videoId),
+    [videoId, widget.videoUrl]
+  );
+
+  const clampViewerPosition = (x: number, y: number) => {
+    const host = viewerHostRef.current;
+    const panel = viewerPanelRef.current;
+    if (!host || !panel) return { x, y };
+    const maxX = Math.max(0, host.clientWidth - panel.offsetWidth);
+    const maxY = Math.max(0, host.clientHeight - panel.offsetHeight);
+    return {
+      x: Math.max(0, Math.min(maxX, x)),
+      y: Math.max(0, Math.min(maxY, y)),
+    };
+  };
+
+  const closeViewer = () => {
+    setViewerOpen(false);
+  };
+
+  const handleViewerHeaderPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setDragState({
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      originX: viewerPosition.x,
+      originY: viewerPosition.y,
+    });
+  };
+
+  useEffect(() => {
+    if (!viewerOpen) return;
+    const frame = window.requestAnimationFrame(() => {
+      setViewerPosition((current) => clampViewerPosition(current.x, current.y));
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [viewerOpen, widget.rect.h, widget.rect.w]);
+
+  useEffect(() => {
+    if (!dragState) return;
+
+    const handlePointerMove = (event: PointerEvent) => {
+      if (event.pointerId !== dragState.pointerId) return;
+      const nextX = dragState.originX + (event.clientX - dragState.startX);
+      const nextY = dragState.originY + (event.clientY - dragState.startY);
+      setViewerPosition(clampViewerPosition(nextX, nextY));
+    };
+
+    const handlePointerEnd = (event: PointerEvent) => {
+      if (event.pointerId !== dragState.pointerId) return;
+      setDragState(null);
+    };
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerEnd);
+    window.addEventListener("pointercancel", handlePointerEnd);
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerEnd);
+      window.removeEventListener("pointercancel", handlePointerEnd);
+    };
+  }, [dragState]);
+
+  useEffect(() => {
+    if (!viewerOpen || !widget.autoCloseOnEnd || !videoId) return;
+    let cancelled = false;
+
+    void loadYouTubeApi()
+      .then((api) => {
+        if (cancelled || !document.getElementById(iframeId)) return;
+        if (youtubePlayerRef.current) {
+          youtubePlayerRef.current.destroy();
+          youtubePlayerRef.current = null;
+        }
+
+        youtubePlayerRef.current = new api.Player(iframeId, {
+          events: {
+            onStateChange: (event) => {
+              if (event.data === api.PlayerState.ENDED) {
+                setViewerOpen(false);
+              }
+            },
+          },
+        });
+      })
+      .catch(() => {
+        // Ignore API failures: iframe playback still works, only auto-close is skipped.
+      });
+
+    return () => {
+      cancelled = true;
+      if (youtubePlayerRef.current) {
+        youtubePlayerRef.current.destroy();
+        youtubePlayerRef.current = null;
+      }
+    };
+  }, [iframeId, videoId, viewerOpen, widget.autoCloseOnEnd]);
+
+  return (
+    <CanvasItem
+      x={widget.rect.x}
+      y={widget.rect.y}
+      w={widget.rect.w}
+      h={widget.rect.h}
+      onChange={onRectChange}
+      onSelect={onSelect}
+      selected={selected}
+      minSize={{ w: 110, h: 52 }}
+      className="controls-drink-item"
+    >
+      <div className="controls-drink-widget" ref={viewerHostRef} data-canvas-interactive="true">
+        <button
+          type="button"
+          className="controls-drink-button"
+          onClick={() => setViewerOpen((current) => !current)}
+          data-canvas-interactive="true"
+        >
+          <InlineEditableText
+            value={widget.label}
+            onCommit={onLabelChange}
+            className="controls-inline-label"
+          />
+        </button>
+        {viewerOpen ? (
+          <div
+            className="controls-drink-viewer"
+            ref={viewerPanelRef}
+            style={{ left: `${viewerPosition.x}px`, top: `${viewerPosition.y}px` }}
+            data-canvas-interactive="true"
+          >
+            <div
+              className="controls-drink-viewer-header"
+              onPointerDown={handleViewerHeaderPointerDown}
+              data-canvas-interactive="true"
+            >
+              <span className="controls-drink-viewer-title">Drink break</span>
+              <button
+                type="button"
+                className="controls-drink-close"
+                onClick={closeViewer}
+                data-canvas-interactive="true"
+                aria-label="Close drink video"
+                title="Close"
+              >
+                x
+              </button>
+            </div>
+            <div className="controls-drink-frame-wrap" data-canvas-interactive="true">
+              <iframe
+                id={iframeId}
+                className="controls-drink-frame"
+                src={embedUrl}
+                title={`${widget.label} video`}
+                loading="lazy"
+                allow="autoplay; encrypted-media; picture-in-picture; web-share"
+                allowFullScreen
+                data-canvas-interactive="true"
+              />
+            </div>
+          </div>
+        ) : null}
       </div>
     </CanvasItem>
   );

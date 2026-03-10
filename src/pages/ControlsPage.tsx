@@ -12,6 +12,7 @@ import { wsClient } from "../services/wsClient";
 import {
   ActionButtonWidget,
   CurvesWidget,
+  DrinkWidget,
   GripperControlWidget,
   JoystickWidget,
   LoadPoseButtonWidget,
@@ -40,6 +41,7 @@ import {
   type ButtonWidgetModel,
   type CanvasWidget,
   type CurvesWidgetModel,
+  type DrinkWidgetModel,
   type JoystickWidgetModel,
   type LoadPoseButtonWidgetModel,
   type LogsWidgetModel,
@@ -677,6 +679,9 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
     updater: (widget: StreamDisplayWidgetModel) => StreamDisplayWidgetModel
   ) => {
     updateSelectedWidget((widget) => (widget.kind === "stream-display" ? updater(widget) : widget));
+  };
+  const updateSelectedDrink = (updater: (widget: DrinkWidgetModel) => DrinkWidgetModel) => {
+    updateSelectedWidget((widget) => (widget.kind === "drink" ? updater(widget) : widget));
   };
   const updateSelectedCurves = (updater: (widget: CurvesWidgetModel) => CurvesWidgetModel) => {
     updateSelectedWidget((widget) => (widget.kind === "curves" ? updater(widget) : widget));
@@ -1367,6 +1372,23 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
             )
           }
           statusText={sourceStatus}
+        />
+      );
+    }
+
+    if (widget.kind === "drink") {
+      return (
+        <DrinkWidget
+          key={widget.id}
+          widget={widget}
+          selected={selected}
+          onSelect={() => setSelectedWidgetId(widget.id)}
+          onRectChange={(next) => handleWidgetRectChange(widget.id, next)}
+          onLabelChange={(nextLabel) =>
+            updateWidget(widget.id, (current) =>
+              current.kind === "drink" ? { ...current, label: nextLabel } : current
+            )
+          }
         />
       );
     }
@@ -2607,6 +2629,39 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
                             }))
                           }
                         />
+                      </label>
+                    </>
+                  ) : selectedWidget.kind === "drink" ? (
+                    <>
+                      <div className="controls-property-title">Drink Widget</div>
+                      <label className="controls-field">
+                        <span>Video URL</span>
+                        <input
+                          className="editor-input"
+                          value={selectedWidget.videoUrl}
+                          onChange={(event) =>
+                            updateSelectedDrink((widget) => ({
+                              ...widget,
+                              videoUrl: event.target.value,
+                            }))
+                          }
+                        />
+                      </label>
+                      <label className="controls-field">
+                        <span>Auto Close On End</span>
+                        <select
+                          className="editor-input"
+                          value={selectedWidget.autoCloseOnEnd ? "enabled" : "disabled"}
+                          onChange={(event) =>
+                            updateSelectedDrink((widget) => ({
+                              ...widget,
+                              autoCloseOnEnd: event.target.value === "enabled",
+                            }))
+                          }
+                        >
+                          <option value="enabled">enabled</option>
+                          <option value="disabled">disabled</option>
+                        </select>
                       </label>
                     </>
                   ) : selectedWidget.kind === "curves" ? (

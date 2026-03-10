@@ -1247,6 +1247,7 @@ body,
 .controls-text-item,
 .controls-textarea-item,
 .controls-action-button-item,
+.controls-drink-item,
 .controls-mode-button-item,
 .controls-navigation-button-item,
 .controls-navigation-bar-item,
@@ -1353,6 +1354,103 @@ body,
 .controls-action-button-widget.tone-danger {
   border-color: color-mix(in srgb, #f97316 44%, var(--border));
   background: color-mix(in srgb, #ea580c 30%, var(--panel) 70%);
+}
+
+.controls-drink-widget {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.controls-drink-button {
+  width: 100%;
+  height: 100%;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, #facc15 65%, #ca8a04 35%);
+  background: linear-gradient(150deg, #fde047 0%, #facc15 54%, #eab308 100%);
+  color: #422006;
+  font-weight: 800;
+  transition: transform 120ms ease, box-shadow 140ms ease, filter 140ms ease;
+}
+
+.controls-drink-button:hover:enabled {
+  filter: brightness(1.03);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, #facc15 70%, transparent),
+    0 8px 18px color-mix(in srgb, #ca8a04 26%, transparent);
+}
+
+.controls-drink-button:active:enabled {
+  transform: translateY(1px) scale(0.995);
+}
+
+.controls-drink-viewer {
+  position: absolute;
+  left: 12px;
+  top: 62px;
+  width: min(92%, 520px);
+  min-width: 280px;
+  max-width: calc(100% - 12px);
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, #facc15 48%, #92400e 52%);
+  background: color-mix(in srgb, #020617 58%, var(--panel) 42%);
+  box-shadow: 0 14px 28px color-mix(in srgb, #000 36%, transparent);
+  z-index: 15;
+  overflow: hidden;
+}
+
+.controls-drink-viewer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem;
+  padding: 0.3rem 0.5rem;
+  cursor: grab;
+  user-select: none;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, #fde047 82%, #ca8a04 18%),
+    color-mix(in srgb, #facc15 75%, #d97706 25%)
+  );
+  color: #422006;
+}
+
+.controls-drink-viewer-header:active {
+  cursor: grabbing;
+}
+
+.controls-drink-viewer-title {
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+}
+
+.controls-drink-close {
+  border: 1px solid color-mix(in srgb, #ca8a04 65%, #78350f 35%);
+  border-radius: 999px;
+  width: 1.35rem;
+  height: 1.35rem;
+  font-size: 0.78rem;
+  font-weight: 900;
+  line-height: 1;
+  color: #422006;
+  background: color-mix(in srgb, #fef08a 74%, #facc15 26%);
+}
+
+.controls-drink-frame-wrap {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  min-height: 180px;
+  max-height: 320px;
+  background: #000;
+}
+
+.controls-drink-frame {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
 }
 
 .application-runtime-screen-petanque .controls-action-button-widget,

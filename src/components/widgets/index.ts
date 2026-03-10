@@ -3,6 +3,7 @@ export { SliderWidget } from "./SliderWidget";
 export {
   ActionButtonWidget,
   CurvesWidget,
+  DrinkWidget,
   GripperControlWidget,
   LogsWidget,
   MagnetControlWidget,
@@ -39,6 +40,7 @@ export {
   type MagnetControlWidget as MagnetControlWidgetModel,
   type StreamDisplayWidget as StreamDisplayWidgetModel,
   type CurvesWidget as CurvesWidgetModel,
+  type DrinkWidget as DrinkWidgetModel,
   type LogsWidget as LogsWidgetModel,
   type NavigationOrientation,
   type StreamFitMode,

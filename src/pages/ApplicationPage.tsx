@@ -6,6 +6,7 @@ import type { CanvasRect } from "../components/layout/CanvasItem";
 import {
   ActionButtonWidget,
   CurvesWidget,
+  DrinkWidget,
   GripperControlWidget,
   JoystickWidget,
   LoadPoseButtonWidget,
@@ -1281,6 +1282,19 @@ export function ApplicationPage({
           onRectChange={NOOP_RECT_CHANGE}
           onLabelChange={NOOP_TEXT_CHANGE}
           statusText={sourceStatus}
+        />
+      );
+    }
+
+    if (widget.kind === "drink") {
+      return (
+        <DrinkWidget
+          key={widget.id}
+          widget={widget}
+          selected={false}
+          onSelect={() => {}}
+          onRectChange={NOOP_RECT_CHANGE}
+          onLabelChange={NOOP_TEXT_CHANGE}
         />
       );
     }

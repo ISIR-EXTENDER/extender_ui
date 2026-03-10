@@ -27,6 +27,7 @@ export type WidgetKind =
   | "gripper-control"
   | "magnet-control"
   | "stream-display"
+  | "drink"
   | "curves"
   | "logs";
 
@@ -151,6 +152,12 @@ export type StreamDisplayWidget = WidgetBase & {
   showWebcamPicker?: boolean;
 };
 
+export type DrinkWidget = WidgetBase & {
+  kind: "drink";
+  videoUrl: string;
+  autoCloseOnEnd: boolean;
+};
+
 export type CurvesWidget = WidgetBase & {
   kind: "curves";
   sampleRateHz: number;
@@ -183,6 +190,7 @@ export type CanvasWidget =
   | GripperControlWidget
   | MagnetControlWidget
   | StreamDisplayWidget
+  | DrinkWidget
   | CurvesWidget
   | LogsWidget;
 

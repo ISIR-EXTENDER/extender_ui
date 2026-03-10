@@ -2,6 +2,7 @@ import type {
   ButtonWidget,
   CanvasWidget,
   CurvesWidget,
+  DrinkWidget,
   GripperControlWidget,
   MagnetControlWidget,
   JoystickWidget,
@@ -36,6 +37,7 @@ export type WidgetCatalogType =
   | "gripper-control"
   | "magnet-control"
   | "stream-display"
+  | "drink"
   | "curves"
   | "logs"
   | "linear-joystick"
@@ -67,6 +69,7 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
   { type: "gripper-control", label: "Gripper Control", enabled: true, defaultSize: { w: 300, h: 170 } },
   { type: "magnet-control", label: "Magnet Control", enabled: true, defaultSize: { w: 240, h: 120 } },
   { type: "stream-display", label: "Stream Display", enabled: true, defaultSize: { w: 360, h: 260 } },
+  { type: "drink", label: "Drink Button", enabled: true, defaultSize: { w: 180, h: 58 } },
   { type: "curves", label: "Curves", enabled: true, defaultSize: { w: 420, h: 240 } },
   { type: "logs", label: "Logs", enabled: true, defaultSize: { w: 360, h: 220 } },
   { type: "linear-joystick", label: "Linear Joystick", enabled: false, defaultSize: { w: 250, h: 60 } },
@@ -285,6 +288,19 @@ export function createWidgetFromCatalogType(
       showUrl: true,
       overlayText: "stream preview",
       rect: { x, y, w: 360, h: 260 },
+    };
+    return widget;
+  }
+
+  if (type === "drink") {
+    const widget: DrinkWidget = {
+      id: nextWidgetId(),
+      kind: "drink",
+      label: "Drink",
+      topic: "/ui/drink",
+      videoUrl: "https://www.youtube.com/shorts/JQbLM2BUcLg",
+      autoCloseOnEnd: true,
+      rect: { x, y, w: 180, h: 58 },
     };
     return widget;
   }

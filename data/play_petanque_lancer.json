@@ -87,6 +87,20 @@
       }
     },
     {
+      "id": "play-lancer-drink",
+      "kind": "drink",
+      "label": "Drink",
+      "topic": "/ui/drink",
+      "videoUrl": "https://www.youtube.com/shorts/JQbLM2BUcLg",
+      "autoCloseOnEnd": true,
+      "rect": {
+        "x": 840,
+        "y": 90,
+        "w": 190,
+        "h": 58
+      }
+    },
+    {
       "id": "play-lancer-speed",
       "kind": "max-velocity",
       "label": "Throw Speed",

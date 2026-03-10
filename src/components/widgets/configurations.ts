@@ -678,6 +678,13 @@ export const DEFAULT_DEMO_CONFIGURATIONS: WidgetConfiguration[] = [
       tone: "danger",
       rect: { w: 150, h: 58 },
     }),
+    createDemoWidget("play-lancer-drink", "drink", 840, 90, {
+      label: "Drink",
+      topic: "/ui/drink",
+      videoUrl: "https://www.youtube.com/shorts/JQbLM2BUcLg",
+      autoCloseOnEnd: true,
+      rect: { w: 190, h: 58 },
+    }),
     createDemoWidget("play-lancer-speed", "max-velocity", 20, 170, {
       label: "Throw Speed",
       topic: "/petanque_throw/total_duration",
