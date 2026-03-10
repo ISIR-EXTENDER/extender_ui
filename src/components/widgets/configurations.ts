@@ -753,6 +753,89 @@ export const DEFAULT_DEMO_CONFIGURATIONS: WidgetConfiguration[] = [
     }),
   ]),
 
+  createDemoConfiguration("play_petanque_lancer_draw", [
+    createDemoWidget("play-lancer-teleop", "button", 20, 25, {
+      label: "Teleop",
+      topic: "/petanque_state_machine/change_state",
+      payload: "teleop",
+      tone: "default",
+      rect: { w: 150, h: 58 },
+    }),
+    createDemoWidget("play-lancer-start", "button", 180, 25, {
+      label: "Start",
+      topic: "/petanque_state_machine/change_state",
+      payload: "activate_throw",
+      tone: "accent",
+      rect: { w: 170, h: 58 },
+    }),
+    createDemoWidget("play-lancer-home", "button", 683, 20, {
+      label: "Home",
+      topic: "/petanque_state_machine/change_state",
+      payload: "go_to_start",
+      tone: "success",
+      rect: { w: 150, h: 58 },
+    }),
+    createDemoWidget("play-lancer-throw", "button", 360, 25, {
+      label: "Throw",
+      topic: "/petanque_state_machine/change_state",
+      payload: "throw",
+      tone: "danger",
+      rect: { w: 150, h: 58 },
+    }),
+    createDemoWidget("play-lancer-test-loop", "button", 850, 20, {
+      label: "TEST",
+      topic: "/petanque_state_machine/change_state",
+      payload: "test_loop",
+      tone: "accent",
+      rect: { w: 190, h: 58 },
+    }),
+    createDemoWidget("play-lancer-pointer", "button", 852, 102, {
+      label: "Pointer",
+      topic: "/petanque_throw/alpha_preset",
+      payload: "pointer",
+      tone: "success",
+      rect: { w: 190, h: 52 },
+    }),
+    createDemoWidget("play-lancer-tirer", "button", 1067, 102, {
+      label: "Tirer",
+      topic: "/petanque_throw/alpha_preset",
+      payload: "tirer",
+      tone: "danger",
+      rect: { w: 190, h: 52 },
+    }),
+    createDemoWidget("play-lancer-alpha", "max-velocity", 20, 102, {
+      label: "Alpha",
+      topic: "/petanque_throw/alpha",
+      min: 0,
+      max: 40,
+      step: 0.01,
+      unsafeThreshold: 20,
+      endpointLeftLabel: "Tirer",
+      endpointRightLabel: "Pointer",
+      bubbleMode: "degrees-unit",
+      rect: { w: 401, h: 157 },
+    }),
+    createDemoWidget("play-lancer-drink", "drink", 1063, 18, {
+      label: "Drink",
+      topic: "/ui/drink",
+      videoUrl: "https://www.youtube.com/shorts/JQbLM2BUcLg",
+      autoCloseOnEnd: true,
+      rect: { w: 197, h: 72 },
+    }),
+    createDemoWidget("play-lancer-draw", "throw-draw", 20, 289, {
+      label: "Throw Draw",
+      topic: "/petanque_throw/draw",
+      angleTopic: "/petanque_throw/angle_between_start_and_finish",
+      powerTopic: "/petanque_throw/total_duration",
+      angleMin: -0.26,
+      angleMax: 0.26,
+      durationMin: 0.9,
+      durationMax: 3,
+      holdToMaxMs: 1400,
+      rect: { w: 1159, h: 385 },
+    }),
+  ]),
+
   createDemoConfiguration("play_petanque_ramassage", [
     createDemoWidget("play-ram-title", "text", 20, 20, {
       text: "PlayPetanque RAMASSAGE",
@@ -1168,7 +1251,8 @@ const normalizePetanqueSliderRanges = (
   return configurations.map((configuration) => {
     const isPetanqueConfig =
       configuration.name === "petanque" ||
-      configuration.name === "play_petanque_lancer";
+      configuration.name === "play_petanque_lancer" ||
+      configuration.name === "play_petanque_lancer_draw";
     if (!isPetanqueConfig) return configuration;
 
     let changed = false;
@@ -1244,7 +1328,8 @@ const normalizePetanqueSliderDisplayOptions = (
   return configurations.map((configuration) => {
     const isPetanqueConfig =
       configuration.name === "petanque" ||
-      configuration.name === "play_petanque_lancer";
+      configuration.name === "play_petanque_lancer" ||
+      configuration.name === "play_petanque_lancer_draw";
     if (!isPetanqueConfig) return configuration;
 
     let changed = false;
@@ -1357,6 +1442,56 @@ const ensurePlayPetanqueLancerActionButtons = (
     return {
       ...configuration,
       widgets: [...configuration.widgets, ...cloneWidgets(missingButtons)],
+      updatedAt: new Date().toISOString(),
+    };
+  });
+};
+
+const migratePlayPetanqueLancerDrawThrowWidget = (
+  configurations: WidgetConfiguration[]
+): WidgetConfiguration[] => {
+  const latestLancerDraw = DEFAULT_DEMO_CONFIGURATIONS.find(
+    (configuration) => configuration.name === "play_petanque_lancer_draw"
+  );
+  if (!latestLancerDraw) return configurations;
+
+  const drawTemplate = latestLancerDraw.widgets.find(
+    (widget): widget is Extract<CanvasWidget, { kind: "throw-draw" }> =>
+      widget.kind === "throw-draw" && widget.id === "play-lancer-draw"
+  );
+  if (!drawTemplate) return configurations;
+
+  return configurations.map((configuration) => {
+    if (configuration.name !== "play_petanque_lancer_draw") return configuration;
+
+    const hasThrowDrawWidget = configuration.widgets.some(
+      (widget) => widget.kind === "throw-draw"
+    );
+    const legacyVisualizationWidget = configuration.widgets.find(
+      (widget) => widget.id === "play-lancer-rviz" && widget.kind === "stream-display"
+    );
+
+    if (hasThrowDrawWidget && !legacyVisualizationWidget) {
+      return configuration;
+    }
+
+    const nextWidgets = configuration.widgets
+      .filter((widget) => widget.id !== "play-lancer-rviz")
+      .map((widget) => ({ ...widget }));
+
+    if (!hasThrowDrawWidget) {
+      const drawWidget: Extract<CanvasWidget, { kind: "throw-draw" }> = {
+        ...cloneWidgets([drawTemplate])[0],
+        rect: legacyVisualizationWidget?.rect
+          ? { ...legacyVisualizationWidget.rect }
+          : { ...drawTemplate.rect },
+      } as Extract<CanvasWidget, { kind: "throw-draw" }>;
+      nextWidgets.push(drawWidget);
+    }
+
+    return {
+      ...configuration,
+      widgets: nextWidgets,
       updatedAt: new Date().toISOString(),
     };
   });
@@ -1881,17 +2016,19 @@ const applyConfigurationMigrations = (
 ): WidgetConfiguration[] =>
   normalizePetanqueTeleopButtonLayout(
     normalizeTeleopVelocitySliderRange(
-      ensurePlayPetanqueLancerActionButtons(
-        normalizePetanqueSliderDisplayOptions(
-          normalizePetanqueSliderRanges(
-            ensurePetanqueGripperControl(
-              ensurePetanqueElectromagnetControl(
-                removePetanqueLegacyNavigationButtons(
-                  migratePetanqueTeleopConfigLayout(
-                    disablePetanqueViewerWidget(
-                      migrateLegacyPetanque(
-                        migrateLegacyDefaultControl(
-                          mergeMissingDemoConfigurations(configurations)
+      migratePlayPetanqueLancerDrawThrowWidget(
+        ensurePlayPetanqueLancerActionButtons(
+          normalizePetanqueSliderDisplayOptions(
+            normalizePetanqueSliderRanges(
+              ensurePetanqueGripperControl(
+                ensurePetanqueElectromagnetControl(
+                  removePetanqueLegacyNavigationButtons(
+                    migratePetanqueTeleopConfigLayout(
+                      disablePetanqueViewerWidget(
+                        migrateLegacyPetanque(
+                          migrateLegacyDefaultControl(
+                            mergeMissingDemoConfigurations(configurations)
+                          )
                         )
                       )
                     )

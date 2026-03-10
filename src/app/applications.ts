@@ -22,6 +22,7 @@ const PLAY_PETANQUE_APP_ID = "application-play-petanque";
 const PLAY_PETANQUE_APP_NAME = "PlayPetanque";
 const PLAY_PETANQUE_CAMERA_SCREEN_ID = "play_petanque_camera";
 const PLAY_PETANQUE_LANCER_SCREEN_ID = "play_petanque_lancer";
+const PLAY_PETANQUE_LANCER_DRAW_SCREEN_ID = "play_petanque_lancer_draw";
 const PLAY_PETANQUE_RAMASSAGE_SCREEN_ID = "play_petanque_ramassage";
 const PLAY_PETANQUE_MEASURES_SCREEN_ID = "play_petanque_measures";
 
@@ -119,6 +120,7 @@ const ensurePlayPetanqueApplication = (
     ...baseScreenIds,
     PLAY_PETANQUE_CAMERA_SCREEN_ID,
     PLAY_PETANQUE_LANCER_SCREEN_ID,
+    PLAY_PETANQUE_LANCER_DRAW_SCREEN_ID,
     PLAY_PETANQUE_RAMASSAGE_SCREEN_ID,
     PLAY_PETANQUE_MEASURES_SCREEN_ID,
   ]);

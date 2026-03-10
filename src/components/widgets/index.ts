@@ -13,6 +13,7 @@ export {
   NavigationButtonWidget,
   RosbagControlWidget,
   StreamDisplayWidget,
+  ThrowDrawWidget,
   TextareaWidget,
   TextWidget,
 } from "./AuxWidgets";
@@ -39,6 +40,7 @@ export {
   type GripperControlWidget as GripperControlWidgetModel,
   type MagnetControlWidget as MagnetControlWidgetModel,
   type StreamDisplayWidget as StreamDisplayWidgetModel,
+  type ThrowDrawWidget as ThrowDrawWidgetModel,
   type CurvesWidget as CurvesWidgetModel,
   type DrinkWidget as DrinkWidgetModel,
   type LogsWidget as LogsWidgetModel,

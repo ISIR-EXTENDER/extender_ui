@@ -26,6 +26,7 @@ import {
   SavePoseButtonWidget,
   SliderWidget,
   StreamDisplayWidget,
+  ThrowDrawWidget,
   TextareaWidget,
   TextWidget,
   WIDGET_CATALOG,
@@ -53,6 +54,7 @@ import {
   type RosbagControlWidgetModel,
   type SliderWidgetModel,
   type StreamDisplayWidgetModel,
+  type ThrowDrawWidgetModel,
   type TextAlign,
   type TextareaWidgetModel,
   type TextWidgetModel,
@@ -105,6 +107,7 @@ const PETANQUE_TOTAL_DURATION_TOPIC = "/petanque_throw/total_duration";
 const PETANQUE_ANGLE_TOPIC = "/petanque_throw/angle_between_start_and_finish";
 const PETANQUE_ALPHA_TOPIC = "/petanque_throw/alpha";
 const PETANQUE_ALPHA_SAFE_MAX = 20;
+const PETANQUE_DEFAULT_TOTAL_DURATION_S = 1.1;
 const SNAP_THRESHOLD_PX = 10;
 const SNAP_GUIDE_HIDE_DELAY_MS = 130;
 const MIN_EDITOR_ZOOM = 0.2;
@@ -223,6 +226,9 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
   const [configNameInput, setConfigNameInput] = useState<string>("");
   const [statusMessage, setStatusMessage] = useState<string>("");
   const [widgetPulseMap, setWidgetPulseMap] = useState<Record<string, number>>({});
+  const [throwDrawWidgetValues, setThrowDrawWidgetValues] = useState<
+    Record<string, { angle: number; duration: number }>
+  >({});
   const [freshnessClock, setFreshnessClock] = useState<number>(() => Date.now());
   const [rosbagRecording, setRosbagRecording] = useState(false);
   const [rosbagStatus, setRosbagStatus] = useState("idle");
@@ -319,6 +325,22 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
         changed = true;
       }
 
+      return changed ? next : prev;
+    });
+  }, [widgets]);
+
+  useEffect(() => {
+    setThrowDrawWidgetValues((prev) => {
+      const currentIds = new Set(widgets.map((widget) => widget.id));
+      let changed = false;
+      const next: Record<string, { angle: number; duration: number }> = {};
+      for (const [widgetId, value] of Object.entries(prev)) {
+        if (currentIds.has(widgetId)) {
+          next[widgetId] = value;
+          continue;
+        }
+        changed = true;
+      }
       return changed ? next : prev;
     });
   }, [widgets]);
@@ -720,6 +742,11 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
     updater: (widget: MaxVelocityWidgetModel) => MaxVelocityWidgetModel
   ) => {
     updateSelectedWidget((widget) => (widget.kind === "max-velocity" ? updater(widget) : widget));
+  };
+  const updateSelectedThrowDraw = (
+    updater: (widget: ThrowDrawWidgetModel) => ThrowDrawWidgetModel
+  ) => {
+    updateSelectedWidget((widget) => (widget.kind === "throw-draw" ? updater(widget) : widget));
   };
   const updateSelectedStreamDisplay = (
     updater: (widget: StreamDisplayWidgetModel) => StreamDisplayWidgetModel
@@ -1295,6 +1322,55 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
           isRecording={rosbagRecording}
           statusText={rosbagStatus}
           onToggleRecording={() => toggleRosbagRecording(widget)}
+        />
+      );
+    }
+
+    if (widget.kind === "throw-draw") {
+      const angleMin = Math.min(widget.angleMin, widget.angleMax);
+      const angleMax = Math.max(widget.angleMin, widget.angleMax);
+      const durationMin = Math.min(widget.durationMin, widget.durationMax);
+      const durationMax = Math.max(widget.durationMin, widget.durationMax);
+      const defaultDuration =
+        widget.powerTopic === PETANQUE_TOTAL_DURATION_TOPIC
+          ? PETANQUE_DEFAULT_TOTAL_DURATION_S
+          : durationMax;
+      const drawValue = throwDrawWidgetValues[widget.id] ?? {
+        angle: Math.max(angleMin, Math.min(angleMax, 0)),
+        duration: Math.max(durationMin, Math.min(durationMax, defaultDuration)),
+      };
+      return (
+        <ThrowDrawWidget
+          key={widget.id}
+          widget={widget}
+          selected={selected}
+          onSelect={() => setSelectedWidgetId(widget.id)}
+          onRectChange={(next) => handleWidgetRectChange(widget.id, next)}
+          onLabelChange={(nextLabel) =>
+            updateWidget(widget.id, (current) =>
+              current.kind === "throw-draw" ? { ...current, label: nextLabel } : current
+            )
+          }
+          angleValue={drawValue.angle}
+          durationValue={drawValue.duration}
+          onValueChange={(next) => {
+            const resolvedAngle =
+              typeof next.angle === "number"
+                ? Math.max(angleMin, Math.min(angleMax, next.angle))
+                : drawValue.angle;
+            const resolvedDuration =
+              typeof next.duration === "number"
+                ? Math.max(durationMin, Math.min(durationMax, next.duration))
+                : drawValue.duration;
+            setThrowDrawWidgetValues((prev) => ({
+              ...prev,
+              [widget.id]: {
+                angle: resolvedAngle,
+                duration: resolvedDuration,
+              },
+            }));
+            markWidgetPulse(widget.id);
+          }}
         />
       );
     }
@@ -2671,6 +2747,117 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
                               updateSelectedMaxVelocity((widget) => ({
                                 ...widget,
                                 unsafeThreshold: readOptionalNumber(event.target.value),
+                              }))
+                            }
+                          />
+                        </label>
+                      </div>
+                    </>
+                  ) : selectedWidget.kind === "throw-draw" ? (
+                    <>
+                      <div className="controls-property-title">Throw Draw</div>
+                      <div className="controls-field-row">
+                        <label className="controls-field">
+                          <span>Angle Topic</span>
+                          <input
+                            className="editor-input"
+                            value={selectedWidget.angleTopic}
+                            onChange={(event) =>
+                              updateSelectedThrowDraw((widget) => ({
+                                ...widget,
+                                angleTopic: event.target.value,
+                              }))
+                            }
+                          />
+                        </label>
+                        <label className="controls-field">
+                          <span>Power Topic</span>
+                          <input
+                            className="editor-input"
+                            value={selectedWidget.powerTopic}
+                            onChange={(event) =>
+                              updateSelectedThrowDraw((widget) => ({
+                                ...widget,
+                                powerTopic: event.target.value,
+                              }))
+                            }
+                          />
+                        </label>
+                      </div>
+                      <div className="controls-field-row">
+                        <label className="controls-field">
+                          <span>Angle Min</span>
+                          <input
+                            type="number"
+                            step={0.001}
+                            className="editor-input"
+                            value={selectedWidget.angleMin}
+                            onChange={(event) =>
+                              updateSelectedThrowDraw((widget) => ({
+                                ...widget,
+                                angleMin: readNumber(event.target.value, widget.angleMin),
+                              }))
+                            }
+                          />
+                        </label>
+                        <label className="controls-field">
+                          <span>Angle Max</span>
+                          <input
+                            type="number"
+                            step={0.001}
+                            className="editor-input"
+                            value={selectedWidget.angleMax}
+                            onChange={(event) =>
+                              updateSelectedThrowDraw((widget) => ({
+                                ...widget,
+                                angleMax: readNumber(event.target.value, widget.angleMax),
+                              }))
+                            }
+                          />
+                        </label>
+                      </div>
+                      <div className="controls-field-row">
+                        <label className="controls-field">
+                          <span>Duration Min</span>
+                          <input
+                            type="number"
+                            step={0.01}
+                            className="editor-input"
+                            value={selectedWidget.durationMin}
+                            onChange={(event) =>
+                              updateSelectedThrowDraw((widget) => ({
+                                ...widget,
+                                durationMin: readNumber(event.target.value, widget.durationMin),
+                              }))
+                            }
+                          />
+                        </label>
+                        <label className="controls-field">
+                          <span>Duration Max</span>
+                          <input
+                            type="number"
+                            step={0.01}
+                            className="editor-input"
+                            value={selectedWidget.durationMax}
+                            onChange={(event) =>
+                              updateSelectedThrowDraw((widget) => ({
+                                ...widget,
+                                durationMax: readNumber(event.target.value, widget.durationMax),
+                              }))
+                            }
+                          />
+                        </label>
+                        <label className="controls-field">
+                          <span>Charge Time (ms)</span>
+                          <input
+                            type="number"
+                            step={50}
+                            className="editor-input"
+                            value={selectedWidget.holdToMaxMs}
+                            onChange={(event) =>
+                              updateSelectedThrowDraw((widget) => ({
+                                ...widget,
+                                holdToMaxMs: Math.max(250, Math.round(readNumber(event.target.value, widget.holdToMaxMs))),
                               }))
                             }
                           />

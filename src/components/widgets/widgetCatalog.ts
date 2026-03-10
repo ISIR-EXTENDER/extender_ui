@@ -14,6 +14,7 @@ import type {
   NavigationButtonWidget,
   RosbagControlWidget,
   StreamDisplayWidget,
+  ThrowDrawWidget,
   SavePoseButtonWidget,
   SliderWidget,
   TextareaWidget,
@@ -37,6 +38,7 @@ export type WidgetCatalogType =
   | "gripper-control"
   | "magnet-control"
   | "stream-display"
+  | "throw-draw"
   | "drink"
   | "curves"
   | "logs"
@@ -69,6 +71,7 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
   { type: "gripper-control", label: "Gripper Control", enabled: true, defaultSize: { w: 300, h: 170 } },
   { type: "magnet-control", label: "Magnet Control", enabled: true, defaultSize: { w: 240, h: 120 } },
   { type: "stream-display", label: "Stream Display", enabled: true, defaultSize: { w: 360, h: 260 } },
+  { type: "throw-draw", label: "Throw Draw", enabled: true, defaultSize: { w: 640, h: 360 } },
   { type: "drink", label: "Drink Button", enabled: true, defaultSize: { w: 180, h: 58 } },
   { type: "curves", label: "Curves", enabled: true, defaultSize: { w: 420, h: 240 } },
   { type: "logs", label: "Logs", enabled: true, defaultSize: { w: 360, h: 220 } },
@@ -288,6 +291,24 @@ export function createWidgetFromCatalogType(
       showUrl: true,
       overlayText: "stream preview",
       rect: { x, y, w: 360, h: 260 },
+    };
+    return widget;
+  }
+
+  if (type === "throw-draw") {
+    const widget: ThrowDrawWidget = {
+      id: nextWidgetId(),
+      kind: "throw-draw",
+      label: "Throw Draw",
+      topic: "/petanque_throw/draw",
+      angleTopic: "/petanque_throw/angle_between_start_and_finish",
+      powerTopic: "/petanque_throw/total_duration",
+      angleMin: -0.26,
+      angleMax: 0.26,
+      durationMin: 0.9,
+      durationMax: 3,
+      holdToMaxMs: 1400,
+      rect: { x, y, w: 640, h: 360 },
     };
     return widget;
   }

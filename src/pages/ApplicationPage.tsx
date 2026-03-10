@@ -20,6 +20,7 @@ import {
   SavePoseButtonWidget,
   SliderWidget,
   StreamDisplayWidget,
+  ThrowDrawWidget,
   TextareaWidget,
   TextWidget,
   DEFAULT_CANVAS_SETTINGS,
@@ -206,6 +207,9 @@ export function ApplicationPage({
   const [rosbagStatus, setRosbagStatus] = useState("idle");
   const [petanqueFlowStage, setPetanqueFlowStage] = useState<PetanqueFlowStage>("teleop");
   const [maxVelocityWidgetValues, setMaxVelocityWidgetValues] = useState<Record<string, number>>({});
+  const [throwDrawWidgetValues, setThrowDrawWidgetValues] = useState<
+    Record<string, { angle: number; duration: number }>
+  >({});
   const [measureViewMode, setMeasureViewMode] = useState<MeasureViewMode>("live");
   const [capturedMeasureImageDataUrl, setCapturedMeasureImageDataUrl] = useState<string | null>(
     null
@@ -1159,6 +1163,88 @@ export function ApplicationPage({
           isRecording={rosbagRecording}
           statusText={rosbagStatus}
           onToggleRecording={() => toggleRosbagRecording(widget)}
+        />
+      );
+    }
+
+    if (widget.kind === "throw-draw") {
+      const angleMin = Math.min(widget.angleMin, widget.angleMax);
+      const angleMax = Math.max(widget.angleMin, widget.angleMax);
+      const durationMin = Math.min(widget.durationMin, widget.durationMax);
+      const durationMax = Math.max(widget.durationMin, widget.durationMax);
+      const defaultDuration =
+        widget.powerTopic === PETANQUE_TOTAL_DURATION_TOPIC
+          ? PETANQUE_DEFAULT_TOTAL_DURATION_S
+          : durationMax;
+      const drawValue = throwDrawWidgetValues[widget.id] ?? {
+        angle: Math.max(angleMin, Math.min(angleMax, 0)),
+        duration: Math.max(durationMin, Math.min(durationMax, defaultDuration)),
+      };
+      const clampedAngle = Math.max(angleMin, Math.min(angleMax, drawValue.angle));
+      const clampedDuration = Math.max(durationMin, Math.min(durationMax, drawValue.duration));
+      return (
+        <ThrowDrawWidget
+          key={widget.id}
+          widget={widget}
+          selected={false}
+          onSelect={() => {}}
+          onRectChange={NOOP_RECT_CHANGE}
+          onLabelChange={NOOP_TEXT_CHANGE}
+          angleValue={clampedAngle}
+          durationValue={clampedDuration}
+          onValueChange={(next) => {
+            const resolvedAngle =
+              typeof next.angle === "number"
+                ? Math.max(angleMin, Math.min(angleMax, next.angle))
+                : clampedAngle;
+            const resolvedDuration =
+              typeof next.duration === "number"
+                ? Math.max(durationMin, Math.min(durationMax, next.duration))
+                : clampedDuration;
+
+            setThrowDrawWidgetValues((prev) => ({
+              ...prev,
+              [widget.id]: {
+                angle: resolvedAngle,
+                duration: resolvedDuration,
+              },
+            }));
+
+            setMaxVelocityWidgetValues((prev) => {
+              const nextValues = { ...prev };
+              for (const candidate of widgets) {
+                if (candidate.kind !== "max-velocity") continue;
+                if (candidate.topic === widget.angleTopic) {
+                  nextValues[candidate.id] = resolvedAngle;
+                }
+                if (candidate.topic === widget.powerTopic) {
+                  nextValues[candidate.id] = resolvedDuration;
+                }
+              }
+              return nextValues;
+            });
+
+            const cfg: {
+              total_duration?: number;
+              angle_between_start_and_finish?: number;
+            } = {};
+            if (widget.powerTopic === PETANQUE_TOTAL_DURATION_TOPIC) {
+              cfg.total_duration = clampPetanqueDuration(resolvedDuration);
+            }
+            if (widget.angleTopic === PETANQUE_ANGLE_TOPIC) {
+              cfg.angle_between_start_and_finish = resolvedAngle;
+            }
+            if (
+              cfg.total_duration !== undefined ||
+              cfg.angle_between_start_and_finish !== undefined
+            ) {
+              wsClient.send({
+                type: "petanque_cfg",
+                ...cfg,
+              });
+            }
+            markWidgetPulse(widget.id);
+          }}
         />
       );
     }

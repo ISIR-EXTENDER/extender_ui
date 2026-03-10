@@ -27,6 +27,7 @@ export type WidgetKind =
   | "gripper-control"
   | "magnet-control"
   | "stream-display"
+  | "throw-draw"
   | "drink"
   | "curves"
   | "logs";
@@ -157,6 +158,17 @@ export type StreamDisplayWidget = WidgetBase & {
   showWebcamPicker?: boolean;
 };
 
+export type ThrowDrawWidget = WidgetBase & {
+  kind: "throw-draw";
+  angleTopic: string;
+  powerTopic: string;
+  angleMin: number;
+  angleMax: number;
+  durationMin: number;
+  durationMax: number;
+  holdToMaxMs: number;
+};
+
 export type DrinkWidget = WidgetBase & {
   kind: "drink";
   videoUrl: string;
@@ -195,6 +207,7 @@ export type CanvasWidget =
   | GripperControlWidget
   | MagnetControlWidget
   | StreamDisplayWidget
+  | ThrowDrawWidget
   | DrinkWidget
   | CurvesWidget
   | LogsWidget;

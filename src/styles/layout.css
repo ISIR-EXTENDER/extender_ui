@@ -1616,6 +1616,7 @@ body,
 }
 
 .controls-max-velocity-item,
+.controls-throw-draw-item,
 .controls-gripper-item,
 .controls-magnet-item,
 .controls-stream-item,
@@ -1625,6 +1626,7 @@ body,
 }
 
 .controls-max-velocity-widget,
+.controls-throw-draw-widget,
 .controls-gripper-widget,
 .controls-magnet-widget,
 .controls-stream-widget,
@@ -1740,6 +1742,140 @@ body,
   letter-spacing: 0.01em;
   padding: 0.12rem 0.44rem;
   text-transform: uppercase;
+}
+
+.controls-throw-draw-widget {
+  padding: 0.5rem 0.65rem;
+  display: grid;
+  align-content: start;
+  gap: 0.45rem;
+}
+
+.controls-throw-draw-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.controls-throw-draw-readout {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.73rem;
+  font-weight: 800;
+  color: color-mix(in srgb, var(--text) 88%, var(--muted));
+}
+
+.controls-throw-draw-readout span {
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--border));
+  background: color-mix(in srgb, var(--panel) 72%, var(--accent) 28%);
+  padding: 0.12rem 0.44rem;
+  line-height: 1;
+}
+
+.controls-throw-draw-pad {
+  position: relative;
+  height: min(100%, 250px);
+  min-height: 160px;
+  border-radius: 9px;
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border));
+  background:
+    radial-gradient(circle at 50% 84%, color-mix(in srgb, #93c5fd 16%, transparent), transparent 52%),
+    linear-gradient(180deg, color-mix(in srgb, var(--panel-2) 92%, #0f172a 8%), var(--panel-2));
+  overflow: hidden;
+  touch-action: none;
+}
+
+.controls-throw-draw-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.controls-throw-draw-sector {
+  fill: color-mix(in srgb, #60a5fa 12%, transparent);
+  stroke: color-mix(in srgb, #93c5fd 68%, #3b82f6 32%);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.controls-throw-draw-limit {
+  stroke: color-mix(in srgb, #93c5fd 52%, #64748b 48%);
+  stroke-width: 1.8;
+}
+
+.controls-throw-draw-centerline {
+  stroke: color-mix(in srgb, #64748b 62%, #e2e8f0 38%);
+  stroke-width: 1.4;
+  stroke-dasharray: 4 4;
+}
+
+.controls-throw-draw-vector {
+  stroke: color-mix(in srgb, #a855f7 72%, #7c3aed 28%);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.controls-throw-draw-target {
+  fill: color-mix(in srgb, #c4b5fd 75%, #8b5cf6 25%);
+  stroke: color-mix(in srgb, #7c3aed 75%, #0f172a 25%);
+  stroke-width: 2;
+}
+
+.controls-throw-draw-charge {
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  transform: translateX(-50%);
+  width: 68px;
+  height: 68px;
+  border-radius: 999px;
+  border: 2px solid color-mix(in srgb, #60a5fa 60%, var(--border));
+  background:
+    radial-gradient(circle at 30% 25%, color-mix(in srgb, #dbeafe 35%, transparent), transparent 50%),
+    color-mix(in srgb, #334155 70%, var(--panel) 30%);
+  color: #e2e8f0;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  box-shadow: 0 8px 18px color-mix(in srgb, #020617 40%, transparent);
+  user-select: none;
+  touch-action: none;
+}
+
+.controls-throw-draw-charge.is-active {
+  border-color: color-mix(in srgb, #facc15 72%, #ca8a04 28%);
+  background:
+    radial-gradient(circle at 30% 25%, color-mix(in srgb, #fef3c7 36%, transparent), transparent 52%),
+    linear-gradient(145deg, #f59e0b 0%, #d97706 100%);
+  color: #1f2937;
+}
+
+.controls-throw-draw-power-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 0.5rem;
+  align-items: center;
+  font-size: 0.73rem;
+  font-weight: 700;
+  color: color-mix(in srgb, var(--text) 78%, var(--muted));
+}
+
+.controls-throw-draw-power-track {
+  height: 12px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, #64748b 44%, var(--border));
+  background: color-mix(in srgb, #334155 52%, var(--panel) 48%);
+  overflow: hidden;
+}
+
+.controls-throw-draw-power-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #38bdf8 0%, #8b5cf6 62%, #f59e0b 100%);
+  transition: width 60ms linear;
 }
 
 .controls-gripper-widget {

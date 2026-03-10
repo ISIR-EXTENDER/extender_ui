@@ -28,6 +28,7 @@ import type {
   NavigationButtonWidget as NavigationButtonWidgetModel,
   RosbagControlWidget as RosbagControlWidgetModel,
   StreamDisplayWidget as StreamDisplayWidgetModel,
+  ThrowDrawWidget as ThrowDrawWidgetModel,
   TextareaWidget as TextareaWidgetModel,
   TextWidget as TextWidgetModel,
   WidgetIcon,
@@ -97,6 +98,14 @@ type MaxVelocityWidgetProps = BaseWidgetProps & {
   bubbleValueFormatter?: (value: number) => string;
   reverseDirection?: boolean;
   unsafeThreshold?: number;
+};
+
+type ThrowDrawWidgetProps = BaseWidgetProps & {
+  widget: ThrowDrawWidgetModel;
+  onLabelChange: (nextLabel: string) => void;
+  angleValue: number;
+  durationValue: number;
+  onValueChange: (next: { angle?: number; duration?: number; powerPercent: number }) => void;
 };
 
 type GripperControlWidgetProps = BaseWidgetProps & {
@@ -639,6 +648,233 @@ export function MaxVelocityWidget({
             ) : null}
           </div>
         ) : null}
+      </div>
+    </CanvasItem>
+  );
+}
+
+export function ThrowDrawWidget({
+  widget,
+  selected,
+  onSelect,
+  onRectChange,
+  onLabelChange,
+  angleValue,
+  durationValue,
+  onValueChange,
+}: ThrowDrawWidgetProps) {
+  const angleMin = Math.min(widget.angleMin, widget.angleMax);
+  const angleMax = Math.max(widget.angleMin, widget.angleMax);
+  const durationMin = Math.min(widget.durationMin, widget.durationMax);
+  const durationMax = Math.max(widget.durationMin, widget.durationMax);
+  const durationSpan = Math.max(1e-6, durationMax - durationMin);
+  const holdToMaxMs = Math.max(250, widget.holdToMaxMs);
+  const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
+  const toPowerPercent = (duration: number) =>
+    clamp(((durationMax - duration) / durationSpan) * 100, 0, 100);
+  const toDuration = (powerPercent: number) =>
+    clamp(durationMax - (clamp(powerPercent, 0, 100) / 100) * durationSpan, durationMin, durationMax);
+
+  const [angle, setAngle] = useState(() => clamp(angleValue, angleMin, angleMax));
+  const [powerPercent, setPowerPercent] = useState(() => toPowerPercent(durationValue));
+  const [padSize, setPadSize] = useState({ w: 640, h: 360 });
+  const [isDraggingAngle, setIsDraggingAngle] = useState(false);
+  const [isChargingPower, setIsChargingPower] = useState(false);
+  const padRef = useRef<HTMLDivElement | null>(null);
+  const chargeStartRef = useRef<number | null>(null);
+  const chargeRafRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!isDraggingAngle) {
+      setAngle(clamp(angleValue, angleMin, angleMax));
+    }
+  }, [angleValue, angleMin, angleMax, isDraggingAngle]);
+
+  useEffect(() => {
+    if (!isChargingPower) {
+      setPowerPercent(toPowerPercent(durationValue));
+    }
+  }, [durationValue, durationMin, durationMax, isChargingPower]);
+
+  useEffect(() => {
+    const node = padRef.current;
+    if (!node || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      setPadSize({
+        w: Math.max(80, entry.contentRect.width),
+        h: Math.max(80, entry.contentRect.height),
+      });
+    });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (chargeRafRef.current !== null) {
+        window.cancelAnimationFrame(chargeRafRef.current);
+      }
+    };
+  }, []);
+
+  const updateAngleFromPointer = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const rect = padRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const originXPx = rect.width / 2;
+    const originYPx = rect.height * 0.84;
+    const dx = event.clientX - rect.left - originXPx;
+    const dy = originYPx - (event.clientY - rect.top);
+    const rawAngle = Math.atan2(dx, Math.max(1e-6, dy));
+    const clampedAngle = clamp(rawAngle, angleMin, angleMax);
+    setAngle(clampedAngle);
+    onValueChange({ angle: clampedAngle, powerPercent });
+  };
+
+  const stopPowerCharge = () => {
+    chargeStartRef.current = null;
+    if (chargeRafRef.current !== null) {
+      window.cancelAnimationFrame(chargeRafRef.current);
+      chargeRafRef.current = null;
+    }
+    setIsChargingPower(false);
+  };
+
+  const startPowerCharge = () => {
+    chargeStartRef.current = performance.now();
+    setIsChargingPower(true);
+    setPowerPercent(0);
+    onValueChange({ duration: toDuration(0), powerPercent: 0 });
+
+    const step = (now: number) => {
+      if (chargeStartRef.current === null) return;
+      const elapsedMs = now - chargeStartRef.current;
+      const nextPowerPercent = clamp((elapsedMs / holdToMaxMs) * 100, 0, 100);
+      setPowerPercent(nextPowerPercent);
+      onValueChange({
+        duration: toDuration(nextPowerPercent),
+        powerPercent: nextPowerPercent,
+      });
+      if (nextPowerPercent < 100 && chargeStartRef.current !== null) {
+        chargeRafRef.current = window.requestAnimationFrame(step);
+      }
+    };
+    chargeRafRef.current = window.requestAnimationFrame(step);
+  };
+
+  const originX = padSize.w / 2;
+  const originY = padSize.h * 0.84;
+  const radius = Math.max(48, Math.min(padSize.w * 0.45, padSize.h * 0.74));
+  const pointForAngle = (angleValueRad: number, scale = 1) => ({
+    x: originX + Math.sin(angleValueRad) * radius * scale,
+    y: originY - Math.cos(angleValueRad) * radius * scale,
+  });
+  const minPoint = pointForAngle(angleMin);
+  const maxPoint = pointForAngle(angleMax);
+  const currentPoint = pointForAngle(angle, 0.9);
+  const arcPath = `M ${minPoint.x} ${minPoint.y} A ${radius} ${radius} 0 0 1 ${maxPoint.x} ${maxPoint.y}`;
+
+  return (
+    <CanvasItem
+      x={widget.rect.x}
+      y={widget.rect.y}
+      w={widget.rect.w}
+      h={widget.rect.h}
+      onChange={onRectChange}
+      onSelect={onSelect}
+      selected={selected}
+      minSize={{ w: 300, h: 220 }}
+      className="controls-throw-draw-item"
+    >
+      <div className="controls-throw-draw-widget">
+        <div className="controls-throw-draw-header">
+          <InlineEditableText value={widget.label} onCommit={onLabelChange} className="controls-inline-label" />
+          <div className="controls-throw-draw-readout">
+            <span>{((angle * 180) / Math.PI).toFixed(1)}°</span>
+            <span>{Math.round(powerPercent)}%</span>
+          </div>
+        </div>
+        <div
+          ref={padRef}
+          className="controls-throw-draw-pad"
+          data-canvas-interactive="true"
+          onPointerDown={(event) => {
+            event.stopPropagation();
+            event.preventDefault();
+            event.currentTarget.setPointerCapture(event.pointerId);
+            setIsDraggingAngle(true);
+            updateAngleFromPointer(event);
+          }}
+          onPointerMove={(event) => {
+            if (!isDraggingAngle) return;
+            event.stopPropagation();
+            updateAngleFromPointer(event);
+          }}
+          onPointerUp={(event) => {
+            event.stopPropagation();
+            setIsDraggingAngle(false);
+          }}
+          onPointerCancel={() => setIsDraggingAngle(false)}
+        >
+          <svg
+            className="controls-throw-draw-svg"
+            viewBox={`0 0 ${padSize.w} ${padSize.h}`}
+            preserveAspectRatio="none"
+          >
+            <path className="controls-throw-draw-sector" d={arcPath} />
+            <line className="controls-throw-draw-limit" x1={originX} y1={originY} x2={minPoint.x} y2={minPoint.y} />
+            <line className="controls-throw-draw-limit" x1={originX} y1={originY} x2={maxPoint.x} y2={maxPoint.y} />
+            <line
+              className="controls-throw-draw-centerline"
+              x1={originX}
+              y1={originY}
+              x2={originX}
+              y2={Math.max(16, originY - radius * 1.03)}
+            />
+            <line
+              className="controls-throw-draw-vector"
+              x1={originX}
+              y1={originY}
+              x2={currentPoint.x}
+              y2={currentPoint.y}
+            />
+            <circle
+              className="controls-throw-draw-target"
+              cx={currentPoint.x}
+              cy={currentPoint.y}
+              r={Math.max(10, radius * 0.04)}
+            />
+          </svg>
+          <button
+            type="button"
+            className={`controls-throw-draw-charge ${isChargingPower ? "is-active" : ""}`.trim()}
+            data-canvas-interactive="true"
+            onPointerDown={(event) => {
+              event.stopPropagation();
+              event.preventDefault();
+              event.currentTarget.setPointerCapture(event.pointerId);
+              startPowerCharge();
+            }}
+            onPointerUp={(event) => {
+              event.stopPropagation();
+              stopPowerCharge();
+            }}
+            onPointerCancel={(event) => {
+              event.stopPropagation();
+              stopPowerCharge();
+            }}
+          >
+            Hold
+          </button>
+        </div>
+        <div className="controls-throw-draw-power-row">
+          <span>Power</span>
+          <div className="controls-throw-draw-power-track">
+            <div className="controls-throw-draw-power-fill" style={{ width: `${powerPercent}%` }} />
+          </div>
+          <span>{Math.round(powerPercent)}%</span>
+        </div>
       </div>
     </CanvasItem>
   );

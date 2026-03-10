@@ -6,6 +6,7 @@
     "petanque_teleop_config",
     "play_petanque_camera",
     "play_petanque_lancer",
+    "play_petanque_lancer_draw",
     "play_petanque_ramassage",
     "play_petanque_measures"
   ],
