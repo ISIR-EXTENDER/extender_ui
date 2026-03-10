@@ -668,13 +668,22 @@ export function ThrowDrawWidget({
   durationValue,
   onValueChange,
 }: ThrowDrawWidgetProps) {
+  type ThrowHistoryEntry = {
+    id: string;
+    angle: number;
+    duration: number;
+    powerPercent: number;
+  };
+
   const angleMin = Math.min(widget.angleMin, widget.angleMax);
   const angleMax = Math.max(widget.angleMin, widget.angleMax);
   const angleSpan = Math.max(1e-6, angleMax - angleMin);
   const durationMin = Math.min(widget.durationMin, widget.durationMax);
   const durationMax = Math.max(widget.durationMin, widget.durationMax);
   const durationSpan = Math.max(1e-6, durationMax - durationMin);
-  const holdToMaxMs = Math.max(250, widget.holdToMaxMs);
+  const holdToMaxMs = Math.max(2200, widget.holdToMaxMs * 1.9);
+  const chargeGraceMs = 280;
+  const chargeFrictionExponent = 2.2;
   const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
   // Expand the drawable sector for accessibility while preserving real command range.
   const drawAngleScale = 3.6;
@@ -707,17 +716,30 @@ export function ThrowDrawWidget({
   const [isDraggingAngle, setIsDraggingAngle] = useState(false);
   const [isChargingPower, setIsChargingPower] = useState(false);
   const [hasAngleSelection, setHasAngleSelection] = useState(false);
+  const [isArcLocked, setIsArcLocked] = useState(false);
+  const [gestureTrail, setGestureTrail] = useState<Array<{ x: number; y: number }>>([]);
+  const [throwHistory, setThrowHistory] = useState<ThrowHistoryEntry[]>([]);
+  const [selectedHistoryId, setSelectedHistoryId] = useState<string | null>(null);
   const [activePointerId, setActivePointerId] = useState<number | null>(null);
   const padRef = useRef<HTMLDivElement | null>(null);
   const chargeStartRef = useRef<number | null>(null);
   const chargeRafRef = useRef<number | null>(null);
   const powerPercentRef = useRef(initialPowerPercent);
-  const selectionDistanceThresholdPx = 24;
+  const arcLockedRef = useRef(false);
 
   const setPowerPercentValue = (nextPowerPercent: number) => {
     powerPercentRef.current = nextPowerPercent;
     setPowerPercent(nextPowerPercent);
   };
+  const setArcLocked = (nextLocked: boolean) => {
+    arcLockedRef.current = nextLocked;
+    setIsArcLocked(nextLocked);
+  };
+
+  const originX = padSize.w / 2;
+  const originY = padSize.h * 0.84;
+  const radius = Math.max(48, Math.min(padSize.w * 0.45, padSize.h * 0.74));
+  const nearArcThreshold = radius * 0.9;
 
   useEffect(() => {
     if (!isDraggingAngle) {
@@ -771,7 +793,9 @@ export function ThrowDrawWidget({
     const step = (now: number) => {
       if (chargeStartRef.current === null) return;
       const elapsedMs = now - chargeStartRef.current;
-      const nextPowerPercent = clamp((elapsedMs / holdToMaxMs) * 100, 0, 100);
+      const normalized = clamp((elapsedMs - chargeGraceMs) / holdToMaxMs, 0, 1);
+      const withFriction = 1 - Math.pow(1 - normalized, chargeFrictionExponent);
+      const nextPowerPercent = clamp(withFriction * 100, 0, 100);
       setPowerPercentValue(nextPowerPercent);
       onValueChange({
         duration: toDuration(nextPowerPercent),
@@ -784,21 +808,48 @@ export function ThrowDrawWidget({
     chargeRafRef.current = window.requestAnimationFrame(step);
   };
 
-  const updateAngleFromPointer = (event: ReactPointerEvent<HTMLDivElement>) => {
+  const updateGestureFromPointer = (
+    event: ReactPointerEvent<HTMLDivElement>,
+    options?: { startNewTrail?: boolean }
+  ) => {
     const rect = padRef.current?.getBoundingClientRect();
     if (!rect) return false;
-    const originXPx = rect.width / 2;
-    const originYPx = rect.height * 0.84;
-    const dx = event.clientX - rect.left - originXPx;
-    const dy = originYPx - (event.clientY - rect.top);
-    const dragDistance = Math.hypot(dx, dy);
-    if (dragDistance < selectionDistanceThresholdPx) return false;
+    const scaleX = padSize.w / Math.max(1, rect.width);
+    const scaleY = padSize.h / Math.max(1, rect.height);
+    const localX = clamp((event.clientX - rect.left) * scaleX, 0, padSize.w);
+    const localY = clamp((event.clientY - rect.top) * scaleY, 0, padSize.h);
+    setGestureTrail((prev) => {
+      if (options?.startNewTrail) {
+        return [{ x: localX, y: localY }];
+      }
+      const last = prev[prev.length - 1];
+      if (last && Math.hypot(localX - last.x, localY - last.y) < 4) {
+        return prev;
+      }
+      const next = [...prev, { x: localX, y: localY }];
+      if (next.length > 120) {
+        next.shift();
+      }
+      return next;
+    });
+
+    const dx = localX - originX;
+    const dy = originY - localY;
+    const radialDistance = Math.hypot(dx, dy);
+    const shouldLockNow = !isArcLocked && radialDistance >= nearArcThreshold;
+    const isLocked = isArcLocked || shouldLockNow;
+    if (!isLocked) return false;
+
+    if (shouldLockNow) {
+      setArcLocked(true);
+      setHasAngleSelection(true);
+      startPowerInference();
+    }
+
     const rawDrawAngle = Math.atan2(dx, Math.max(1e-6, dy));
     const mappedAngle = mapDrawAngleToActual(rawDrawAngle);
-    setHasAngleSelection(true);
     setAngle(mappedAngle);
-    startPowerInference();
-    onValueChange({ angle: mappedAngle, powerPercent });
+    onValueChange({ angle: mappedAngle, powerPercent: powerPercentRef.current });
     return true;
   };
 
@@ -816,16 +867,24 @@ export function ThrowDrawWidget({
     stopPowerCharge();
     if (!triggerThrow || !wasCharging) return;
     const finalPowerPercent = clamp(powerPercentRef.current, 0, 100);
+    const finalDuration = toDuration(finalPowerPercent);
+    const finalAngle = clamp(angle, angleMin, angleMax);
+    const historyEntry: ThrowHistoryEntry = {
+      id: `throw-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
+      angle: finalAngle,
+      duration: finalDuration,
+      powerPercent: finalPowerPercent,
+    };
+    setThrowHistory((prev) => [historyEntry, ...prev].slice(0, 5));
+    setSelectedHistoryId(historyEntry.id);
     onValueChange({
-      duration: toDuration(finalPowerPercent),
+      angle: finalAngle,
+      duration: finalDuration,
       powerPercent: finalPowerPercent,
       throwRequested: true,
     });
   };
 
-  const originX = padSize.w / 2;
-  const originY = padSize.h * 0.84;
-  const radius = Math.max(48, Math.min(padSize.w * 0.45, padSize.h * 0.74));
   const pointForAngle = (angleValueRad: number, scale = 1) => ({
     x: originX + Math.sin(angleValueRad) * radius * scale,
     y: originY - Math.cos(angleValueRad) * radius * scale,
@@ -834,6 +893,34 @@ export function ThrowDrawWidget({
   const maxPoint = pointForAngle(drawAngleMax);
   const currentPoint = pointForAngle(mapActualAngleToDraw(angle), 0.9);
   const arcPath = `M ${minPoint.x} ${minPoint.y} A ${radius} ${radius} 0 0 1 ${maxPoint.x} ${maxPoint.y}`;
+  const trailPoints = gestureTrail.map((point) => `${point.x},${point.y}`).join(" ");
+  const showLockedLine = hasAngleSelection && (!isDraggingAngle || isArcLocked);
+  const applyHistoryPreset = (entry: ThrowHistoryEntry) => {
+    stopPowerCharge();
+    setIsDraggingAngle(false);
+    setActivePointerId(null);
+    setGestureTrail([]);
+    setArcLocked(false);
+    setHasAngleSelection(true);
+    setSelectedHistoryId(entry.id);
+    setAngle(clamp(entry.angle, angleMin, angleMax));
+    setPowerPercentValue(clamp(entry.powerPercent, 0, 100));
+    onValueChange({
+      angle: clamp(entry.angle, angleMin, angleMax),
+      duration: clamp(entry.duration, durationMin, durationMax),
+      powerPercent: clamp(entry.powerPercent, 0, 100),
+    });
+  };
+  const hintText = isChargingPower
+    ? "Hold to increase power, then lacher to throw."
+    : isDraggingAngle && !isArcLocked
+      ? "Draw path until the arc to lock angle."
+      : selectedHistoryId
+        ? "Preset selected. You can test then draw+hold to throw."
+      : hasAngleSelection
+        ? "Ready: draw and hold again to throw, or Reset."
+        : "Draw the initial path to select angle.";
+  const hintClassName = `controls-throw-draw-hint ${isChargingPower ? "is-active" : ""}`.trim();
 
   return (
     <CanvasItem
@@ -866,8 +953,11 @@ export function ThrowDrawWidget({
                 event.stopPropagation();
                 stopPowerCharge();
                 setHasAngleSelection(false);
+                setArcLocked(false);
                 setIsDraggingAngle(false);
                 setActivePointerId(null);
+                setGestureTrail([]);
+                setSelectedHistoryId(null);
                 const resetAngle = clamp(0, angleMin, angleMax);
                 setAngle(resetAngle);
                 setPowerPercentValue(0);
@@ -882,79 +972,119 @@ export function ThrowDrawWidget({
             </button>
           </div>
         </div>
-        <div
-          ref={padRef}
-          className="controls-throw-draw-pad"
-          data-canvas-interactive="true"
-          onPointerDown={(event) => {
-            event.stopPropagation();
-            event.preventDefault();
-            event.currentTarget.setPointerCapture(event.pointerId);
-            setIsDraggingAngle(true);
-            setActivePointerId(event.pointerId);
-            updateAngleFromPointer(event);
-          }}
-          onPointerMove={(event) => {
-            if (!isDraggingAngle) return;
-            if (activePointerId !== null && event.pointerId !== activePointerId) return;
-            event.stopPropagation();
-            updateAngleFromPointer(event);
-          }}
-          onPointerUp={(event) => {
-            if (activePointerId !== null && event.pointerId !== activePointerId) return;
-            event.stopPropagation();
-            setIsDraggingAngle(false);
-            setActivePointerId(null);
-            finishPowerInference(true);
-          }}
-          onPointerCancel={(event) => {
-            if (activePointerId !== null && event.pointerId !== activePointerId) return;
-            setIsDraggingAngle(false);
-            setActivePointerId(null);
-            finishPowerInference(false);
-          }}
-        >
-          <svg
-            className="controls-throw-draw-svg"
-            viewBox={`0 0 ${padSize.w} ${padSize.h}`}
-            preserveAspectRatio="none"
-          >
-            <path className="controls-throw-draw-sector" d={arcPath} />
-            <line className="controls-throw-draw-limit" x1={originX} y1={originY} x2={minPoint.x} y2={minPoint.y} />
-            <line className="controls-throw-draw-limit" x1={originX} y1={originY} x2={maxPoint.x} y2={maxPoint.y} />
-            <line
-              className="controls-throw-draw-centerline"
-              x1={originX}
-              y1={originY}
-              x2={originX}
-              y2={Math.max(16, originY - radius * 1.03)}
-            />
-            <line
-              className="controls-throw-draw-vector"
-              x1={originX}
-              y1={originY}
-              x2={currentPoint.x}
-              y2={currentPoint.y}
-              style={{ opacity: hasAngleSelection ? 1 : 0 }}
-            />
-            <circle
-              className="controls-throw-draw-target"
-              cx={currentPoint.x}
-              cy={currentPoint.y}
-              r={Math.max(10, radius * 0.04)}
-              style={{ opacity: hasAngleSelection ? 1 : 0 }}
-            />
-          </svg>
-          {!hasAngleSelection ? (
-            <div className="controls-throw-draw-hint">Draw angle, keep pressed to charge, release to throw.</div>
-          ) : null}
-        </div>
-        <div className="controls-throw-draw-power-row">
-          <span>Power</span>
-          <div className="controls-throw-draw-power-track">
-            <div className="controls-throw-draw-power-fill" style={{ width: `${powerPercent}%` }} />
+        <div className="controls-throw-draw-main">
+          <div className="controls-throw-draw-left">
+            <div
+              ref={padRef}
+              className="controls-throw-draw-pad"
+              data-canvas-interactive="true"
+              onPointerDown={(event) => {
+                event.stopPropagation();
+                event.preventDefault();
+                event.currentTarget.setPointerCapture(event.pointerId);
+                setIsDraggingAngle(true);
+                setActivePointerId(event.pointerId);
+                stopPowerCharge();
+                setArcLocked(false);
+                setGestureTrail([]);
+                updateGestureFromPointer(event, { startNewTrail: true });
+              }}
+              onPointerMove={(event) => {
+                if (!isDraggingAngle) return;
+                if (activePointerId !== null && event.pointerId !== activePointerId) return;
+                event.stopPropagation();
+                updateGestureFromPointer(event);
+              }}
+              onPointerUp={(event) => {
+                if (activePointerId !== null && event.pointerId !== activePointerId) return;
+                event.stopPropagation();
+                setIsDraggingAngle(false);
+                setActivePointerId(null);
+                finishPowerInference(arcLockedRef.current);
+                setArcLocked(false);
+                setGestureTrail([]);
+              }}
+              onPointerCancel={(event) => {
+                if (activePointerId !== null && event.pointerId !== activePointerId) return;
+                setIsDraggingAngle(false);
+                setActivePointerId(null);
+                finishPowerInference(false);
+                setArcLocked(false);
+                setGestureTrail([]);
+              }}
+            >
+              <svg
+                className="controls-throw-draw-svg"
+                viewBox={`0 0 ${padSize.w} ${padSize.h}`}
+                preserveAspectRatio="none"
+              >
+                <path className="controls-throw-draw-sector" d={arcPath} />
+                <line className="controls-throw-draw-limit" x1={originX} y1={originY} x2={minPoint.x} y2={minPoint.y} />
+                <line className="controls-throw-draw-limit" x1={originX} y1={originY} x2={maxPoint.x} y2={maxPoint.y} />
+                <line
+                  className="controls-throw-draw-centerline"
+                  x1={originX}
+                  y1={originY}
+                  x2={originX}
+                  y2={Math.max(16, originY - radius * 1.03)}
+                />
+                {isDraggingAngle && !isArcLocked && gestureTrail.length > 1 ? (
+                  <polyline className="controls-throw-draw-trail" points={trailPoints} />
+                ) : null}
+                <line
+                  className="controls-throw-draw-vector"
+                  x1={originX}
+                  y1={originY}
+                  x2={currentPoint.x}
+                  y2={currentPoint.y}
+                  style={{ opacity: showLockedLine ? 1 : 0 }}
+                />
+                <circle
+                  className="controls-throw-draw-target"
+                  cx={currentPoint.x}
+                  cy={currentPoint.y}
+                  r={Math.max(10, radius * 0.04)}
+                  style={{ opacity: showLockedLine ? 1 : 0 }}
+                />
+              </svg>
+              <div className={hintClassName}>{hintText}</div>
+            </div>
+            <div className="controls-throw-draw-power-row">
+              <span>Power</span>
+              <div className="controls-throw-draw-power-track">
+                <div className="controls-throw-draw-power-fill" style={{ width: `${powerPercent}%` }} />
+              </div>
+              <span>{Math.round(powerPercent)}%</span>
+            </div>
           </div>
-          <span>{Math.round(powerPercent)}%</span>
+          <aside className="controls-throw-draw-history" data-canvas-interactive="true">
+            <div className="controls-throw-draw-history-title">Last 5 Throws</div>
+            {throwHistory.length === 0 ? (
+              <div className="controls-throw-draw-history-empty">No throw history yet.</div>
+            ) : (
+              <div className="controls-throw-draw-history-list">
+                {throwHistory.map((entry, index) => (
+                  <button
+                    key={entry.id}
+                    type="button"
+                    className={`controls-throw-draw-history-item ${selectedHistoryId === entry.id ? "is-selected" : ""}`.trim()}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      applyHistoryPreset(entry);
+                    }}
+                  >
+                    <span className="controls-throw-draw-history-rank">{index + 1}</span>
+                    <span className="controls-throw-draw-history-angle">
+                      {((entry.angle * 180) / Math.PI).toFixed(1)}°
+                    </span>
+                    <span className="controls-throw-draw-history-power">
+                      {entry.powerPercent.toFixed(0)}%
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </aside>
         </div>
       </div>
     </CanvasItem>
