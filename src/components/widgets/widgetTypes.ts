@@ -156,6 +156,13 @@ export type StreamDisplayWidget = WidgetBase & {
   showHeader?: boolean;
   showSourceBadge?: boolean;
   showWebcamPicker?: boolean;
+  enableVisualServo?: boolean;
+  visualServoAutoPickup?: boolean;
+  visualServoGain?: number;
+  visualServoMaxCommand?: number;
+  visualServoDeadzonePx?: number;
+  visualServoApproachZ?: number;
+  visualServoAutoPickupHoldMs?: number;
 };
 
 export type ThrowDrawWidget = WidgetBase & {

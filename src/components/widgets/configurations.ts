@@ -882,6 +882,13 @@ export const DEFAULT_DEMO_CONFIGURATIONS: WidgetConfiguration[] = [
       showHeader: false,
       showSourceBadge: false,
       showWebcamPicker: false,
+      enableVisualServo: true,
+      visualServoAutoPickup: true,
+      visualServoGain: 1.4,
+      visualServoMaxCommand: 0.38,
+      visualServoDeadzonePx: 42,
+      visualServoApproachZ: -0.08,
+      visualServoAutoPickupHoldMs: 850,
       rect: { w: 760, h: 530 },
     }),
     createDemoWidget("play-ram-rz", "slider", 800, 170, {

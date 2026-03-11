@@ -1548,6 +1548,13 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
             showStatus: widget.showStatus ?? true,
             showUrl: widget.showUrl ?? true,
             overlayText: widget.overlayText ?? "stream preview",
+            enableVisualServo: widget.enableVisualServo ?? false,
+            visualServoAutoPickup: widget.visualServoAutoPickup ?? false,
+            visualServoGain: widget.visualServoGain ?? 1.3,
+            visualServoMaxCommand: widget.visualServoMaxCommand ?? 0.45,
+            visualServoDeadzonePx: widget.visualServoDeadzonePx ?? 44,
+            visualServoApproachZ: widget.visualServoApproachZ ?? 0,
+            visualServoAutoPickupHoldMs: widget.visualServoAutoPickupHoldMs ?? 900,
           }}
           selected={selected}
           onSelect={() => setSelectedWidgetId(widget.id)}
@@ -1558,6 +1565,7 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
             )
           }
           statusText={sourceStatus}
+          runtimeInteractive={false}
         />
       );
     }
@@ -3051,6 +3059,139 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
                           </select>
                         </label>
                       </div>
+                      <div className="controls-field-row">
+                        <label className="controls-field">
+                          <span>Visual Servo</span>
+                          <select
+                            className="editor-input"
+                            value={(selectedWidget.enableVisualServo ?? false) ? "enabled" : "disabled"}
+                            onChange={(event) =>
+                              updateSelectedStreamDisplay((widget) => ({
+                                ...widget,
+                                enableVisualServo: event.target.value === "enabled",
+                              }))
+                            }
+                          >
+                            <option value="disabled">disabled</option>
+                            <option value="enabled">enabled</option>
+                          </select>
+                        </label>
+                        <label className="controls-field">
+                          <span>Auto Pick Up</span>
+                          <select
+                            className="editor-input"
+                            value={(selectedWidget.visualServoAutoPickup ?? false) ? "enabled" : "disabled"}
+                            onChange={(event) =>
+                              updateSelectedStreamDisplay((widget) => ({
+                                ...widget,
+                                visualServoAutoPickup: event.target.value === "enabled",
+                              }))
+                            }
+                          >
+                            <option value="disabled">disabled</option>
+                            <option value="enabled">enabled</option>
+                          </select>
+                        </label>
+                      </div>
+                      <div className="controls-field-row">
+                        <label className="controls-field">
+                          <span>Servo Gain</span>
+                          <input
+                            type="number"
+                            step={0.05}
+                            className="editor-input"
+                            value={selectedWidget.visualServoGain ?? 1.3}
+                            onChange={(event) =>
+                              updateSelectedStreamDisplay((widget) => ({
+                                ...widget,
+                                visualServoGain: readNumber(event.target.value, widget.visualServoGain ?? 1.3),
+                              }))
+                            }
+                          />
+                        </label>
+                        <label className="controls-field">
+                          <span>Max Command</span>
+                          <input
+                            type="number"
+                            step={0.01}
+                            min={0}
+                            max={1}
+                            className="editor-input"
+                            value={selectedWidget.visualServoMaxCommand ?? 0.45}
+                            onChange={(event) =>
+                              updateSelectedStreamDisplay((widget) => ({
+                                ...widget,
+                                visualServoMaxCommand: Math.max(
+                                  0,
+                                  Math.min(1, readNumber(event.target.value, widget.visualServoMaxCommand ?? 0.45))
+                                ),
+                              }))
+                            }
+                          />
+                        </label>
+                      </div>
+                      <div className="controls-field-row">
+                        <label className="controls-field">
+                          <span>Deadzone (px)</span>
+                          <input
+                            type="number"
+                            step={1}
+                            min={4}
+                            className="editor-input"
+                            value={selectedWidget.visualServoDeadzonePx ?? 44}
+                            onChange={(event) =>
+                              updateSelectedStreamDisplay((widget) => ({
+                                ...widget,
+                                visualServoDeadzonePx: Math.max(
+                                  4,
+                                  Math.round(readNumber(event.target.value, widget.visualServoDeadzonePx ?? 44))
+                                ),
+                              }))
+                            }
+                          />
+                        </label>
+                        <label className="controls-field">
+                          <span>Approach Z</span>
+                          <input
+                            type="number"
+                            step={0.01}
+                            min={-1}
+                            max={1}
+                            className="editor-input"
+                            value={selectedWidget.visualServoApproachZ ?? 0}
+                            onChange={(event) =>
+                              updateSelectedStreamDisplay((widget) => ({
+                                ...widget,
+                                visualServoApproachZ: Math.max(
+                                  -1,
+                                  Math.min(1, readNumber(event.target.value, widget.visualServoApproachZ ?? 0))
+                                ),
+                              }))
+                            }
+                          />
+                        </label>
+                      </div>
+                      <label className="controls-field">
+                        <span>Auto Pick Hold (ms)</span>
+                        <input
+                          type="number"
+                          step={50}
+                          min={250}
+                          className="editor-input"
+                          value={selectedWidget.visualServoAutoPickupHoldMs ?? 900}
+                          onChange={(event) =>
+                            updateSelectedStreamDisplay((widget) => ({
+                              ...widget,
+                              visualServoAutoPickupHoldMs: Math.max(
+                                250,
+                                Math.round(
+                                  readNumber(event.target.value, widget.visualServoAutoPickupHoldMs ?? 900)
+                                )
+                              ),
+                            }))
+                          }
+                        />
+                      </label>
                       <label className="controls-field">
                         <span>Overlay Text</span>
                         <input

@@ -290,6 +290,13 @@ export function createWidgetFromCatalogType(
       showStatus: true,
       showUrl: true,
       overlayText: "stream preview",
+      enableVisualServo: false,
+      visualServoAutoPickup: false,
+      visualServoGain: 1.3,
+      visualServoMaxCommand: 0.45,
+      visualServoDeadzonePx: 44,
+      visualServoApproachZ: 0,
+      visualServoAutoPickupHoldMs: 900,
       rect: { x, y, w: 360, h: 260 },
     };
     return widget;

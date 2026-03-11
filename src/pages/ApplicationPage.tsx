@@ -63,6 +63,7 @@ const PETANQUE_TOTAL_DURATION_MAX_S = 3.0;
 const PETANQUE_DEFAULT_TOTAL_DURATION_S = 1.1;
 const PETANQUE_DEFAULT_ALPHA = 0;
 const PLAY_PETANQUE_MEASURES_SCREEN_ID = "play_petanque_measures";
+const PLAY_PETANQUE_RAMASSAGE_SCREEN_ID = "play_petanque_ramassage";
 const PLAY_PETANQUE_MEASURE_STREAM_WIDGET_ID = "play-measure-stream";
 const PLAY_PETANQUE_MEASURE_STATUS_TOPIC = "/petanque_measure/status";
 const PLAY_PETANQUE_MEASURE_VECTORS_TOPIC = "/petanque_measure/vectors";
@@ -1645,12 +1646,29 @@ export function ApplicationPage({
             showStatus: runtimeStreamWidget.showStatus ?? true,
             showUrl: runtimeStreamWidget.showUrl ?? true,
             overlayText: runtimeStreamWidget.overlayText ?? "stream preview",
+            enableVisualServo:
+              runtimeStreamWidget.enableVisualServo ??
+              (activeScreenId === PLAY_PETANQUE_RAMASSAGE_SCREEN_ID &&
+                runtimeStreamWidget.source === "webcam"),
+            visualServoAutoPickup: runtimeStreamWidget.visualServoAutoPickup ?? false,
+            visualServoGain: runtimeStreamWidget.visualServoGain ?? 1.3,
+            visualServoMaxCommand: runtimeStreamWidget.visualServoMaxCommand ?? 0.45,
+            visualServoDeadzonePx: runtimeStreamWidget.visualServoDeadzonePx ?? 44,
+            visualServoApproachZ: runtimeStreamWidget.visualServoApproachZ ?? 0,
+            visualServoAutoPickupHoldMs: runtimeStreamWidget.visualServoAutoPickupHoldMs ?? 900,
           }}
           selected={false}
           onSelect={() => {}}
           onRectChange={NOOP_RECT_CHANGE}
           onLabelChange={NOOP_TEXT_CHANGE}
           statusText={sourceStatus}
+          runtimeInteractive
+          onVisualServoStart={() => {
+            wsClient.send({ type: "state_cmd", command: "teleop" });
+          }}
+          onVisualServoRequestPickup={() => {
+            wsClient.send({ type: "state_cmd", command: "pick_up" });
+          }}
         />
       );
     }

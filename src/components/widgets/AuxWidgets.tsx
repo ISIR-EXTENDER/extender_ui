@@ -1,4 +1,11 @@
-import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import { CanvasItem } from "../layout/CanvasItem";
 import type { CanvasRect } from "../layout/CanvasItem";
 import * as Slider from "@radix-ui/react-slider";
@@ -135,6 +142,10 @@ type StreamDisplayWidgetProps = BaseWidgetProps & {
   widget: StreamDisplayWidgetModel;
   onLabelChange: (nextLabel: string) => void;
   statusText: string;
+  runtimeInteractive?: boolean;
+  onVisualServoStart?: () => void;
+  onVisualServoStop?: () => void;
+  onVisualServoRequestPickup?: () => void;
 };
 
 type DrinkWidgetProps = BaseWidgetProps & {
@@ -1429,10 +1440,25 @@ export function StreamDisplayWidget({
   onRectChange,
   onLabelChange,
   statusText,
+  runtimeInteractive = false,
+  onVisualServoStart,
+  onVisualServoStop,
+  onVisualServoRequestPickup,
 }: StreamDisplayWidgetProps) {
   type WebcamOption = {
     deviceId: string;
     label: string;
+  };
+  type ServoPoint = {
+    x: number;
+    y: number;
+  };
+  type ServoTemplate = {
+    width: number;
+    height: number;
+    halfWidth: number;
+    halfHeight: number;
+    pixels: Uint8Array;
   };
   const [remoteImageFailed, setRemoteImageFailed] = useState(false);
   const [webcamLoading, setWebcamLoading] = useState(false);
@@ -1441,8 +1467,22 @@ export function StreamDisplayWidget({
   const [webcamOptions, setWebcamOptions] = useState<WebcamOption[]>([]);
   const [activeWebcamDeviceId, setActiveWebcamDeviceId] = useState("");
   const [preferredWebcamDeviceId, setPreferredWebcamDeviceId] = useState("");
+  const [servoTarget, setServoTarget] = useState<ServoPoint | null>(null);
+  const [servoTracked, setServoTracked] = useState<ServoPoint | null>(null);
+  const [servoRunning, setServoRunning] = useState(false);
+  const [servoStatus, setServoStatus] = useState("Tap ball to select target.");
   const webcamVideoRef = useRef<HTMLVideoElement | null>(null);
   const webcamStreamRef = useRef<MediaStream | null>(null);
+  const servoOverlayRef = useRef<HTMLDivElement | null>(null);
+  const servoCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const servoAnimationRef = useRef<number | null>(null);
+  const servoLastUiUpdateMsRef = useRef(0);
+  const servoTemplateRef = useRef<ServoTemplate | null>(null);
+  const servoTrackPointRef = useRef<ServoPoint | null>(null);
+  const servoTargetRef = useRef<ServoPoint | null>(null);
+  const servoRunningRef = useRef(false);
+  const servoAlignedSinceMsRef = useRef<number | null>(null);
+  const servoPickupSentRef = useRef(false);
   const webcamPreferenceKey = `extender.controls.webcam.device.${widget.id}`;
   const webcamPickerId = `stream-webcam-picker-${widget.id}`;
   const trimmedStreamUrl = widget.streamUrl.trim();
@@ -1562,6 +1602,19 @@ export function StreamDisplayWidget({
   const showStatusRow = widget.showStatus ?? true;
   const showUrlRow = widget.showUrl ?? true;
   const showWebcamPicker = wantsWebcam && (widget.showWebcamPicker ?? true);
+  const visualServoEnabled = runtimeInteractive && wantsWebcam && (widget.enableVisualServo ?? false);
+  const visualServoGain = Math.max(0.05, widget.visualServoGain ?? 1.3);
+  const visualServoMaxCommand = Math.max(0.05, Math.min(1, widget.visualServoMaxCommand ?? 0.45));
+  const visualServoDeadzonePx = Math.max(8, widget.visualServoDeadzonePx ?? 44);
+  const visualServoApproachZ = Math.max(-1, Math.min(1, widget.visualServoApproachZ ?? 0));
+  const visualServoAutoPickup = widget.visualServoAutoPickup ?? false;
+  const visualServoAutoPickupHoldMs = Math.max(250, widget.visualServoAutoPickupHoldMs ?? 900);
+  const setJoy = useTeleopStore((s) => s.setJoy);
+  const setZ = useTeleopStore((s) => s.setZ);
+  const stopServoMotion = useCallback(() => {
+    setJoy(0, 0);
+    setZ(0);
+  }, [setJoy, setZ]);
   const streamGridTemplateRows = [
     showHeader ? "auto" : null,
     showWebcamPicker ? "auto" : null,
@@ -1721,6 +1774,315 @@ export function StreamDisplayWidget({
     };
   }, [preferredWebcamDeviceId, trimmedStreamUrl, wantsWebcam]);
 
+  useEffect(() => {
+    servoTargetRef.current = servoTarget;
+  }, [servoTarget]);
+
+  useEffect(() => {
+    servoRunningRef.current = servoRunning;
+  }, [servoRunning]);
+
+  useEffect(() => {
+    if (visualServoEnabled) return;
+    if (servoAnimationRef.current !== null) {
+      window.cancelAnimationFrame(servoAnimationRef.current);
+      servoAnimationRef.current = null;
+    }
+    setServoRunning(false);
+    setServoTarget(null);
+    setServoTracked(null);
+    servoTemplateRef.current = null;
+    servoTrackPointRef.current = null;
+    servoTargetRef.current = null;
+    servoAlignedSinceMsRef.current = null;
+    servoPickupSentRef.current = false;
+    stopServoMotion();
+  }, [stopServoMotion, visualServoEnabled]);
+
+  useEffect(() => {
+    if (!visualServoEnabled || webcamFrameReady) return;
+    if (servoRunning) {
+      setServoRunning(false);
+      onVisualServoStop?.();
+    }
+    setServoStatus("Waiting for webcam feed...");
+    stopServoMotion();
+  }, [onVisualServoStop, servoRunning, stopServoMotion, visualServoEnabled, webcamFrameReady]);
+
+  const clampUnit = (value: number) => Math.max(-1, Math.min(1, value));
+  const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
+
+  const resolveDisplayBox = () => {
+    const overlay = servoOverlayRef.current;
+    const video = webcamVideoRef.current;
+    if (!overlay || !video || video.videoWidth <= 0 || video.videoHeight <= 0) {
+      return null;
+    }
+    const containerWidth = overlay.clientWidth;
+    const containerHeight = overlay.clientHeight;
+    if (containerWidth <= 1 || containerHeight <= 1) return null;
+    const videoAspect = video.videoWidth / video.videoHeight;
+    const containerAspect = containerWidth / containerHeight;
+    const useCover = (widget.fitMode ?? "cover") === "cover";
+    const scale = useCover
+      ? Math.max(containerWidth / video.videoWidth, containerHeight / video.videoHeight)
+      : Math.min(containerWidth / video.videoWidth, containerHeight / video.videoHeight);
+    const displayedWidth = video.videoWidth * scale;
+    const displayedHeight = video.videoHeight * scale;
+    const offsetX = (containerWidth - displayedWidth) / 2;
+    const offsetY = (containerHeight - displayedHeight) / 2;
+    return {
+      containerWidth,
+      containerHeight,
+      videoAspect,
+      containerAspect,
+      displayedWidth,
+      displayedHeight,
+      offsetX,
+      offsetY,
+    };
+  };
+
+  const pointerToVideoPoint = (event: ReactPointerEvent<HTMLDivElement>): ServoPoint | null => {
+    const overlay = servoOverlayRef.current;
+    const box = resolveDisplayBox();
+    if (!overlay || !box) return null;
+    const rect = overlay.getBoundingClientRect();
+    const localX = event.clientX - rect.left;
+    const localY = event.clientY - rect.top;
+    const relativeX = (localX - box.offsetX) / box.displayedWidth;
+    const relativeY = (localY - box.offsetY) / box.displayedHeight;
+    if (!Number.isFinite(relativeX) || !Number.isFinite(relativeY)) return null;
+    return {
+      x: clamp01(relativeX),
+      y: clamp01(relativeY),
+    };
+  };
+
+  const videoPointToOverlayPercent = (point: ServoPoint | null) => {
+    if (!point) return null;
+    const box = resolveDisplayBox();
+    if (!box) {
+      return {
+        left: `${(clamp01(point.x) * 100).toFixed(2)}%`,
+        top: `${(clamp01(point.y) * 100).toFixed(2)}%`,
+      };
+    }
+    const px = box.offsetX + clamp01(point.x) * box.displayedWidth;
+    const py = box.offsetY + clamp01(point.y) * box.displayedHeight;
+    return {
+      left: `${((px / box.containerWidth) * 100).toFixed(2)}%`,
+      top: `${((py / box.containerHeight) * 100).toFixed(2)}%`,
+    };
+  };
+
+  const captureGrayFrame = () => {
+    const video = webcamVideoRef.current;
+    const canvas = servoCanvasRef.current;
+    if (!video || !canvas || video.videoWidth <= 0 || video.videoHeight <= 0) return null;
+    const maxWidth = 360;
+    const scale = Math.min(1, maxWidth / video.videoWidth);
+    const width = Math.max(96, Math.round(video.videoWidth * scale));
+    const height = Math.max(72, Math.round(video.videoHeight * scale));
+    if (canvas.width !== width || canvas.height !== height) {
+      canvas.width = width;
+      canvas.height = height;
+    }
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    if (!ctx) return null;
+    ctx.drawImage(video, 0, 0, width, height);
+    const rgba = ctx.getImageData(0, 0, width, height).data;
+    const gray = new Uint8Array(width * height);
+    for (let i = 0, j = 0; i < rgba.length; i += 4, j += 1) {
+      gray[j] = (0.299 * rgba[i] + 0.587 * rgba[i + 1] + 0.114 * rgba[i + 2]) | 0;
+    }
+    return { gray, width, height };
+  };
+
+  const buildTemplate = (frameGray: Uint8Array, frameWidth: number, frameHeight: number, point: ServoPoint) => {
+    const centerX = Math.round(clamp01(point.x) * (frameWidth - 1));
+    const centerY = Math.round(clamp01(point.y) * (frameHeight - 1));
+    const halfWidth = Math.max(7, Math.round(frameWidth * 0.03));
+    const halfHeight = Math.max(7, Math.round(frameHeight * 0.03));
+    const minX = Math.max(0, centerX - halfWidth);
+    const maxX = Math.min(frameWidth - 1, centerX + halfWidth);
+    const minY = Math.max(0, centerY - halfHeight);
+    const maxY = Math.min(frameHeight - 1, centerY + halfHeight);
+    const patchWidth = maxX - minX + 1;
+    const patchHeight = maxY - minY + 1;
+    if (patchWidth < 9 || patchHeight < 9) return null;
+    const pixels = new Uint8Array(patchWidth * patchHeight);
+    let k = 0;
+    for (let y = minY; y <= maxY; y += 1) {
+      const rowStart = y * frameWidth;
+      for (let x = minX; x <= maxX; x += 1) {
+        pixels[k] = frameGray[rowStart + x];
+        k += 1;
+      }
+    }
+    return { width: patchWidth, height: patchHeight, halfWidth, halfHeight, pixels };
+  };
+
+  const findTemplateMatch = (
+    frameGray: Uint8Array,
+    frameWidth: number,
+    frameHeight: number,
+    template: ServoTemplate,
+    previousPoint: ServoPoint
+  ) => {
+    const centerX = Math.round(clamp01(previousPoint.x) * (frameWidth - 1));
+    const centerY = Math.round(clamp01(previousPoint.y) * (frameHeight - 1));
+    const searchRadius = Math.max(10, Math.round(Math.min(frameWidth, frameHeight) * 0.08));
+    let bestX = centerX;
+    let bestY = centerY;
+    let bestScore = Number.POSITIVE_INFINITY;
+    const minCandidateX = Math.max(template.halfWidth, centerX - searchRadius);
+    const maxCandidateX = Math.min(frameWidth - template.halfWidth - 1, centerX + searchRadius);
+    const minCandidateY = Math.max(template.halfHeight, centerY - searchRadius);
+    const maxCandidateY = Math.min(frameHeight - template.halfHeight - 1, centerY + searchRadius);
+    if (minCandidateX >= maxCandidateX || minCandidateY >= maxCandidateY) {
+      return {
+        point: previousPoint,
+        score: 1,
+      };
+    }
+    for (let candidateY = minCandidateY; candidateY <= maxCandidateY; candidateY += 1) {
+      for (let candidateX = minCandidateX; candidateX <= maxCandidateX; candidateX += 1) {
+        let score = 0;
+        let templateIndex = 0;
+        const startY = candidateY - template.halfHeight;
+        const startX = candidateX - template.halfWidth;
+        for (let dy = 0; dy < template.height; dy += 1) {
+          const rowStart = (startY + dy) * frameWidth + startX;
+          for (let dx = 0; dx < template.width; dx += 1) {
+            score += Math.abs(frameGray[rowStart + dx] - template.pixels[templateIndex]);
+            templateIndex += 1;
+          }
+        }
+        if (score < bestScore) {
+          bestScore = score;
+          bestX = candidateX;
+          bestY = candidateY;
+        }
+      }
+    }
+    const normalizedScore = bestScore / (template.width * template.height * 255);
+    return {
+      point: {
+        x: frameWidth > 1 ? bestX / (frameWidth - 1) : 0.5,
+        y: frameHeight > 1 ? bestY / (frameHeight - 1) : 0.5,
+      },
+      score: normalizedScore,
+    };
+  };
+
+  const startServo = () => {
+    if (!visualServoEnabled || !servoTargetRef.current || !webcamFrameReady) return;
+    if (servoRunningRef.current) return;
+    servoRunningRef.current = true;
+    setServoRunning(true);
+    setServoStatus("Visual servo running...");
+    servoPickupSentRef.current = false;
+    servoAlignedSinceMsRef.current = null;
+    onVisualServoStart?.();
+    const step = (nowMs: number) => {
+      if (!servoRunningRef.current) return;
+      const frame = captureGrayFrame();
+      const target = servoTargetRef.current;
+      if (!frame || !target) {
+        servoAnimationRef.current = window.requestAnimationFrame(step);
+        return;
+      }
+      if (!servoTemplateRef.current) {
+        servoTemplateRef.current = buildTemplate(frame.gray, frame.width, frame.height, target);
+        servoTrackPointRef.current = target;
+      }
+      const template = servoTemplateRef.current;
+      const previousPoint = servoTrackPointRef.current ?? target;
+      if (!template) {
+        servoAnimationRef.current = window.requestAnimationFrame(step);
+        return;
+      }
+      const match = findTemplateMatch(frame.gray, frame.width, frame.height, template, previousPoint);
+      const lockLost = match.score > 0.43;
+      const trackedPoint = lockLost ? previousPoint : match.point;
+      servoTrackPointRef.current = trackedPoint;
+      const ex = trackedPoint.x - 0.5;
+      const ey = trackedPoint.y - 0.5;
+      const deadzoneX = visualServoDeadzonePx / frame.width;
+      const deadzoneY = visualServoDeadzonePx / frame.height;
+      const aligned = Math.abs(ex) <= deadzoneX && Math.abs(ey) <= deadzoneY;
+      const cmdX = clampUnit(ex * visualServoGain);
+      const cmdY = clampUnit(ey * visualServoGain);
+      setJoy(cmdX * visualServoMaxCommand, cmdY * visualServoMaxCommand);
+      setZ(aligned ? visualServoApproachZ : 0);
+      if (visualServoAutoPickup) {
+        if (aligned) {
+          if (servoAlignedSinceMsRef.current == null) {
+            servoAlignedSinceMsRef.current = nowMs;
+          }
+          const holdMs = nowMs - servoAlignedSinceMsRef.current;
+          if (
+            holdMs >= visualServoAutoPickupHoldMs &&
+            !servoPickupSentRef.current
+          ) {
+            servoPickupSentRef.current = true;
+            onVisualServoRequestPickup?.();
+            setServoStatus("Centered: pick_up requested.");
+            setServoRunning(false);
+            servoRunningRef.current = false;
+            stopServoMotion();
+            return;
+          }
+        } else {
+          servoAlignedSinceMsRef.current = null;
+        }
+      }
+      if (nowMs - servoLastUiUpdateMsRef.current >= 120) {
+        servoLastUiUpdateMsRef.current = nowMs;
+        setServoTracked(trackedPoint);
+        if (lockLost) {
+          setServoStatus("Tracking weak, keep ball visible.");
+        } else if (aligned) {
+          setServoStatus(
+            visualServoAutoPickup ? "Centered, holding for pick up..." : "Centered on target."
+          );
+        } else {
+          setServoStatus(
+            `Aligning (dx ${(ex * 100).toFixed(0)}%, dy ${(ey * 100).toFixed(0)}%).`
+          );
+        }
+      }
+      servoAnimationRef.current = window.requestAnimationFrame(step);
+    };
+    servoAnimationRef.current = window.requestAnimationFrame(step);
+  };
+
+  const stopServo = () => {
+    if (servoAnimationRef.current !== null) {
+      window.cancelAnimationFrame(servoAnimationRef.current);
+      servoAnimationRef.current = null;
+    }
+    const wasRunning = servoRunningRef.current;
+    servoRunningRef.current = false;
+    setServoRunning(false);
+    servoAlignedSinceMsRef.current = null;
+    stopServoMotion();
+    if (wasRunning) {
+      onVisualServoStop?.();
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      stopServo();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const targetOverlayStyle = videoPointToOverlayPercent(servoTarget);
+  const trackedOverlayStyle = videoPointToOverlayPercent(servoTracked);
+
   const hasPreferredOption = webcamOptions.some(
     (option) => option.deviceId === preferredWebcamDeviceId
   );
@@ -1795,6 +2157,101 @@ export function StreamDisplayWidget({
                     display: webcamFrameReady ? "block" : "none",
                   }}
                 />
+                {visualServoEnabled && webcamFrameReady ? (
+                  <div
+                    ref={servoOverlayRef}
+                    className="controls-stream-servo-overlay"
+                    data-canvas-interactive="true"
+                    onPointerDown={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      const point = pointerToVideoPoint(event);
+                      if (!point) return;
+                      setServoTarget(point);
+                      setServoTracked(point);
+                      servoTargetRef.current = point;
+                      servoTrackPointRef.current = point;
+                      servoTemplateRef.current = null;
+                      setServoStatus("Target selected. Start servo to align.");
+                    }}
+                  >
+                    <div className="controls-stream-servo-reticle controls-stream-servo-reticle-center" />
+                    {targetOverlayStyle ? (
+                      <div
+                        className="controls-stream-servo-reticle controls-stream-servo-reticle-target"
+                        style={targetOverlayStyle}
+                      />
+                    ) : null}
+                    {trackedOverlayStyle ? (
+                      <div
+                        className="controls-stream-servo-reticle controls-stream-servo-reticle-tracked"
+                        style={trackedOverlayStyle}
+                      />
+                    ) : null}
+                    <div
+                      className="controls-stream-servo-controls"
+                      onPointerDown={(event) => event.stopPropagation()}
+                    >
+                      <button
+                        type="button"
+                        className="controls-stream-servo-button"
+                        data-canvas-interactive="true"
+                        disabled={!servoTarget || servoRunning}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          startServo();
+                        }}
+                      >
+                        Start Servo
+                      </button>
+                      <button
+                        type="button"
+                        className="controls-stream-servo-button"
+                        data-canvas-interactive="true"
+                        disabled={!servoRunning}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          stopServo();
+                          setServoStatus("Servo stopped.");
+                        }}
+                      >
+                        Stop
+                      </button>
+                      <button
+                        type="button"
+                        className="controls-stream-servo-button"
+                        data-canvas-interactive="true"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          stopServo();
+                          setServoTarget(null);
+                          setServoTracked(null);
+                          servoTargetRef.current = null;
+                          servoTrackPointRef.current = null;
+                          servoTemplateRef.current = null;
+                          setServoStatus("Tap ball to select target.");
+                        }}
+                      >
+                        Reset
+                      </button>
+                      <button
+                        type="button"
+                        className="controls-stream-servo-button tone-accent"
+                        data-canvas-interactive="true"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onVisualServoRequestPickup?.();
+                          setServoStatus("Pick up requested.");
+                        }}
+                      >
+                        Pick Up
+                      </button>
+                    </div>
+                    <div className="controls-stream-servo-status">
+                      {servoStatus}
+                    </div>
+                  </div>
+                ) : null}
               </>
             )
           ) : canEmbedVisualization ? (
@@ -1819,6 +2276,7 @@ export function StreamDisplayWidget({
               {widget.overlayText?.trim() || statusText}
             </div>
           )}
+          {visualServoEnabled ? <canvas ref={servoCanvasRef} className="controls-stream-servo-canvas" /> : null}
         </div>
         {showStatusRow ? <div className="controls-stream-status">{statusText}</div> : null}
         {showUrlRow ? <div className="controls-stream-url">{widget.streamUrl || "no stream url"}</div> : null}
