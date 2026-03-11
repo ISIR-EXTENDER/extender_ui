@@ -1484,6 +1484,7 @@ export function StreamDisplayWidget({
   const servoAlignedSinceMsRef = useRef<number | null>(null);
   const servoPickupSentRef = useRef(false);
   const webcamPreferenceKey = `extender.controls.webcam.device.${widget.id}`;
+  const visualServoTargetKey = `extender.controls.visual_servo.target.${widget.id}`;
   const webcamPickerId = `stream-webcam-picker-${widget.id}`;
   const trimmedStreamUrl = widget.streamUrl.trim();
   const isHttpStream = /^https?:\/\//i.test(trimmedStreamUrl);
@@ -1651,6 +1652,46 @@ export function StreamDisplayWidget({
       // ignore storage errors
     }
   }, [preferredWebcamDeviceId, webcamPreferenceKey]);
+
+  useEffect(() => {
+    if (!visualServoEnabled || typeof window === "undefined") return;
+    try {
+      const raw = window.localStorage.getItem(visualServoTargetKey);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as { x?: unknown; y?: unknown };
+      if (typeof parsed.x !== "number" || typeof parsed.y !== "number") return;
+      const restoredPoint = {
+        x: Math.max(0, Math.min(1, parsed.x)),
+        y: Math.max(0, Math.min(1, parsed.y)),
+      };
+      setServoTarget(restoredPoint);
+      setServoTracked(restoredPoint);
+      servoTargetRef.current = restoredPoint;
+      servoTrackPointRef.current = restoredPoint;
+      setServoStatus("Target restored. Start servo to align.");
+    } catch {
+      // ignore storage errors
+    }
+  }, [visualServoEnabled, visualServoTargetKey]);
+
+  useEffect(() => {
+    if (!visualServoEnabled || typeof window === "undefined") return;
+    try {
+      if (!servoTarget) {
+        window.localStorage.removeItem(visualServoTargetKey);
+        return;
+      }
+      window.localStorage.setItem(
+        visualServoTargetKey,
+        JSON.stringify({
+          x: Math.max(0, Math.min(1, servoTarget.x)),
+          y: Math.max(0, Math.min(1, servoTarget.y)),
+        })
+      );
+    } catch {
+      // ignore storage errors
+    }
+  }, [servoTarget, visualServoEnabled, visualServoTargetKey]);
 
   useEffect(() => {
     const stopCurrentStream = () => {
