@@ -1664,10 +1664,18 @@ export function ApplicationPage({
           statusText={sourceStatus}
           runtimeInteractive
           onVisualServoStart={() => {
-            wsClient.send({ type: "state_cmd", command: "teleop" });
+            wsClient.send({ type: "visual_servo_cmd", command: "prepare_pickup" });
+          }}
+          onVisualServoStop={() => {
+            wsClient.send({ type: "visual_servo_cmd", command: "abort" });
           }}
           onVisualServoRequestPickup={() => {
-            wsClient.send({ type: "state_cmd", command: "pick_up" });
+            wsClient.send({
+              type: "visual_servo_cmd",
+              command: "pickup_now",
+              close_gripper: true,
+              enable_magnet: false,
+            });
           }}
         />
       );
