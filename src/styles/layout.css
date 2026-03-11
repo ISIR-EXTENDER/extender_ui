@@ -2372,6 +2372,12 @@ body,
   width: 12px;
   height: 12px;
   background: rgba(34, 197, 94, 0.3);
+  transition:
+    left 140ms linear,
+    top 140ms linear,
+    transform 140ms ease-out,
+    box-shadow 180ms ease-out;
+  will-change: left, top, transform;
 }
 
 .controls-stream-servo-controls {

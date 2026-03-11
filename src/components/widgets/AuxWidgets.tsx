@@ -1818,8 +1818,11 @@ export function StreamDisplayWidget({
     if (!overlay || !video || video.videoWidth <= 0 || video.videoHeight <= 0) {
       return null;
     }
-    const containerWidth = overlay.clientWidth;
-    const containerHeight = overlay.clientHeight;
+    // Use rendered (post-transform) size so pointer mapping stays correct when
+    // the runtime canvas is scaled to fit the viewport.
+    const overlayRect = overlay.getBoundingClientRect();
+    const containerWidth = overlayRect.width;
+    const containerHeight = overlayRect.height;
     if (containerWidth <= 1 || containerHeight <= 1) return null;
     const videoAspect = video.videoWidth / video.videoHeight;
     const containerAspect = containerWidth / containerHeight;
