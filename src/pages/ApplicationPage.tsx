@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { loadApplicationsFromLocalStorage } from "../app/applications";
+import { resolveApplicationRuntimePlugins } from "../app/runtime/registry";
 import type { CanvasRect } from "../components/layout/CanvasItem";
 import {
   ActionButtonWidget,
@@ -56,7 +57,6 @@ import {
   formatMeasureVectorsText,
   resolveMeasureResultOverlayText,
   triggerMeasureButton,
-  upsertMeasureResultHistory,
   type MeasureResultHistoryEntry,
   type MeasureViewMode,
 } from "./applicationMeasureRuntime";
@@ -320,51 +320,46 @@ export function ApplicationPage({
     onNavigateToScreen(activeScreenId);
   }, [activeScreenId, onNavigateToScreen, routeScreenId]);
 
+  const activeRuntimePlugins = useMemo(
+    () =>
+      resolveApplicationRuntimePlugins({
+        application: activeApplication,
+        activeScreenId,
+      }),
+    [activeApplication, activeScreenId]
+  );
+
   useEffect(() => {
     const unsubscribe = wsClient.onMessage((message) => {
-      if (message.type === "measure_result") {
-        const resultImageDataUrl = message.image_data_url;
-        const resultVectorsJson =
-          typeof message.vectors_json === "string" ? message.vectors_json : null;
-        if (resultImageDataUrl) {
-          setMeasureResultImageDataUrl(resultImageDataUrl);
-          measureResultHistoryRef.current = upsertMeasureResultHistory(
-            measureResultHistoryRef.current,
-            {
-              id: `measure-${message.updated_at_ms ?? Date.now()}`,
-              imageDataUrl: resultImageDataUrl,
-              vectorsJson: resultVectorsJson,
-              updatedAtMs: message.updated_at_ms ?? Date.now(),
-              source: "opencv",
-            }
-          );
-        }
-        if (resultVectorsJson) {
-          setMeasureVectorsJson(resultVectorsJson);
-        }
-        setMeasureLastUpdatedAtMs(message.updated_at_ms ?? Date.now());
-        setMeasureStatusText("Measure result updated");
-        setMeasureRequestPending(false);
-        setMeasureViewMode("result");
-        return;
-      }
-
-      if (
-        message.type === "event" &&
-        message.code.startsWith("MEASURE_") &&
-        message.message.trim()
-      ) {
-        setMeasureStatusText(message.message.trim());
-        if (message.code === "MEASURE_REQUEST_FAILED") {
-          setMeasureRequestPending(false);
-        }
+      for (const plugin of activeRuntimePlugins) {
+        const handled = plugin.handleIncomingMessage?.({
+          application: activeApplication,
+          activeScreenId,
+          message,
+          widgets,
+          state: {
+            measureResultHistory: measureResultHistoryRef.current,
+          },
+          actions: {
+            setMeasureResultImageDataUrl,
+            setMeasureVectorsJson,
+            setMeasureLastUpdatedAtMs,
+            setMeasureStatusText,
+            setMeasureRequestPending,
+            setMeasureViewMode,
+            setMeasureResultHistory: (nextHistory) => {
+              measureResultHistoryRef.current = nextHistory;
+            },
+          },
+        });
+        if (handled) return;
       }
     });
 
     return () => {
       unsubscribe();
     };
-  }, []);
+  }, [activeApplication, activeRuntimePlugins, activeScreenId, widgets]);
 
   const allowedScreenIds = useMemo(
     () => new Set(activeApplication?.screenIds ?? []),
