@@ -3,8 +3,8 @@ import type { CanvasWidget } from "../../components/widgets";
 import type {
   MeasureResultHistoryEntry,
   MeasureViewMode,
-} from "../../pages/applicationMeasureRuntime";
-import type { PetanqueFlowStage } from "../../pages/applicationRuntimeButtons";
+} from "../../apps/petanque/measureRuntime";
+import type { PetanqueFlowStage } from "../../apps/petanque/buttonRuntime";
 import type { WsIncoming } from "../../types/ws";
 
 export type ApplicationRuntimeMatchArgs = {

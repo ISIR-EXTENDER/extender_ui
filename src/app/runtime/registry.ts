@@ -1,5 +1,5 @@
-import { petanqueRuntimePlugin } from "./petanqueRuntime";
-import { sandboxRuntimePlugin } from "./sandboxRuntime";
+import { petanqueRuntimePlugin } from "../../apps/petanque/runtime";
+import { sandboxRuntimePlugin } from "../../apps/sandbox/runtime";
 import type { ApplicationRuntimeMatchArgs, ApplicationRuntimePlugin } from "./types";
 
 const RUNTIME_PLUGINS: ApplicationRuntimePlugin[] = [

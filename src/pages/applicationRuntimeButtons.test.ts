@@ -13,7 +13,7 @@ import {
   isPetanqueStateCommand,
   resolvePetanqueAlphaPreset,
   resolvePetanqueFlowStageAfterCommand,
-} from "./applicationRuntimeButtons";
+} from "../apps/petanque/buttonRuntime";
 
 describe("applicationRuntimeButtons", () => {
   it("detects measure and petanque command topics", () => {

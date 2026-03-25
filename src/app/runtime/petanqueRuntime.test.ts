@@ -4,7 +4,7 @@ import {
   PETANQUE_STATE_TOPIC,
   PLAY_PETANQUE_MEASURE_REFRESH_TOPIC,
 } from "../../pages/applicationTopics";
-import { petanqueRuntimePlugin } from "./petanqueRuntime";
+import { petanqueRuntimePlugin } from "../../apps/petanque/runtime";
 import { resolveApplicationRuntimePlugins } from "./registry";
 import type { ApplicationRuntimeButtonArgs, ApplicationRuntimeMessageArgs } from "./types";
 

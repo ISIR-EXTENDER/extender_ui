@@ -56,7 +56,7 @@ import {
   resolveMeasureResultOverlayText,
   type MeasureResultHistoryEntry,
   type MeasureViewMode,
-} from "./applicationMeasureRuntime";
+} from "../apps/petanque/measureRuntime";
 import {
   applyTeleopConfigScalarValue,
   getTeleopConfigButtonLabel,
@@ -71,7 +71,7 @@ import {
   type PetanqueAlphaPreset,
   type PetanqueFlowStage,
   type PetanqueStateCommand,
-} from "./applicationRuntimeButtons";
+} from "../apps/petanque/buttonRuntime";
 
 type ApplicationPageProps = {
   applicationId: string;

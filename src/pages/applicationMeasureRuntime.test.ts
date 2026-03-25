@@ -18,7 +18,7 @@ import {
   resolveMeasureStreamWidgetId,
   triggerMeasureButton,
   upsertMeasureResultHistory,
-} from "./applicationMeasureRuntime";
+} from "../apps/petanque/measureRuntime";
 
 describe("applicationMeasureRuntime", () => {
   it("formats status and vector text safely", () => {

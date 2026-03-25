@@ -12,8 +12,8 @@ export default defineConfig({
       reporter: ["text", "html", "lcov"],
       include: [
         "src/app/runtime/**/*.ts",
-        "src/pages/applicationMeasureRuntime.ts",
-        "src/pages/applicationRuntimeButtons.ts",
+        "src/apps/petanque/**/*.ts",
+        "src/apps/sandbox/**/*.ts",
         "src/pages/applicationTeleopConfig.ts",
       ],
       exclude: ["src/app/runtime/types.ts"],
