@@ -41,7 +41,6 @@ import { useUiStore } from "../store/uiStore";
 import {
   PETANQUE_ALPHA_PRESET_TOPIC,
   PETANQUE_ALPHA_TOPIC,
-  PETANQUE_ANGLE_TOPIC,
   PETANQUE_TOTAL_DURATION_TOPIC,
   PLAY_PETANQUE_MEASURE_STATUS_TOPIC,
   PLAY_PETANQUE_MEASURE_STREAM_WIDGET_ID,
@@ -72,6 +71,21 @@ import {
   type PetanqueFlowStage,
   type PetanqueStateCommand,
 } from "../apps/petanque/buttonRuntime";
+import {
+  PETANQUE_ALPHA_MAX,
+  PETANQUE_ALPHA_SAFE_MAX,
+  PETANQUE_DEFAULT_TOTAL_DURATION_S,
+  buildPetanqueCfgUpdate,
+  buildPetanqueStateCommandMessage,
+  buildPetanqueThrowCfgUpdate,
+  clampPetanqueDuration,
+  isPetanqueCfgUpdateEmpty,
+  resolvePetanqueAlphaPresetValue,
+  resolvePetanqueMaxVelocityPresentation,
+  resolvePetanqueMaxVelocityValue,
+  resolvePetanqueThrowDrawValue,
+  syncPetanqueAlphaWidgets,
+} from "../apps/petanque/controlRuntime";
 
 type ApplicationPageProps = {
   applicationId: string;
@@ -83,29 +97,8 @@ type ApplicationPageProps = {
 
 const TOPIC_FRESHNESS_MS = 200;
 const TOPIC_FRESHNESS_TICK_MS = 100;
-const PETANQUE_ALPHA_SAFE_MAX = 20;
-const PETANQUE_ALPHA_MAX = 40;
-const PETANQUE_ALPHA_POINTER = 20;
-const PETANQUE_ALPHA_TIRER = 0;
-const PETANQUE_TOTAL_DURATION_MIN_S = 0.9;
-const PETANQUE_TOTAL_DURATION_MAX_S = 3.0;
-const PETANQUE_DEFAULT_TOTAL_DURATION_S = 1.1;
-const PETANQUE_DEFAULT_ALPHA = 0;
 type SliderChannel = "z" | "rz";
 const clampSignedUnit = (value: number) => Math.max(-1, Math.min(1, value));
-const clampPetanqueDuration = (durationSeconds: number) =>
-  Math.max(PETANQUE_TOTAL_DURATION_MIN_S, Math.min(PETANQUE_TOTAL_DURATION_MAX_S, durationSeconds));
-const formatMaxVelocityPowerPercent = (
-  value: number,
-  min: number,
-  max: number,
-  reverseDirection: boolean
-) => {
-  const span = Math.max(1e-6, max - min);
-  const normalized = reverseDirection ? (max - value) / span : (value - min) / span;
-  const percent = Math.max(0, Math.min(100, normalized * 100));
-  return `Power ${percent.toFixed(0)}%`;
-};
 
 const NOOP_RECT_CHANGE: (next: CanvasRect) => void = () => {};
 const NOOP_TEXT_CHANGE = Object.assign(
@@ -463,10 +456,7 @@ export function ApplicationPage({
   };
 
   const sendPetanqueStateCommand = (command: PetanqueStateCommand) => {
-    wsClient.send({
-      type: "state_cmd",
-      command,
-    });
+    wsClient.send(buildPetanqueStateCommandMessage(command));
     advancePetanqueFlow(command);
   };
 
@@ -475,24 +465,12 @@ export function ApplicationPage({
     if (clamped <= PETANQUE_ALPHA_SAFE_MAX) {
       alphaUnsafeValidatedRef.current = false;
     }
-    setThrowDrawAlphaValues((prev) => {
-      const next = { ...prev };
-      for (const widget of widgets) {
-        if (widget.kind === "throw-draw" && widget.alphaTopic === PETANQUE_ALPHA_TOPIC) {
-          next[widget.id] = clamped;
-        }
-      }
-      return next;
-    });
-    setMaxVelocityWidgetValues((prev) => {
-      const next = { ...prev };
-      for (const widget of widgets) {
-        if (widget.kind === "max-velocity" && widget.topic === PETANQUE_ALPHA_TOPIC) {
-          next[widget.id] = clamped;
-        }
-      }
-      return next;
-    });
+    setThrowDrawAlphaValues((prev) =>
+      syncPetanqueAlphaWidgets(widgets, clamped, prev, maxVelocityWidgetValues).nextThrowDrawAlphaValues
+    );
+    setMaxVelocityWidgetValues((prev) =>
+      syncPetanqueAlphaWidgets(widgets, clamped, throwDrawAlphaValues, prev).nextMaxVelocityWidgetValues
+    );
     wsClient.send({
       type: "petanque_cfg",
       alpha: clamped,
@@ -500,7 +478,7 @@ export function ApplicationPage({
   };
 
   const triggerPetanqueAlphaPreset = (preset: PetanqueAlphaPreset) => {
-    const alpha = preset === "pointer" ? PETANQUE_ALPHA_POINTER : PETANQUE_ALPHA_TIRER;
+    const alpha = resolvePetanqueAlphaPresetValue(preset);
     setPetanqueAlpha(alpha);
     sendPetanqueStateCommand("throw");
   };
@@ -890,42 +868,31 @@ export function ApplicationPage({
     }
 
     if (widget.kind === "throw-draw") {
-      const angleMin = Math.min(widget.angleMin, widget.angleMax);
-      const angleMax = Math.max(widget.angleMin, widget.angleMax);
-      const durationMin = Math.min(widget.durationMin, widget.durationMax);
-      const durationMax = Math.max(widget.durationMin, widget.durationMax);
-      const hasAlphaControl =
-        typeof widget.alphaTopic === "string" && widget.alphaTopic.trim().length > 0;
-      const alphaMin = Math.min(widget.alphaMin ?? 0, widget.alphaMax ?? PETANQUE_ALPHA_MAX);
-      const alphaMax = Math.max(widget.alphaMin ?? 0, widget.alphaMax ?? PETANQUE_ALPHA_MAX);
       const alphaWidget =
-        hasAlphaControl
+        typeof widget.alphaTopic === "string" && widget.alphaTopic.trim().length > 0
           ? widgets.find(
               (candidate) =>
                 candidate.kind === "max-velocity" && candidate.topic === widget.alphaTopic
             ) ?? null
           : null;
-      const drawAlphaValueFromState = throwDrawAlphaValues[widget.id];
       const alphaWidgetValue = alphaWidget ? maxVelocityWidgetValues[alphaWidget.id] : undefined;
-      const drawAlphaValue = hasAlphaControl
-        ? typeof drawAlphaValueFromState === "number"
-          ? drawAlphaValueFromState
-          : typeof alphaWidgetValue === "number"
-          ? alphaWidgetValue
-          : widget.alphaTopic === PETANQUE_ALPHA_TOPIC
-            ? PETANQUE_DEFAULT_ALPHA
-            : alphaMin
-        : undefined;
-      const defaultDuration =
-        widget.powerTopic === PETANQUE_TOTAL_DURATION_TOPIC
-          ? PETANQUE_DEFAULT_TOTAL_DURATION_S
-          : durationMax;
-      const drawValue = throwDrawWidgetValues[widget.id] ?? {
-        angle: Math.max(angleMin, Math.min(angleMax, 0)),
-        duration: Math.max(durationMin, Math.min(durationMax, defaultDuration)),
-      };
-      const clampedAngle = Math.max(angleMin, Math.min(angleMax, drawValue.angle));
-      const clampedDuration = Math.max(durationMin, Math.min(durationMax, drawValue.duration));
+      const {
+        angleMin,
+        angleMax,
+        durationMin,
+        durationMax,
+        hasAlphaControl,
+        alphaMin,
+        alphaMax,
+        drawAlphaValue,
+        clampedAngle,
+        clampedDuration,
+      } = resolvePetanqueThrowDrawValue(
+        widget,
+        throwDrawWidgetValues,
+        throwDrawAlphaValues,
+        alphaWidgetValue
+      );
       const applyDrawAlpha = (rawNextAlpha: number) => {
         if (!hasAlphaControl) return;
         let resolvedAlpha = Math.max(alphaMin, Math.min(alphaMax, rawNextAlpha));
@@ -1009,20 +976,8 @@ export function ApplicationPage({
               return nextValues;
             });
 
-            const cfg: {
-              total_duration?: number;
-              angle_between_start_and_finish?: number;
-            } = {};
-            if (widget.powerTopic === PETANQUE_TOTAL_DURATION_TOPIC) {
-              cfg.total_duration = clampPetanqueDuration(resolvedDuration);
-            }
-            if (widget.angleTopic === PETANQUE_ANGLE_TOPIC) {
-              cfg.angle_between_start_and_finish = resolvedAngle;
-            }
-            if (
-              cfg.total_duration !== undefined ||
-              cfg.angle_between_start_and_finish !== undefined
-            ) {
+            const cfg = buildPetanqueThrowCfgUpdate(widget, resolvedAngle, resolvedDuration);
+            if (!isPetanqueCfgUpdateEmpty(cfg)) {
               wsClient.send({
                 type: "petanque_cfg",
                 ...cfg,
@@ -1053,55 +1008,13 @@ export function ApplicationPage({
           angularScaleY,
           angularScaleZ,
         }) ??
-        (typeof maxVelocityWidgetValues[widget.id] === "number"
-          ? maxVelocityWidgetValues[widget.id]
-          : widget.topic === PETANQUE_TOTAL_DURATION_TOPIC
-            ? PETANQUE_DEFAULT_TOTAL_DURATION_S
-            : widget.topic === PETANQUE_ANGLE_TOPIC
-              ? 0
-              : widget.topic === PETANQUE_ALPHA_TOPIC
-                ? PETANQUE_DEFAULT_ALPHA
-                : 1);
-      const reverseDirection =
-        widget.reverseDirection ??
-        widget.topic === PETANQUE_TOTAL_DURATION_TOPIC;
-      const endpointLabels =
-        widget.endpointLeftLabel || widget.endpointRightLabel
-          ? {
-              left: widget.endpointLeftLabel,
-              right: widget.endpointRightLabel,
-            }
-          : widget.topic === PETANQUE_TOTAL_DURATION_TOPIC
-            ? { left: "Slow", right: "Fast" }
-            : widget.topic === PETANQUE_ANGLE_TOPIC
-              ? { left: "Left", right: "Right" }
-              : widget.topic === PETANQUE_ALPHA_TOPIC
-                ? { left: "Tirer", right: "Pointer" }
-                : undefined;
-      const bubbleMode =
-        widget.bubbleMode ??
-        (widget.topic === PETANQUE_ANGLE_TOPIC
-          ? "degrees"
-          : widget.topic === PETANQUE_ALPHA_TOPIC
-            ? "degrees-unit"
-            : widget.topic === PETANQUE_TOTAL_DURATION_TOPIC
-              ? "power"
-              : "number");
-      const bubbleValueFormatter =
-        bubbleMode === "degrees"
-          ? (rawValue: number) => `${((rawValue * 180) / Math.PI).toFixed(1)}°`
-          : bubbleMode === "degrees-unit"
-            ? (rawValue: number) => `${rawValue.toFixed(1)}°`
-            : bubbleMode === "power"
-              ? (rawValue: number) =>
-                  formatMaxVelocityPowerPercent(rawValue, widget.min, widget.max, reverseDirection)
-              : undefined;
-      const unsafeThreshold =
-        typeof widget.unsafeThreshold === "number"
-          ? widget.unsafeThreshold
-          : widget.topic === PETANQUE_ALPHA_TOPIC
-            ? PETANQUE_ALPHA_SAFE_MAX
-            : undefined;
+        (resolvePetanqueMaxVelocityValue(widget.topic, widget.id, maxVelocityWidgetValues) ?? 1);
+      const {
+        reverseDirection,
+        endpointLabels,
+        bubbleValueFormatter,
+        unsafeThreshold,
+      } = resolvePetanqueMaxVelocityPresentation(widget);
       return (
         <MaxVelocityWidget
           key={widget.id}
@@ -1148,23 +1061,9 @@ export function ApplicationPage({
               setAngularScaleY,
               setAngularScaleZ,
             });
-            if (widget.topic === PETANQUE_TOTAL_DURATION_TOPIC) {
-              wsClient.send({
-                type: "petanque_cfg",
-                total_duration: clampPetanqueDuration(resolvedNextValue),
-              });
-            }
-            if (widget.topic === PETANQUE_ANGLE_TOPIC) {
-              wsClient.send({
-                type: "petanque_cfg",
-                angle_between_start_and_finish: resolvedNextValue,
-              });
-            }
-            if (widget.topic === PETANQUE_ALPHA_TOPIC) {
-              wsClient.send({
-                type: "petanque_cfg",
-                alpha: resolvedNextValue,
-              });
+            const petanqueCfgUpdate = buildPetanqueCfgUpdate(widget.topic, resolvedNextValue);
+            if (petanqueCfgUpdate) {
+              wsClient.send(petanqueCfgUpdate);
             }
             if (!isLocalMaxVelocityTopic(widget.topic)) {
               wsClient.send({
