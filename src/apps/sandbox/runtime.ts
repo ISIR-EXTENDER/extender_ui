@@ -1,4 +1,8 @@
 import type { ApplicationRuntimePlugin } from "../../app/runtime/types";
+import {
+  SANDBOX_MAX_VELOCITY_TOPIC,
+  resolveSandboxMaxVelocityPresentation,
+} from "./controlRuntime";
 
 const SANDBOX_SCREEN_IDS = new Set(["sandbox_control", "sandbox_teleop_config"]);
 
@@ -7,4 +11,8 @@ export const sandboxRuntimePlugin: ApplicationRuntimePlugin = {
   matches: ({ application, activeScreenId }) =>
     (activeScreenId != null && SANDBOX_SCREEN_IDS.has(activeScreenId)) ||
     application?.screenIds.some((screenId) => SANDBOX_SCREEN_IDS.has(screenId)) === true,
+  getMaxVelocityState: ({ widget }) => {
+    if (widget.topic !== SANDBOX_MAX_VELOCITY_TOPIC) return null;
+    return resolveSandboxMaxVelocityPresentation(widget);
+  },
 };

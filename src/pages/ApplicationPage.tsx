@@ -39,7 +39,6 @@ import { wsClient } from "../services/wsClient";
 import { useTeleopStore } from "../store/teleopStore";
 import { useUiStore } from "../store/uiStore";
 import {
-  PETANQUE_ALPHA_PRESET_TOPIC,
   PETANQUE_ALPHA_TOPIC,
   PETANQUE_TOTAL_DURATION_TOPIC,
   isLocalMaxVelocityTopic,
@@ -59,8 +58,6 @@ import {
 } from "./applicationTeleopConfig";
 import {
   resolvePetanqueFlowStageAfterCommand,
-  resolvePetanqueAlphaPreset,
-  type PetanqueAlphaPreset,
   type PetanqueFlowStage,
   type PetanqueStateCommand,
 } from "../apps/petanque/buttonRuntime";
@@ -73,9 +70,6 @@ import {
   buildPetanqueThrowCfgUpdate,
   clampPetanqueDuration,
   isPetanqueCfgUpdateEmpty,
-  resolvePetanqueAlphaPresetValue,
-  resolvePetanqueMaxVelocityPresentation,
-  resolvePetanqueMaxVelocityValue,
   resolvePetanqueThrowDrawValue,
   syncPetanqueAlphaWidgets,
 } from "../apps/petanque/controlRuntime";
@@ -315,6 +309,27 @@ export function ApplicationPage({
       [widgetId]: Date.now(),
     }));
   }, []);
+  const setPetanqueAlpha = useCallback(
+    (nextValue: number) => {
+      const clamped = Math.max(0, Math.min(PETANQUE_ALPHA_MAX, nextValue));
+      if (clamped <= PETANQUE_ALPHA_SAFE_MAX) {
+        alphaUnsafeValidatedRef.current = false;
+      }
+      setThrowDrawAlphaValues((prev) =>
+        syncPetanqueAlphaWidgets(widgets, clamped, prev, maxVelocityWidgetValues)
+          .nextThrowDrawAlphaValues
+      );
+      setMaxVelocityWidgetValues((prev) =>
+        syncPetanqueAlphaWidgets(widgets, clamped, throwDrawAlphaValues, prev)
+          .nextMaxVelocityWidgetValues
+      );
+      wsClient.send({
+        type: "petanque_cfg",
+        alpha: clamped,
+      });
+    },
+    [maxVelocityWidgetValues, throwDrawAlphaValues, widgets]
+  );
   const isWidgetFresh = (widgetId: string) =>
     freshnessClock - (widgetPulseMap[widgetId] ?? 0) <= TOPIC_FRESHNESS_MS;
   const runtimePluginState = useMemo(
@@ -328,9 +343,11 @@ export function ApplicationPage({
       measureVectorsJson,
       measureStatusText,
       measureLastUpdatedAtMs,
+      maxVelocityWidgetValues,
     }),
     [
       capturedMeasureImageDataUrl,
+      maxVelocityWidgetValues,
       measureLastUpdatedAtMs,
       measureRequestPending,
       measureResultHistory,
@@ -352,10 +369,11 @@ export function ApplicationPage({
       setMeasureResultHistory,
       setCapturedMeasureImageDataUrl,
       setPetanqueFlowStage,
+      setPetanqueAlpha,
       markWidgetPulse,
       sendMessage: (payload: object) => wsClient.send(payload),
     }),
-    [markWidgetPulse]
+    [markWidgetPulse, setPetanqueAlpha]
   );
 
   useEffect(() => {
@@ -454,29 +472,6 @@ export function ApplicationPage({
   const sendPetanqueStateCommand = (command: PetanqueStateCommand) => {
     wsClient.send(buildPetanqueStateCommandMessage(command));
     advancePetanqueFlow(command);
-  };
-
-  const setPetanqueAlpha = (nextValue: number) => {
-    const clamped = Math.max(0, Math.min(PETANQUE_ALPHA_MAX, nextValue));
-    if (clamped <= PETANQUE_ALPHA_SAFE_MAX) {
-      alphaUnsafeValidatedRef.current = false;
-    }
-    setThrowDrawAlphaValues((prev) =>
-      syncPetanqueAlphaWidgets(widgets, clamped, prev, maxVelocityWidgetValues).nextThrowDrawAlphaValues
-    );
-    setMaxVelocityWidgetValues((prev) =>
-      syncPetanqueAlphaWidgets(widgets, clamped, throwDrawAlphaValues, prev).nextMaxVelocityWidgetValues
-    );
-    wsClient.send({
-      type: "petanque_cfg",
-      alpha: clamped,
-    });
-  };
-
-  const triggerPetanqueAlphaPreset = (preset: PetanqueAlphaPreset) => {
-    const alpha = resolvePetanqueAlphaPresetValue(preset);
-    setPetanqueAlpha(alpha);
-    sendPetanqueStateCommand("throw");
   };
 
   const upsertPose = (poses: PoseSnapshot[], pose: PoseSnapshot) => {
@@ -692,11 +687,6 @@ export function ApplicationPage({
     }
 
     if (widget.kind === "button") {
-      const petanqueAlphaPreset =
-        widget.topic === PETANQUE_ALPHA_PRESET_TOPIC
-          ? resolvePetanqueAlphaPreset(widget.payload)
-          : null;
-      const isPetanqueAlphaPresetButton = petanqueAlphaPreset !== null;
       const isTeleopConfigButton = isTeleopConfigButtonTopic(widget.topic);
       const runtimeButtonPresentation = activeRuntimePlugins.reduce<{
         disabled?: boolean;
@@ -716,14 +706,6 @@ export function ApplicationPage({
           }) ?? null
         );
       }, null);
-      const petanqueAlphaPresetDisabled =
-        isPetanqueAlphaPresetButton && petanqueFlowStage !== "start_ready";
-      const petanqueAlphaPresetTone =
-        petanqueAlphaPreset === "pointer"
-          ? "success"
-          : petanqueAlphaPreset === "tirer"
-            ? "danger"
-            : widget.tone ?? "default";
       const teleopConfigButtonState = isTeleopConfigButton
         ? getTeleopConfigButtonState(widget.topic, {
             swapXY,
@@ -763,25 +745,13 @@ export function ApplicationPage({
           onSelect={() => {}}
           onRectChange={NOOP_RECT_CHANGE}
           onLabelChange={NOOP_TEXT_CHANGE}
-          disabled={
-            isPetanqueAlphaPresetButton
-                ? petanqueAlphaPresetDisabled
-              : (runtimeButtonPresentation?.disabled ?? false)
-          }
-          active={
-            isPetanqueAlphaPresetButton
-                ? false
-              : (runtimeButtonPresentation?.active ?? teleopConfigButtonState?.active ?? false)
-          }
+          disabled={runtimeButtonPresentation?.disabled ?? false}
+          active={runtimeButtonPresentation?.active ?? teleopConfigButtonState?.active ?? false}
           tone={
-            isPetanqueAlphaPresetButton
-                ? petanqueAlphaPresetTone
-              : (
-                  runtimeButtonPresentation?.tone ??
-                  teleopConfigButtonState?.tone ??
-                  widget.tone ??
-                  "default"
-                )
+            runtimeButtonPresentation?.tone ??
+            teleopConfigButtonState?.tone ??
+            widget.tone ??
+            "default"
           }
           onTrigger={() => {
             for (const plugin of activeRuntimePlugins) {
@@ -794,13 +764,6 @@ export function ApplicationPage({
                 actions: runtimePluginActions,
               });
               if (handled) return;
-            }
-
-            if (isPetanqueAlphaPresetButton && petanqueAlphaPreset) {
-              if (petanqueAlphaPresetDisabled) return;
-              triggerPetanqueAlphaPreset(petanqueAlphaPreset);
-              markWidgetPulse(widget.id);
-              return;
             }
 
             if (isTeleopConfigButton) {
@@ -990,6 +953,28 @@ export function ApplicationPage({
     }
 
     if (widget.kind === "max-velocity") {
+      const runtimeMaxVelocityState = activeRuntimePlugins.reduce<{
+        value?: number | null;
+        endpointLabels?: {
+          left?: string;
+          right?: string;
+        };
+        bubbleValueFormatter?: (value: number) => string;
+        reverseDirection?: boolean;
+        unsafeThreshold?: number;
+      } | null>((current, plugin) => {
+        if (current) return current;
+        return (
+          plugin.getMaxVelocityState?.({
+            application: activeApplication,
+            activeScreenId,
+            widget,
+            widgets,
+            state: runtimePluginState,
+            actions: runtimePluginActions,
+          }) ?? null
+        );
+      }, null);
       const widgetValue =
         resolveTeleopConfigScalarValue(widget.topic, {
           maxVelocity,
@@ -1002,13 +987,18 @@ export function ApplicationPage({
           angularScaleY,
           angularScaleZ,
         }) ??
-        (resolvePetanqueMaxVelocityValue(widget.topic, widget.id, maxVelocityWidgetValues) ?? 1);
+        (runtimeMaxVelocityState?.value ?? 1);
       const {
         reverseDirection,
         endpointLabels,
         bubbleValueFormatter,
         unsafeThreshold,
-      } = resolvePetanqueMaxVelocityPresentation(widget);
+      } = runtimeMaxVelocityState ?? {
+        reverseDirection: widget.reverseDirection,
+        endpointLabels: undefined,
+        bubbleValueFormatter: undefined,
+        unsafeThreshold: undefined,
+      };
       return (
         <MaxVelocityWidget
           key={widget.id}

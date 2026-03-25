@@ -16,10 +16,19 @@ import {
   getMeasureButtonState,
   getPetanqueButtonState,
   isMeasureButtonTopic,
+  resolvePetanqueAlphaPreset,
   isPetanqueStateCommand,
   resolvePetanqueFlowStageAfterCommand,
 } from "./buttonRuntime";
 import {
+  buildPetanqueStateCommandMessage,
+  isPetanqueMaxVelocityTopic,
+  resolvePetanqueAlphaPresetValue,
+  resolvePetanqueMaxVelocityPresentation,
+  resolvePetanqueMaxVelocityValue,
+} from "./controlRuntime";
+import {
+  PETANQUE_ALPHA_PRESET_TOPIC,
   PETANQUE_STATE_TOPIC,
   PLAY_PETANQUE_MEASURE_STATUS_TOPIC,
   PLAY_PETANQUE_MEASURE_REQUEST_TOPIC,
@@ -135,6 +144,18 @@ export const petanqueRuntimePlugin: ApplicationRuntimePlugin = {
     return null;
   },
   getButtonPresentation: (args) => {
+    const petanqueAlphaPreset =
+      args.widget.topic === PETANQUE_ALPHA_PRESET_TOPIC
+        ? resolvePetanqueAlphaPreset(args.widget.payload)
+        : null;
+    if (petanqueAlphaPreset) {
+      return {
+        disabled: args.state.petanqueFlowStage !== "start_ready",
+        active: false,
+        tone: petanqueAlphaPreset === "pointer" ? "success" : "danger",
+      };
+    }
+
     const petanqueCommand = isPetanqueStateCommand(args.widget.payload)
       ? args.widget.payload
       : null;
@@ -164,7 +185,39 @@ export const petanqueRuntimePlugin: ApplicationRuntimePlugin = {
 
     return null;
   },
+  getMaxVelocityState: (args) => {
+    if (!isPetanqueMaxVelocityTopic(args.widget.topic)) {
+      return null;
+    }
+    const value = resolvePetanqueMaxVelocityValue(
+      args.widget.topic,
+      args.widget.id,
+      args.state.maxVelocityWidgetValues
+    );
+    const presentation = resolvePetanqueMaxVelocityPresentation(args.widget);
+
+    return {
+      value,
+      endpointLabels: presentation.endpointLabels,
+      bubbleValueFormatter: presentation.bubbleValueFormatter,
+      reverseDirection: presentation.reverseDirection,
+      unsafeThreshold: presentation.unsafeThreshold,
+    };
+  },
   handleButtonTrigger: (args) => {
+    const petanqueAlphaPreset =
+      args.widget.topic === PETANQUE_ALPHA_PRESET_TOPIC
+        ? resolvePetanqueAlphaPreset(args.widget.payload)
+        : null;
+    if (petanqueAlphaPreset) {
+      if (args.state.petanqueFlowStage !== "start_ready") return true;
+      args.actions.setPetanqueAlpha(resolvePetanqueAlphaPresetValue(petanqueAlphaPreset));
+      args.actions.sendMessage(buildPetanqueStateCommandMessage("throw"));
+      args.actions.setPetanqueFlowStage("start_ready");
+      args.actions.markWidgetPulse(args.widget.id);
+      return true;
+    }
+
     const petanqueCommand = isPetanqueStateCommand(args.widget.payload)
       ? args.widget.payload
       : null;

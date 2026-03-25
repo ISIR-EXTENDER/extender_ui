@@ -22,6 +22,7 @@ export type ApplicationRuntimeMessageActions = {
   setMeasureResultHistory: (value: MeasureResultHistoryEntry[]) => void;
   setCapturedMeasureImageDataUrl: (value: string) => void;
   setPetanqueFlowStage: (value: PetanqueFlowStage) => void;
+  setPetanqueAlpha: (value: number) => void;
   markWidgetPulse: (widgetId: string) => void;
   sendMessage: (payload: object) => void;
 };
@@ -36,6 +37,7 @@ export type ApplicationRuntimeState = {
   measureVectorsJson: string | null;
   measureStatusText: string;
   measureLastUpdatedAtMs: number | null;
+  maxVelocityWidgetValues: Record<string, number>;
 };
 
 export type ApplicationRuntimeMessageArgs = ApplicationRuntimeMatchArgs & {
@@ -67,11 +69,32 @@ export type ApplicationRuntimeWidgetArgs = ApplicationRuntimeMatchArgs & {
   state: ApplicationRuntimeState;
 };
 
+export type ApplicationRuntimeMaxVelocityState = {
+  value?: number | null;
+  endpointLabels?: {
+    left?: string;
+    right?: string;
+  };
+  bubbleValueFormatter?: (value: number) => string;
+  reverseDirection?: boolean;
+  unsafeThreshold?: number;
+};
+
+export type ApplicationRuntimeMaxVelocityArgs = ApplicationRuntimeMatchArgs & {
+  widget: Extract<CanvasWidget, { kind: "max-velocity" }>;
+  widgets: CanvasWidget[];
+  state: ApplicationRuntimeState;
+  actions: ApplicationRuntimeMessageActions;
+};
+
 export type ApplicationRuntimePlugin = {
   id: string;
   matches: (args: ApplicationRuntimeMatchArgs) => boolean;
   handleIncomingMessage?: (args: ApplicationRuntimeMessageArgs) => boolean;
   decorateWidget?: (args: ApplicationRuntimeWidgetArgs) => CanvasWidget | null;
+  getMaxVelocityState?: (
+    args: ApplicationRuntimeMaxVelocityArgs
+  ) => ApplicationRuntimeMaxVelocityState | null;
   getButtonPresentation?: (
     args: ApplicationRuntimeButtonArgs
   ) => ApplicationRuntimeButtonPresentation | null;

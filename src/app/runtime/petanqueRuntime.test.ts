@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  PETANQUE_ALPHA_PRESET_TOPIC,
+  PETANQUE_ALPHA_TOPIC,
   PETANQUE_STATE_TOPIC,
   PLAY_PETANQUE_MEASURE_REFRESH_TOPIC,
   PLAY_PETANQUE_MEASURE_STATUS_TOPIC,
@@ -22,6 +24,7 @@ const createRuntimeState = () => ({
   measureVectorsJson: null,
   measureStatusText: "Live feed active (demo available)",
   measureLastUpdatedAtMs: null,
+  maxVelocityWidgetValues: {},
 });
 
 const createRuntimeActions = () => ({
@@ -34,6 +37,7 @@ const createRuntimeActions = () => ({
   setMeasureResultHistory: vi.fn(),
   setCapturedMeasureImageDataUrl: vi.fn(),
   setPetanqueFlowStage: vi.fn(),
+  setPetanqueAlpha: vi.fn(),
   markWidgetPulse: vi.fn(),
   sendMessage: vi.fn(),
 });
@@ -117,6 +121,35 @@ describe("petanqueRuntimePlugin", () => {
     });
   });
 
+  it("derives alpha preset button presentation from petanque flow state", () => {
+    const presentation = petanqueRuntimePlugin.getButtonPresentation?.({
+      application: null,
+      activeScreenId: "petanque",
+      widget: {
+        id: "pointer",
+        kind: "button",
+        label: "Pointer",
+        topic: PETANQUE_ALPHA_PRESET_TOPIC,
+        payload: "pointer",
+        x: 0,
+        y: 0,
+        width: 10,
+        height: 10,
+      } as never,
+      widgets: [],
+      state: {
+        ...createRuntimeState(),
+        petanqueFlowStage: "start_ready",
+      },
+      actions: createRuntimeActions(),
+    });
+
+    expect(presentation).toMatchObject({
+      disabled: false,
+      tone: "success",
+    });
+  });
+
   it("routes state-machine triggers through the generic runtime action API", () => {
     const actions = createRuntimeActions();
     const args: ApplicationRuntimeButtonArgs = {
@@ -172,6 +205,74 @@ describe("petanqueRuntimePlugin", () => {
     expect(actions.sendMessage).toHaveBeenCalledWith({ type: "measure_refresh" });
     expect(actions.setMeasureViewMode).toHaveBeenCalledWith("result");
     expect(actions.markWidgetPulse).toHaveBeenCalledWith("refresh");
+  });
+
+  it("routes alpha preset buttons through the petanque runtime plugin", () => {
+    const actions = createRuntimeActions();
+    const args: ApplicationRuntimeButtonArgs = {
+      application: null,
+      activeScreenId: "petanque",
+      widget: {
+        id: "tirer",
+        kind: "button",
+        label: "Tirer",
+        topic: PETANQUE_ALPHA_PRESET_TOPIC,
+        payload: "tirer",
+        x: 0,
+        y: 0,
+        width: 10,
+        height: 10,
+      } as never,
+      widgets: [],
+      state: {
+        ...createRuntimeState(),
+        petanqueFlowStage: "start_ready",
+      },
+      actions,
+    };
+
+    expect(petanqueRuntimePlugin.handleButtonTrigger?.(args)).toBe(true);
+    expect(actions.setPetanqueAlpha).toHaveBeenCalledWith(0);
+    expect(actions.sendMessage).toHaveBeenCalledWith({
+      type: "state_cmd",
+      command: "throw",
+    });
+    expect(actions.markWidgetPulse).toHaveBeenCalledWith("tirer");
+  });
+
+  it("exposes petanque max-velocity runtime state from the plugin", () => {
+    const runtimeState = petanqueRuntimePlugin.getMaxVelocityState?.({
+      application: null,
+      activeScreenId: "play_petanque_lancer",
+      widget: {
+        id: "play-lancer-alpha",
+        kind: "max-velocity",
+        label: "Alpha",
+        topic: PETANQUE_ALPHA_TOPIC,
+        min: 0,
+        max: 40,
+        step: 1,
+        rect: { x: 0, y: 0, w: 10, h: 10 },
+      } as never,
+      widgets: [],
+      state: {
+        ...createRuntimeState(),
+        maxVelocityWidgetValues: {
+          "play-lancer-alpha": 12,
+        },
+      },
+      actions: createRuntimeActions(),
+    });
+
+    expect(runtimeState).toMatchObject({
+      value: 12,
+      reverseDirection: false,
+      unsafeThreshold: 20,
+      endpointLabels: {
+        left: "Tirer",
+        right: "Pointer",
+      },
+    });
   });
 
   it("decorates measure status widgets from runtime state", () => {

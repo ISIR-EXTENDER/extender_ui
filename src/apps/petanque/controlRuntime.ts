@@ -15,6 +15,11 @@ export const PETANQUE_TOTAL_DURATION_MAX_S = 3.0;
 export const PETANQUE_DEFAULT_TOTAL_DURATION_S = 1.1;
 export const PETANQUE_DEFAULT_ALPHA = 0;
 
+export const isPetanqueMaxVelocityTopic = (topic: string) =>
+  topic === PETANQUE_TOTAL_DURATION_TOPIC ||
+  topic === PETANQUE_ANGLE_TOPIC ||
+  topic === PETANQUE_ALPHA_TOPIC;
+
 export const clampPetanqueDuration = (durationSeconds: number) =>
   Math.max(PETANQUE_TOTAL_DURATION_MIN_S, Math.min(PETANQUE_TOTAL_DURATION_MAX_S, durationSeconds));
 
