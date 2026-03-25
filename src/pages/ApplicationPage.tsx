@@ -39,7 +39,6 @@ import { wsClient } from "../services/wsClient";
 import { useTeleopStore } from "../store/teleopStore";
 import { useUiStore } from "../store/uiStore";
 import {
-  PETANQUE_ALPHA_TOPIC,
   PETANQUE_TOTAL_DURATION_TOPIC,
   isLocalMaxVelocityTopic,
 } from "./applicationTopics";
@@ -65,7 +64,6 @@ import {
   PETANQUE_ALPHA_MAX,
   PETANQUE_ALPHA_SAFE_MAX,
   PETANQUE_DEFAULT_TOTAL_DURATION_S,
-  buildPetanqueCfgUpdate,
   buildPetanqueStateCommandMessage,
   clampPetanqueDuration,
   syncPetanqueAlphaWidgets,
@@ -970,23 +968,23 @@ export function ApplicationPage({
           unsafeThreshold={unsafeThreshold}
           reverseDirection={reverseDirection}
           onValueChange={(nextValue) => {
-            let resolvedNextValue = nextValue;
-            if (widget.topic === PETANQUE_ALPHA_TOPIC) {
-              if (typeof unsafeThreshold === "number" && nextValue > unsafeThreshold) {
-                if (!alphaUnsafeValidatedRef.current) {
-                  const confirmed = window.confirm(
-                    `Alpha above ${unsafeThreshold} is not safe. Validate this value?`
-                  );
-                  if (!confirmed) {
-                    resolvedNextValue = unsafeThreshold;
-                  } else {
-                    alphaUnsafeValidatedRef.current = true;
-                  }
-                }
-              } else {
-                alphaUnsafeValidatedRef.current = false;
-              }
-            }
+            const runtimeMaxVelocityChange = activeRuntimePlugins.reduce<{
+              value: number;
+            } | null>((current, plugin) => {
+              if (current) return current;
+              return (
+                plugin.handleMaxVelocityChange?.({
+                  application: activeApplication,
+                  activeScreenId,
+                  widget,
+                  widgets,
+                  state: runtimePluginState,
+                  actions: runtimePluginActions,
+                  nextValue,
+                }) ?? null
+              );
+            }, null);
+            const resolvedNextValue = runtimeMaxVelocityChange?.value ?? nextValue;
             setMaxVelocityWidgetValues((prev) => ({
               ...prev,
               [widget.id]: resolvedNextValue,
@@ -1002,10 +1000,6 @@ export function ApplicationPage({
               setAngularScaleY,
               setAngularScaleZ,
             });
-            const petanqueCfgUpdate = buildPetanqueCfgUpdate(widget.topic, resolvedNextValue);
-            if (petanqueCfgUpdate) {
-              wsClient.send(petanqueCfgUpdate);
-            }
             if (!isLocalMaxVelocityTopic(widget.topic)) {
               wsClient.send({
                 type: "ui_scalar",

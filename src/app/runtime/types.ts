@@ -113,6 +113,14 @@ export type ApplicationRuntimeMaxVelocityArgs = ApplicationRuntimeMatchArgs & {
   actions: ApplicationRuntimeMessageActions;
 };
 
+export type ApplicationRuntimeMaxVelocityChangeArgs = ApplicationRuntimeMaxVelocityArgs & {
+  nextValue: number;
+};
+
+export type ApplicationRuntimeMaxVelocityChangeResult = {
+  value: number;
+};
+
 export type ApplicationRuntimeThrowDrawState = {
   angleValue: number;
   durationValue: number;
@@ -145,6 +153,9 @@ export type ApplicationRuntimePlugin = {
   getMaxVelocityState?: (
     args: ApplicationRuntimeMaxVelocityArgs
   ) => ApplicationRuntimeMaxVelocityState | null;
+  handleMaxVelocityChange?: (
+    args: ApplicationRuntimeMaxVelocityChangeArgs
+  ) => ApplicationRuntimeMaxVelocityChangeResult | null;
   getThrowDrawState?: (
     args: ApplicationRuntimeThrowDrawArgs
   ) => ApplicationRuntimeThrowDrawState | null;

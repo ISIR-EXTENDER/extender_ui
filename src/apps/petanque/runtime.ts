@@ -31,6 +31,7 @@ import {
   handlePetanqueThrowDrawChange,
   resolvePetanqueThrowDrawState,
 } from "./throwDrawRuntime";
+import { handlePetanqueMaxVelocityChange } from "./maxVelocityRuntime";
 import {
   PETANQUE_ALPHA_PRESET_TOPIC,
   PETANQUE_STATE_TOPIC,
@@ -208,6 +209,7 @@ export const petanqueRuntimePlugin: ApplicationRuntimePlugin = {
       unsafeThreshold: presentation.unsafeThreshold,
     };
   },
+  handleMaxVelocityChange: (args) => handlePetanqueMaxVelocityChange(args),
   getThrowDrawState: (args) => {
     const state = resolvePetanqueThrowDrawState(args);
     return {
