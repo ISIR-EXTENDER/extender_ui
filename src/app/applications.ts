@@ -16,6 +16,10 @@ export type ApplicationConfig = {
 const STORAGE_KEY = "extender.controls.applications.v1";
 const PETANQUE_SCREEN_ID = "petanque";
 const PETANQUE_TELEOP_CONFIG_SCREEN_ID = "petanque_teleop_config";
+const SANDBOX_APP_ID = "application-95a8";
+const SANDBOX_APP_NAME = "SandboxV0.0";
+const SANDBOX_CONTROL_SCREEN_ID = "sandbox_control";
+const SANDBOX_TELEOP_CONFIG_SCREEN_ID = "sandbox_teleop_config";
 const PEPR_PETANQUE_APP_ID = "application-a50f";
 const PEPR_PETANQUE_APP_NAME = "PEPR-Petanque";
 const PLAY_PETANQUE_APP_ID = "application-play-petanque";
@@ -149,6 +153,27 @@ const createDefaultAdminApplication = (): ApplicationConfig => ({
   updatedAt: new Date().toISOString(),
 });
 
+const createDefaultSandboxApplication = (): ApplicationConfig => ({
+  id: SANDBOX_APP_ID,
+  name: SANDBOX_APP_NAME,
+  screenIds: [SANDBOX_CONTROL_SCREEN_ID, SANDBOX_TELEOP_CONFIG_SCREEN_ID],
+  homeScreenId: SANDBOX_CONTROL_SCREEN_ID,
+  updatedAt: new Date().toISOString(),
+});
+
+const ensureSandboxApplication = (applications: ApplicationConfig[]): ApplicationConfig[] => {
+  const existing = applications.find(
+    (application) =>
+      application.id === SANDBOX_APP_ID ||
+      application.name.trim().toLowerCase() === SANDBOX_APP_NAME.toLowerCase()
+  );
+  if (existing) return applications;
+
+  return [...applications, createDefaultSandboxApplication()].sort((a, b) =>
+    a.name.localeCompare(b.name)
+  );
+};
+
 const sanitizeApplication = (value: unknown): ApplicationConfig | null => {
   if (!isRecord(value)) return null;
   if (typeof value.id !== "string" || typeof value.name !== "string") return null;
@@ -186,17 +211,31 @@ export const createEmptyApplication = (seed?: string): ApplicationConfig => {
 export function loadApplicationsFromLocalStorage(): ApplicationConfig[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [createDefaultAdminApplication()];
+    if (!raw) {
+      return [createDefaultAdminApplication(), createDefaultSandboxApplication()].sort((a, b) =>
+        a.name.localeCompare(b.name)
+      );
+    }
     const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [createDefaultAdminApplication()];
-    const sanitized = ensurePlayPetanqueApplication(
+    if (!Array.isArray(parsed)) {
+      return [createDefaultAdminApplication(), createDefaultSandboxApplication()].sort((a, b) =>
+        a.name.localeCompare(b.name)
+      );
+    }
+    const sanitized = ensureSandboxApplication(
+      ensurePlayPetanqueApplication(
       parsed
         .map(sanitizeApplication)
         .filter((item): item is ApplicationConfig => item !== null)
         .map(ensurePetanqueTeleopConfigScreen)
         .sort((a, b) => a.name.localeCompare(b.name))
+      )
     );
-    if (!sanitized.length) return [createDefaultAdminApplication()];
+    if (!sanitized.length) {
+      return [createDefaultAdminApplication(), createDefaultSandboxApplication()].sort((a, b) =>
+        a.name.localeCompare(b.name)
+      );
+    }
     if (sanitized.some((application) => application.id === ADMIN_DEMO_APP_ID)) {
       return sanitized;
     }
@@ -204,7 +243,9 @@ export function loadApplicationsFromLocalStorage(): ApplicationConfig[] {
       a.name.localeCompare(b.name)
     );
   } catch {
-    return [createDefaultAdminApplication()];
+    return [createDefaultAdminApplication(), createDefaultSandboxApplication()].sort((a, b) =>
+      a.name.localeCompare(b.name)
+    );
   }
 }
 
@@ -299,5 +340,5 @@ export async function syncApplicationsFromFolder(
     merged = upsertApplication(merged, application);
   }
 
-  return ensurePlayPetanqueApplication(merged);
+  return ensureSandboxApplication(ensurePlayPetanqueApplication(merged));
 }
