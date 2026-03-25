@@ -4,6 +4,18 @@ import type {
   ApplicationRuntimeMatchArgs,
   ApplicationRuntimePlugin,
 } from "./types";
+import {
+  getMeasureButtonState,
+  getPetanqueButtonState,
+  isMeasureButtonTopic,
+  isPetanqueStateCommand,
+  resolvePetanqueFlowStageAfterCommand,
+} from "../../pages/applicationRuntimeButtons";
+import {
+  PETANQUE_STATE_TOPIC,
+  PLAY_PETANQUE_MEASURE_REQUEST_TOPIC,
+} from "../../pages/applicationTopics";
+import { triggerMeasureButton } from "../../pages/applicationMeasureRuntime";
 
 const PETANQUE_RUNTIME_SCREEN_IDS = new Set([
   "petanque",
@@ -73,5 +85,78 @@ export const petanqueRuntimePlugin: ApplicationRuntimePlugin = {
     }
 
     return false;
+  },
+  getButtonPresentation: (args) => {
+    const petanqueCommand = isPetanqueStateCommand(args.widget.payload)
+      ? args.widget.payload
+      : null;
+    const isStateMachineButton =
+      args.widget.topic === PETANQUE_STATE_TOPIC && petanqueCommand !== null;
+    if (isStateMachineButton && petanqueCommand) {
+      return getPetanqueButtonState(petanqueCommand, args.state.petanqueFlowStage);
+    }
+
+    const isMeasureButton = isMeasureButtonTopic(args.widget.topic);
+    if (isMeasureButton) {
+      const buttonState = getMeasureButtonState(
+        args.widget.topic,
+        args.state.measureViewMode,
+        args.state.measureRequestPending,
+        args.widget.tone ?? "default"
+      );
+      return {
+        ...buttonState,
+        label:
+          args.widget.topic === PLAY_PETANQUE_MEASURE_REQUEST_TOPIC &&
+          args.state.measureRequestPending
+            ? "Measuring..."
+            : undefined,
+      };
+    }
+
+    return null;
+  },
+  handleButtonTrigger: (args) => {
+    const petanqueCommand = isPetanqueStateCommand(args.widget.payload)
+      ? args.widget.payload
+      : null;
+    const isStateMachineButton =
+      args.widget.topic === PETANQUE_STATE_TOPIC && petanqueCommand !== null;
+    if (isStateMachineButton && petanqueCommand) {
+      const buttonState = getPetanqueButtonState(petanqueCommand, args.state.petanqueFlowStage);
+      if (buttonState.disabled) return true;
+      args.actions.sendMessage({
+        type: "state_cmd",
+        command: petanqueCommand,
+      });
+      const nextStage = resolvePetanqueFlowStageAfterCommand(petanqueCommand);
+      if (nextStage) {
+        args.actions.setPetanqueFlowStage(nextStage);
+      }
+      args.actions.markWidgetPulse(args.widget.id);
+      return true;
+    }
+
+    if (!isMeasureButtonTopic(args.widget.topic)) {
+      return false;
+    }
+
+    return triggerMeasureButton(
+      args.widget.topic,
+      args.widget.id,
+      {
+        capturedMeasureImageDataUrl: args.state.capturedMeasureImageDataUrl,
+        measureResultImageDataUrl: args.state.measureResultImageDataUrl,
+        widgets: args.widgets,
+      },
+      {
+        setMeasureViewMode: args.actions.setMeasureViewMode,
+        setMeasureStatusText: args.actions.setMeasureStatusText,
+        setCapturedMeasureImageDataUrl: args.actions.setCapturedMeasureImageDataUrl,
+        setMeasureRequestPending: args.actions.setMeasureRequestPending,
+        markWidgetPulse: args.actions.markWidgetPulse,
+        sendMessage: (message) => args.actions.sendMessage(message),
+      }
+    );
   },
 };

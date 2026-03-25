@@ -42,9 +42,7 @@ import {
   PETANQUE_ALPHA_PRESET_TOPIC,
   PETANQUE_ALPHA_TOPIC,
   PETANQUE_ANGLE_TOPIC,
-  PETANQUE_STATE_TOPIC,
   PETANQUE_TOTAL_DURATION_TOPIC,
-  PLAY_PETANQUE_MEASURE_REQUEST_TOPIC,
   PLAY_PETANQUE_MEASURE_STATUS_TOPIC,
   PLAY_PETANQUE_MEASURE_STREAM_WIDGET_ID,
   PLAY_PETANQUE_MEASURE_VECTORS_TOPIC,
@@ -56,7 +54,6 @@ import {
   formatMeasureStatusText,
   formatMeasureVectorsText,
   resolveMeasureResultOverlayText,
-  triggerMeasureButton,
   type MeasureResultHistoryEntry,
   type MeasureViewMode,
 } from "./applicationMeasureRuntime";
@@ -69,10 +66,6 @@ import {
   triggerTeleopConfigButton,
 } from "./applicationTeleopConfig";
 import {
-  getMeasureButtonState,
-  getPetanqueButtonState,
-  isMeasureButtonTopic,
-  isPetanqueStateCommand,
   resolvePetanqueFlowStageAfterCommand,
   resolvePetanqueAlphaPreset,
   type PetanqueAlphaPreset,
@@ -328,6 +321,37 @@ export function ApplicationPage({
       }),
     [activeApplication, activeScreenId]
   );
+  const markWidgetPulse = (widgetId: string) => {
+    setWidgetPulseMap((prev) => ({
+      ...prev,
+      [widgetId]: Date.now(),
+    }));
+  };
+  const isWidgetFresh = (widgetId: string) =>
+    freshnessClock - (widgetPulseMap[widgetId] ?? 0) <= TOPIC_FRESHNESS_MS;
+  const runtimePluginState = {
+    petanqueFlowStage,
+    measureViewMode,
+    measureRequestPending,
+    measureResultImageDataUrl,
+    capturedMeasureImageDataUrl,
+    measureResultHistory: measureResultHistoryRef.current,
+  };
+  const runtimePluginActions = {
+    setMeasureResultImageDataUrl,
+    setMeasureVectorsJson,
+    setMeasureLastUpdatedAtMs,
+    setMeasureStatusText,
+    setMeasureRequestPending,
+    setMeasureViewMode,
+    setMeasureResultHistory: (nextHistory: MeasureResultHistoryEntry[]) => {
+      measureResultHistoryRef.current = nextHistory;
+    },
+    setCapturedMeasureImageDataUrl,
+    setPetanqueFlowStage,
+    markWidgetPulse,
+    sendMessage: (payload: object) => wsClient.send(payload),
+  };
 
   useEffect(() => {
     const unsubscribe = wsClient.onMessage((message) => {
@@ -337,20 +361,8 @@ export function ApplicationPage({
           activeScreenId,
           message,
           widgets,
-          state: {
-            measureResultHistory: measureResultHistoryRef.current,
-          },
-          actions: {
-            setMeasureResultImageDataUrl,
-            setMeasureVectorsJson,
-            setMeasureLastUpdatedAtMs,
-            setMeasureStatusText,
-            setMeasureRequestPending,
-            setMeasureViewMode,
-            setMeasureResultHistory: (nextHistory) => {
-              measureResultHistoryRef.current = nextHistory;
-            },
-          },
+          state: runtimePluginState,
+          actions: runtimePluginActions,
         });
         if (handled) return;
       }
@@ -359,7 +371,14 @@ export function ApplicationPage({
     return () => {
       unsubscribe();
     };
-  }, [activeApplication, activeRuntimePlugins, activeScreenId, widgets]);
+  }, [
+    activeApplication,
+    activeRuntimePlugins,
+    activeScreenId,
+    runtimePluginActions,
+    runtimePluginState,
+    widgets,
+  ]);
 
   const allowedScreenIds = useMemo(
     () => new Set(activeApplication?.screenIds ?? []),
@@ -400,16 +419,6 @@ export function ApplicationPage({
     }),
     [canvasScale, canvasSize]
   );
-
-  const markWidgetPulse = (widgetId: string) => {
-    setWidgetPulseMap((prev) => ({
-      ...prev,
-      [widgetId]: Date.now(),
-    }));
-  };
-
-  const isWidgetFresh = (widgetId: string) =>
-    freshnessClock - (widgetPulseMap[widgetId] ?? 0) <= TOPIC_FRESHNESS_MS;
 
   const isMeasureScreen =
     activeScreenId === PLAY_PETANQUE_MEASURES_SCREEN_ID;
@@ -698,20 +707,30 @@ export function ApplicationPage({
     }
 
     if (widget.kind === "button") {
-      const petanqueCommand = isPetanqueStateCommand(widget.payload) ? widget.payload : null;
-      const isStateMachineButton =
-        widget.topic === PETANQUE_STATE_TOPIC && petanqueCommand !== null;
       const petanqueAlphaPreset =
         widget.topic === PETANQUE_ALPHA_PRESET_TOPIC
           ? resolvePetanqueAlphaPreset(widget.payload)
           : null;
       const isPetanqueAlphaPresetButton = petanqueAlphaPreset !== null;
       const isTeleopConfigButton = isTeleopConfigButtonTopic(widget.topic);
-      const isMeasureButton =
-        isMeasureScreen && isMeasureButtonTopic(widget.topic);
-      const petanqueButtonState = isStateMachineButton && petanqueCommand
-        ? getPetanqueButtonState(petanqueCommand, petanqueFlowStage)
-        : null;
+      const runtimeButtonPresentation = activeRuntimePlugins.reduce<{
+        disabled?: boolean;
+        active?: boolean;
+        tone?: "default" | "accent" | "success" | "danger";
+        label?: string;
+      } | null>((current, plugin) => {
+        if (current) return current;
+        return (
+          plugin.getButtonPresentation?.({
+            application: activeApplication,
+            activeScreenId,
+            widget,
+            widgets,
+            state: runtimePluginState,
+            actions: runtimePluginActions,
+          }) ?? null
+        );
+      }, null);
       const petanqueAlphaPresetDisabled =
         isPetanqueAlphaPresetButton && petanqueFlowStage !== "start_ready";
       const petanqueAlphaPresetTone =
@@ -731,14 +750,6 @@ export function ApplicationPage({
             invertAngularZ,
           })
         : null;
-      const measureButtonState = isMeasureButton
-        ? getMeasureButtonState(
-            widget.topic,
-            measureViewMode,
-            measureRequestPending,
-            widget.tone ?? "default"
-          )
-        : null;
       const runtimeButtonWidget = isTeleopConfigButton
         ? {
             ...widget,
@@ -752,8 +763,11 @@ export function ApplicationPage({
               invertAngularZ,
             }),
           }
-        : isMeasureButton && widget.topic === PLAY_PETANQUE_MEASURE_REQUEST_TOPIC && measureRequestPending
-          ? { ...widget, label: "Measuring..." }
+        : runtimeButtonPresentation?.label
+          ? {
+              ...widget,
+              label: runtimeButtonPresentation.label,
+            }
           : widget;
 
       return (
@@ -765,63 +779,41 @@ export function ApplicationPage({
           onRectChange={NOOP_RECT_CHANGE}
           onLabelChange={NOOP_TEXT_CHANGE}
           disabled={
-            isMeasureButton
-              ? (measureButtonState?.disabled ?? false)
-              : isPetanqueAlphaPresetButton
+            isPetanqueAlphaPresetButton
                 ? petanqueAlphaPresetDisabled
-              : (petanqueButtonState?.disabled ?? false)
+              : (runtimeButtonPresentation?.disabled ?? false)
           }
           active={
-            isMeasureButton
-              ? (measureButtonState?.active ?? false)
-              : isPetanqueAlphaPresetButton
+            isPetanqueAlphaPresetButton
                 ? false
-              : (petanqueButtonState?.active ?? teleopConfigButtonState?.active ?? false)
+              : (runtimeButtonPresentation?.active ?? teleopConfigButtonState?.active ?? false)
           }
           tone={
-            isMeasureButton
-              ? (measureButtonState?.tone ?? (widget.tone ?? "default"))
-              : isPetanqueAlphaPresetButton
+            isPetanqueAlphaPresetButton
                 ? petanqueAlphaPresetTone
               : (
-                  petanqueButtonState?.tone ??
+                  runtimeButtonPresentation?.tone ??
                   teleopConfigButtonState?.tone ??
                   widget.tone ??
                   "default"
                 )
           }
           onTrigger={() => {
-            if (isMeasureButton) {
-              const handled = triggerMeasureButton(
-                widget.topic,
-                widget.id,
-                {
-                  capturedMeasureImageDataUrl,
-                  measureResultImageDataUrl,
-                  widgets,
-                },
-                {
-                  setMeasureViewMode,
-                  setMeasureStatusText,
-                  setCapturedMeasureImageDataUrl,
-                  setMeasureRequestPending,
-                  markWidgetPulse,
-                  sendMessage: (message) => wsClient.send(message),
-                }
-              );
+            for (const plugin of activeRuntimePlugins) {
+              const handled = plugin.handleButtonTrigger?.({
+                application: activeApplication,
+                activeScreenId,
+                widget,
+                widgets,
+                state: runtimePluginState,
+                actions: runtimePluginActions,
+              });
               if (handled) return;
             }
 
             if (isPetanqueAlphaPresetButton && petanqueAlphaPreset) {
               if (petanqueAlphaPresetDisabled) return;
               triggerPetanqueAlphaPreset(petanqueAlphaPreset);
-              markWidgetPulse(widget.id);
-              return;
-            }
-
-            if (isStateMachineButton && petanqueCommand) {
-              if (petanqueButtonState?.disabled) return;
-              sendPetanqueStateCommand(petanqueCommand);
               markWidgetPulse(widget.id);
               return;
             }
