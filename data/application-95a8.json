@@ -1,0 +1,10 @@
+{
+  "id": "application-95a8",
+  "name": "SandboxV0.0",
+  "screenIds": [
+    "sandbox_control",
+    "sandbox_teleop_config"
+  ],
+  "homeScreenId": "sandbox_control",
+  "updatedAt": "2026-03-24T10:18:32.671Z"
+}
