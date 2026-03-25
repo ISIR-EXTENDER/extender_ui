@@ -4,7 +4,10 @@ import type {
   MeasureResultHistoryEntry,
   MeasureViewMode,
 } from "../../apps/petanque/measureRuntime";
-import type { PetanqueFlowStage } from "../../apps/petanque/buttonRuntime";
+import type {
+  PetanqueFlowStage,
+  PetanqueStateCommand,
+} from "../../apps/petanque/buttonRuntime";
 import type { WsIncoming } from "../../types/ws";
 
 export type ApplicationRuntimeMatchArgs = {
@@ -23,6 +26,26 @@ export type ApplicationRuntimeMessageActions = {
   setCapturedMeasureImageDataUrl: (value: string) => void;
   setPetanqueFlowStage: (value: PetanqueFlowStage) => void;
   setPetanqueAlpha: (value: number) => void;
+  setPetanqueAlphaUnsafeValidated: (value: boolean) => void;
+  setMaxVelocityWidgetValues: (
+    value:
+      | Record<string, number>
+      | ((prev: Record<string, number>) => Record<string, number>)
+  ) => void;
+  setThrowDrawWidgetValues: (
+    value:
+      | Record<string, { angle: number; duration: number }>
+      | ((
+          prev: Record<string, { angle: number; duration: number }>
+        ) => Record<string, { angle: number; duration: number }>)
+  ) => void;
+  setThrowDrawAlphaValues: (
+    value:
+      | Record<string, number>
+      | ((prev: Record<string, number>) => Record<string, number>)
+  ) => void;
+  confirmAction: (message: string) => boolean;
+  sendPetanqueStateCommand: (command: PetanqueStateCommand) => void;
   markWidgetPulse: (widgetId: string) => void;
   sendMessage: (payload: object) => void;
 };
@@ -38,6 +61,9 @@ export type ApplicationRuntimeState = {
   measureStatusText: string;
   measureLastUpdatedAtMs: number | null;
   maxVelocityWidgetValues: Record<string, number>;
+  throwDrawWidgetValues: Record<string, { angle: number; duration: number }>;
+  throwDrawAlphaValues: Record<string, number>;
+  petanqueAlphaUnsafeValidated: boolean;
 };
 
 export type ApplicationRuntimeMessageArgs = ApplicationRuntimeMatchArgs & {
@@ -87,6 +113,30 @@ export type ApplicationRuntimeMaxVelocityArgs = ApplicationRuntimeMatchArgs & {
   actions: ApplicationRuntimeMessageActions;
 };
 
+export type ApplicationRuntimeThrowDrawState = {
+  angleValue: number;
+  durationValue: number;
+  alphaValue?: number;
+  hasAlphaControl: boolean;
+};
+
+export type ApplicationRuntimeThrowDrawArgs = ApplicationRuntimeMatchArgs & {
+  widget: Extract<CanvasWidget, { kind: "throw-draw" }>;
+  widgets: CanvasWidget[];
+  state: ApplicationRuntimeState;
+  actions: ApplicationRuntimeMessageActions;
+};
+
+export type ApplicationRuntimeThrowDrawChangeArgs = ApplicationRuntimeThrowDrawArgs & {
+  next: {
+    angle?: number;
+    duration?: number;
+    powerPercent: number;
+    alpha?: number;
+    throwRequested?: boolean;
+  };
+};
+
 export type ApplicationRuntimePlugin = {
   id: string;
   matches: (args: ApplicationRuntimeMatchArgs) => boolean;
@@ -95,8 +145,12 @@ export type ApplicationRuntimePlugin = {
   getMaxVelocityState?: (
     args: ApplicationRuntimeMaxVelocityArgs
   ) => ApplicationRuntimeMaxVelocityState | null;
+  getThrowDrawState?: (
+    args: ApplicationRuntimeThrowDrawArgs
+  ) => ApplicationRuntimeThrowDrawState | null;
   getButtonPresentation?: (
     args: ApplicationRuntimeButtonArgs
   ) => ApplicationRuntimeButtonPresentation | null;
   handleButtonTrigger?: (args: ApplicationRuntimeButtonArgs) => boolean;
+  handleThrowDrawChange?: (args: ApplicationRuntimeThrowDrawChangeArgs) => boolean;
 };

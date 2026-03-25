@@ -25,6 +25,9 @@ const createRuntimeState = () => ({
   measureStatusText: "Live feed active (demo available)",
   measureLastUpdatedAtMs: null,
   maxVelocityWidgetValues: {},
+  throwDrawWidgetValues: {},
+  throwDrawAlphaValues: {},
+  petanqueAlphaUnsafeValidated: false,
 });
 
 const createRuntimeActions = () => ({
@@ -38,6 +41,12 @@ const createRuntimeActions = () => ({
   setCapturedMeasureImageDataUrl: vi.fn(),
   setPetanqueFlowStage: vi.fn(),
   setPetanqueAlpha: vi.fn(),
+  setPetanqueAlphaUnsafeValidated: vi.fn(),
+  setMaxVelocityWidgetValues: vi.fn(),
+  setThrowDrawWidgetValues: vi.fn(),
+  setThrowDrawAlphaValues: vi.fn(),
+  confirmAction: vi.fn(() => true),
+  sendPetanqueStateCommand: vi.fn(),
   markWidgetPulse: vi.fn(),
   sendMessage: vi.fn(),
 });

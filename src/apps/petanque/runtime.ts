@@ -28,6 +28,10 @@ import {
   resolvePetanqueMaxVelocityValue,
 } from "./controlRuntime";
 import {
+  handlePetanqueThrowDrawChange,
+  resolvePetanqueThrowDrawState,
+} from "./throwDrawRuntime";
+import {
   PETANQUE_ALPHA_PRESET_TOPIC,
   PETANQUE_STATE_TOPIC,
   PLAY_PETANQUE_MEASURE_STATUS_TOPIC,
@@ -204,6 +208,15 @@ export const petanqueRuntimePlugin: ApplicationRuntimePlugin = {
       unsafeThreshold: presentation.unsafeThreshold,
     };
   },
+  getThrowDrawState: (args) => {
+    const state = resolvePetanqueThrowDrawState(args);
+    return {
+      angleValue: state.angleValue,
+      durationValue: state.durationValue,
+      alphaValue: state.alphaValue,
+      hasAlphaControl: state.hasAlphaControl,
+    };
+  },
   handleButtonTrigger: (args) => {
     const petanqueAlphaPreset =
       args.widget.topic === PETANQUE_ALPHA_PRESET_TOPIC
@@ -260,4 +273,5 @@ export const petanqueRuntimePlugin: ApplicationRuntimePlugin = {
       }
     );
   },
+  handleThrowDrawChange: (args) => handlePetanqueThrowDrawChange(args),
 };

@@ -67,10 +67,7 @@ import {
   PETANQUE_DEFAULT_TOTAL_DURATION_S,
   buildPetanqueCfgUpdate,
   buildPetanqueStateCommandMessage,
-  buildPetanqueThrowCfgUpdate,
   clampPetanqueDuration,
-  isPetanqueCfgUpdateEmpty,
-  resolvePetanqueThrowDrawValue,
   syncPetanqueAlphaWidgets,
 } from "../apps/petanque/controlRuntime";
 
@@ -330,6 +327,20 @@ export function ApplicationPage({
     },
     [maxVelocityWidgetValues, throwDrawAlphaValues, widgets]
   );
+  const advancePetanqueFlow = useCallback((command: PetanqueStateCommand) => {
+    const nextStage = resolvePetanqueFlowStageAfterCommand(command);
+    if (nextStage) {
+      setPetanqueFlowStage(nextStage);
+    }
+  }, []);
+
+  const sendPetanqueStateCommand = useCallback(
+    (command: PetanqueStateCommand) => {
+      wsClient.send(buildPetanqueStateCommandMessage(command));
+      advancePetanqueFlow(command);
+    },
+    [advancePetanqueFlow]
+  );
   const isWidgetFresh = (widgetId: string) =>
     freshnessClock - (widgetPulseMap[widgetId] ?? 0) <= TOPIC_FRESHNESS_MS;
   const runtimePluginState = useMemo(
@@ -344,6 +355,9 @@ export function ApplicationPage({
       measureStatusText,
       measureLastUpdatedAtMs,
       maxVelocityWidgetValues,
+      throwDrawWidgetValues,
+      throwDrawAlphaValues,
+      petanqueAlphaUnsafeValidated: alphaUnsafeValidatedRef.current,
     }),
     [
       capturedMeasureImageDataUrl,
@@ -356,6 +370,8 @@ export function ApplicationPage({
       measureVectorsJson,
       measureViewMode,
       petanqueFlowStage,
+      throwDrawAlphaValues,
+      throwDrawWidgetValues,
     ]
   );
   const runtimePluginActions = useMemo(
@@ -370,10 +386,18 @@ export function ApplicationPage({
       setCapturedMeasureImageDataUrl,
       setPetanqueFlowStage,
       setPetanqueAlpha,
+      setPetanqueAlphaUnsafeValidated: (value: boolean) => {
+        alphaUnsafeValidatedRef.current = value;
+      },
+      setMaxVelocityWidgetValues,
+      setThrowDrawWidgetValues,
+      setThrowDrawAlphaValues,
+      confirmAction: (message: string) => window.confirm(message),
+      sendPetanqueStateCommand,
       markWidgetPulse,
       sendMessage: (payload: object) => wsClient.send(payload),
     }),
-    [markWidgetPulse, setPetanqueAlpha]
+    [markWidgetPulse, sendPetanqueStateCommand, setPetanqueAlpha]
   );
 
   useEffect(() => {
@@ -460,18 +484,6 @@ export function ApplicationPage({
     if (looksLikeTranslationZ) return "z";
 
     return widget.binding === "z" ? "z" : "rz";
-  };
-
-  const advancePetanqueFlow = (command: PetanqueStateCommand) => {
-    const nextStage = resolvePetanqueFlowStageAfterCommand(command);
-    if (nextStage) {
-      setPetanqueFlowStage(nextStage);
-    }
-  };
-
-  const sendPetanqueStateCommand = (command: PetanqueStateCommand) => {
-    wsClient.send(buildPetanqueStateCommandMessage(command));
-    advancePetanqueFlow(command);
   };
 
   const upsertPose = (poses: PoseSnapshot[], pose: PoseSnapshot) => {
@@ -825,71 +837,29 @@ export function ApplicationPage({
     }
 
     if (widget.kind === "throw-draw") {
-      const alphaWidget =
-        typeof widget.alphaTopic === "string" && widget.alphaTopic.trim().length > 0
-          ? widgets.find(
-              (candidate) =>
-                candidate.kind === "max-velocity" && candidate.topic === widget.alphaTopic
-            ) ?? null
-          : null;
-      const alphaWidgetValue = alphaWidget ? maxVelocityWidgetValues[alphaWidget.id] : undefined;
-      const {
-        angleMin,
-        angleMax,
-        durationMin,
-        durationMax,
-        hasAlphaControl,
-        alphaMin,
-        alphaMax,
-        drawAlphaValue,
-        clampedAngle,
-        clampedDuration,
-      } = resolvePetanqueThrowDrawValue(
-        widget,
-        throwDrawWidgetValues,
-        throwDrawAlphaValues,
-        alphaWidgetValue
-      );
-      const applyDrawAlpha = (rawNextAlpha: number) => {
-        if (!hasAlphaControl) return;
-        let resolvedAlpha = Math.max(alphaMin, Math.min(alphaMax, rawNextAlpha));
-        setThrowDrawAlphaValues((prev) => ({
-          ...prev,
-          [widget.id]: resolvedAlpha,
-        }));
-        if (widget.alphaTopic === PETANQUE_ALPHA_TOPIC) {
-          if (resolvedAlpha > PETANQUE_ALPHA_SAFE_MAX) {
-            if (!alphaUnsafeValidatedRef.current) {
-              const confirmed = window.confirm(
-                `Alpha above ${PETANQUE_ALPHA_SAFE_MAX} is not safe. Validate this value?`
-              );
-              if (!confirmed) {
-                resolvedAlpha = PETANQUE_ALPHA_SAFE_MAX;
-              } else {
-                alphaUnsafeValidatedRef.current = true;
-              }
-            }
-          } else {
-            alphaUnsafeValidatedRef.current = false;
-          }
-          setThrowDrawAlphaValues((prev) => ({
-            ...prev,
-            [widget.id]: resolvedAlpha,
-          }));
-          setPetanqueAlpha(resolvedAlpha);
-          return;
-        }
-        setMaxVelocityWidgetValues((prev) => {
-          const nextValues = { ...prev };
-          for (const candidate of widgets) {
-            if (candidate.kind !== "max-velocity") continue;
-            if (candidate.topic === widget.alphaTopic) {
-              nextValues[candidate.id] = resolvedAlpha;
-            }
-          }
-          return nextValues;
-        });
-      };
+      const runtimeThrowDrawState = activeRuntimePlugins.reduce<{
+        angleValue: number;
+        durationValue: number;
+        alphaValue?: number;
+        hasAlphaControl: boolean;
+      } | null>((current, plugin) => {
+        if (current) return current;
+        return (
+          plugin.getThrowDrawState?.({
+            application: activeApplication,
+            activeScreenId,
+            widget,
+            widgets,
+            state: runtimePluginState,
+            actions: runtimePluginActions,
+          }) ?? null
+        );
+      }, null);
+
+      if (!runtimeThrowDrawState) {
+        return null;
+      }
+
       return (
         <ThrowDrawWidget
           key={widget.id}
@@ -897,56 +867,43 @@ export function ApplicationPage({
           selected={false}
           onSelect={() => {}}
           onRectChange={NOOP_RECT_CHANGE}
-          angleValue={clampedAngle}
-          durationValue={clampedDuration}
-          alphaValue={drawAlphaValue}
-          onAlphaChange={hasAlphaControl ? (nextAlpha) => applyDrawAlpha(nextAlpha) : undefined}
+          angleValue={runtimeThrowDrawState.angleValue}
+          durationValue={runtimeThrowDrawState.durationValue}
+          alphaValue={runtimeThrowDrawState.alphaValue}
+          onAlphaChange={
+            runtimeThrowDrawState.hasAlphaControl
+              ? (nextAlpha) => {
+                  for (const plugin of activeRuntimePlugins) {
+                    const handled = plugin.handleThrowDrawChange?.({
+                      application: activeApplication,
+                      activeScreenId,
+                      widget,
+                      widgets,
+                      state: runtimePluginState,
+                      actions: runtimePluginActions,
+                      next: {
+                        powerPercent: 0,
+                        alpha: nextAlpha,
+                      },
+                    });
+                    if (handled) return;
+                  }
+                }
+              : undefined
+          }
           onValueChange={(next) => {
-            const resolvedAngle =
-              typeof next.angle === "number"
-                ? Math.max(angleMin, Math.min(angleMax, next.angle))
-                : clampedAngle;
-            const resolvedDuration =
-              typeof next.duration === "number"
-                ? Math.max(durationMin, Math.min(durationMax, next.duration))
-                : clampedDuration;
-
-            setThrowDrawWidgetValues((prev) => ({
-              ...prev,
-              [widget.id]: {
-                angle: resolvedAngle,
-                duration: resolvedDuration,
-              },
-            }));
-
-            setMaxVelocityWidgetValues((prev) => {
-              const nextValues = { ...prev };
-              for (const candidate of widgets) {
-                if (candidate.kind !== "max-velocity") continue;
-                if (candidate.topic === widget.angleTopic) {
-                  nextValues[candidate.id] = resolvedAngle;
-                }
-                if (candidate.topic === widget.powerTopic) {
-                  nextValues[candidate.id] = resolvedDuration;
-                }
-              }
-              return nextValues;
-            });
-
-            const cfg = buildPetanqueThrowCfgUpdate(widget, resolvedAngle, resolvedDuration);
-            if (!isPetanqueCfgUpdateEmpty(cfg)) {
-              wsClient.send({
-                type: "petanque_cfg",
-                ...cfg,
+            for (const plugin of activeRuntimePlugins) {
+              const handled = plugin.handleThrowDrawChange?.({
+                application: activeApplication,
+                activeScreenId,
+                widget,
+                widgets,
+                state: runtimePluginState,
+                actions: runtimePluginActions,
+                next,
               });
+              if (handled) return;
             }
-            if (typeof next.alpha === "number") {
-              applyDrawAlpha(next.alpha);
-            }
-            if (next.throwRequested) {
-              sendPetanqueStateCommand("throw");
-            }
-            markWidgetPulse(widget.id);
           }}
         />
       );
