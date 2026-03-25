@@ -14,6 +14,7 @@ export type WsState = {
     y: number;
     z: number;
   };
+  joint_positions?: number[];
   watchdog_state?: string;
   joint_torques?: number[];
 };

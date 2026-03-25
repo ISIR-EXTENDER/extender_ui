@@ -1,93 +1,59 @@
-# Extender UI — Tablet Teleoperation Console
+# Extender UI
 
-This is a touch-first teleoperation UI for the Extender robot system. It is designed for a tablet, supports focus mode, and separates tasks across tabs so each answers a single operator question.
+`extender_ui` is the tablet frontend for Extender robots. It is used for teleoperation, app-specific workflows such as pétanque, and sandbox experiments that researchers can change without rewriting the whole UI.
 
-## Project Docs
-- Architecture: `docs/ARCHITECTURE.md`
-- Contributing guide: `docs/CONTRIBUTING.md`
+## Architecture
 
-## Architecture Overview
+The UI now follows a simple split:
 
-- Frontend: React + TypeScript (Vite) for fast UI iteration.
-- State: Zustand store for teleop input state.
-- Transport: WebSocket served by the ROS2 tablet_interface node (rclpy) that publishes teleop_cmd and state updates.
-- Rendering: Lightweight cards, two joysticks, and responsive layouts for large touch targets.
+- generic core: screens, widgets, storage, websocket client, runtime orchestration
+- app modules: behavior that is specific to one app family
+- backend contract: generic websocket messages handled by `tablet_interface`
 
-### Data Flow
+Current app modules:
 
-1. User gestures update joystick and buttons (Z/RZ, mode).
-2. UI sends `teleop_cmd` messages over WebSocket at a fixed rate + on changes.
-3. The tablet_interface node validates + scales commands, then publishes `/teleop_cmd` (ROS2).
-4. UI listens for state messages and renders live telemetry (watchdog, speed, pose, etc.).
+- `src/apps/petanque`
+- `src/apps/sandbox`
 
-### Pétanque specifics
+Important runtime folders:
 
-- `Throw Speed` slider controls `/petanque_throw/total_duration` directly.
-- Runtime range is `3.0s` (slow, left) to `0.9s` (fast, right), step `0.1s`.
-- `Throw Angle` slider range is `[-0.26, 0.26]`.
-- Pétanque state-machine commands are sent on `/petanque_state_machine/change_state`.
+- `src/app/runtime`: generic runtime/plugin system
+- `src/pages`: page orchestration
+- `src/components/widgets`: reusable widget rendering
 
-## Tabs (What each tab answers)
+## Data flow
 
-1. Controls — How do I move?
-  - Motion controls (translation + rotation joysticks).
-2. Live Teleop — What is happening while I move?
-  - Live teleop dashboard + RViz preview.
-3. Articular — How do I position joints?
-  - Joint sliders with limits, torque display, and send/sync actions.
-  - RViz live + joint mini plots on the right.
-4. Poses & Trajectories — How do I replay motion?
-  - Saved poses list, trajectory builder, and preview panels (graphs, interpolation, Cartesian preview).
-5. Pétanque — Use-case optimized interface.
-  - Game status, actions, and vision/trajectory cards.
-6. Camera — What do I see?
-  - Central feed, camera settings side panel, and recording controls.
-7. Visual Servoing — How do I servo to a target?
-  - Target selection, enable toggle, PID, and live visual overlays.
-8. Curves — What do the signals look like?
-  - Live plots for linear/angular velocity, joint velocities, error norms, and gains.
-9. Logs / Rosbags — What did I record?
-  - Start/stop capture, bag naming, and session metrics.
-10. Configuration — How do I configure?
-  - Advanced settings (gains, filters, frames, inversion, robot type, deadman).
-11. Debug — What is happening internally?
-   - Raw streams, controller state, latency, and watchdog diagnostics.
+1. the user interacts with widgets
+2. the UI sends websocket messages such as `teleop_cmd`, `ui_button`, `ui_scalar`, or `camera_frame`
+3. `tablet_interface` republishes those messages into ROS 2
+4. websocket state and events come back to the UI for live feedback
 
-## Libraries Used (and why)
+## Apps
 
-- React + TypeScript: Strong typing for complex UI state and predictable component behavior.
-- Vite: Fast development server and modern build pipeline for quick iteration.
-- Zustand: Minimal, fast global state management for teleop inputs.
-- Radix Slider: Accessible, touch-friendly sliders for gains and joint controls.
-- NippleJS: Mature, reliable joystick behavior for touch screens.
-- Recharts: Lightweight charting for live plots; good tradeoff of features vs. bundle size.
+- `SandboxV0.0`: generic teleop/sandbox app used for experiments
+- pétanque screens: preserved as a compatibility app family during the refactor
 
-## Backend (tablet_interface) Notes
+The rule going forward is:
 
-- **ROS2 rclpy Node**: The tablet_interface package hosts the WebSocket server and publishes `/teleop_cmd`.
-- **FastAPI + Uvicorn**: Lightweight async WebSocket server embedded in the node.
-- **Pydantic**: Validates incoming WS payloads.
-- **Command envelope**: WS validation accepts bounded amplified teleop values to support runtime gain tuning.
-- **Safety**: final motion limits are enforced by ROS controllers / robot configs.
-- **Default WS endpoint**: ws://<bind_host>:8765/ws/control (configurable in tablet_interface parameters).
+- keep the core generic
+- put app-specific behavior in `src/apps/<app_name>`
 
-## TODOs (Backend Wiring)
+## Camera direction
 
-- Wire all buttons/sliders to ROS2 services/actions/topics:
-  - Gripper actions and parameters
-  - Pose management (add/rename/delete/move)
-  - Trajectory builder + execution
-  - Joint control publish/feedback
-  - Camera controls + overlay toggle
-  - Rosbag start/stop + list + download
-  - Visual servoing target selection + PID
-
-## Notes
-
-- The UI is touch-optimized and should not require scrolling on the target tablet resolution.
-- Focus mode displays only the motion panel for low-distraction teleop.
+The UI can display streams and capture frames from stream widgets. Captured frames can now be sent to backend as `camera_frame`, so camera data can become ROS topics and later be reused by perception or visual-servoing nodes.
 
 ## Development
 
-- npm install
-- npm run dev
+```bash
+npm install
+npm run build
+npm run test:coverage
+npm run test:e2e
+```
+
+## Contributing
+
+- prefer generic websocket messages over app-specific transport
+- keep pétanque-specific logic in `src/apps/petanque`
+- keep sandbox-specific logic in `src/apps/sandbox`
+- do not add new app behavior directly into the generic runtime/page layer unless it truly applies to every app

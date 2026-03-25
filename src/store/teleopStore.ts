@@ -2,6 +2,7 @@ import { create } from "zustand";
 
 import type { TeleopCommand, TeleopMode } from "../types/teleop";
 import type { WsState, WsStatus } from "../types/ws";
+import { readJsonStorage, writeJsonStorage } from "../utils/browserStorage";
 
 type TeleopConfigProfile = {
   maxVelocity: number;
@@ -65,25 +66,14 @@ const getDefaultTeleopConfigProfile = (
 };
 
 const readTeleopProfiles = (): Record<string, TeleopConfigProfile> => {
-  if (typeof window === "undefined") return {};
-  try {
-    const raw = window.localStorage.getItem(TELEOP_PROFILE_STORAGE_KEY);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw);
+  return readJsonStorage(TELEOP_PROFILE_STORAGE_KEY, {}, (parsed) => {
     if (!parsed || typeof parsed !== "object") return {};
     return parsed as Record<string, TeleopConfigProfile>;
-  } catch {
-    return {};
-  }
+  });
 };
 
 const writeTeleopProfiles = (profiles: Record<string, TeleopConfigProfile>) => {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(TELEOP_PROFILE_STORAGE_KEY, JSON.stringify(profiles));
-  } catch {
-    // No-op on storage write errors.
-  }
+  writeJsonStorage(TELEOP_PROFILE_STORAGE_KEY, profiles);
 };
 
 const loadTeleopConfigProfile = (robot: string): TeleopConfigProfile => {

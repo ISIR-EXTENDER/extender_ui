@@ -4,6 +4,7 @@ import {
   ADMIN_DEMO_HOME_SCREEN_ID,
   ADMIN_DEMO_SCREEN_IDS,
 } from "./demoDefaults";
+import { readJsonStorage, writeJsonStorage } from "../utils/browserStorage";
 
 export type ApplicationConfig = {
   id: string;
@@ -209,48 +210,43 @@ export const createEmptyApplication = (seed?: string): ApplicationConfig => {
 };
 
 export function loadApplicationsFromLocalStorage(): ApplicationConfig[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      return [createDefaultAdminApplication(), createDefaultSandboxApplication()].sort((a, b) =>
-        a.name.localeCompare(b.name)
-      );
-    }
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) {
-      return [createDefaultAdminApplication(), createDefaultSandboxApplication()].sort((a, b) =>
-        a.name.localeCompare(b.name)
-      );
-    }
-    const sanitized = ensureSandboxApplication(
-      ensurePlayPetanqueApplication(
-      parsed
-        .map(sanitizeApplication)
-        .filter((item): item is ApplicationConfig => item !== null)
-        .map(ensurePetanqueTeleopConfigScreen)
-        .sort((a, b) => a.name.localeCompare(b.name))
-      )
-    );
-    if (!sanitized.length) {
-      return [createDefaultAdminApplication(), createDefaultSandboxApplication()].sort((a, b) =>
-        a.name.localeCompare(b.name)
-      );
-    }
-    if (sanitized.some((application) => application.id === ADMIN_DEMO_APP_ID)) {
-      return sanitized;
-    }
-    return [...sanitized, createDefaultAdminApplication()].sort((a, b) =>
+  return readJsonStorage(
+    STORAGE_KEY,
+    [createDefaultAdminApplication(), createDefaultSandboxApplication()].sort((a, b) =>
       a.name.localeCompare(b.name)
-    );
-  } catch {
-    return [createDefaultAdminApplication(), createDefaultSandboxApplication()].sort((a, b) =>
-      a.name.localeCompare(b.name)
-    );
-  }
+    ),
+    (parsed) => {
+      if (!Array.isArray(parsed)) {
+        return [createDefaultAdminApplication(), createDefaultSandboxApplication()].sort((a, b) =>
+          a.name.localeCompare(b.name)
+        );
+      }
+      const sanitized = ensureSandboxApplication(
+        ensurePlayPetanqueApplication(
+          parsed
+            .map(sanitizeApplication)
+            .filter((item): item is ApplicationConfig => item !== null)
+            .map(ensurePetanqueTeleopConfigScreen)
+            .sort((a, b) => a.name.localeCompare(b.name))
+        )
+      );
+      if (!sanitized.length) {
+        return [createDefaultAdminApplication(), createDefaultSandboxApplication()].sort((a, b) =>
+          a.name.localeCompare(b.name)
+        );
+      }
+      if (sanitized.some((application) => application.id === ADMIN_DEMO_APP_ID)) {
+        return sanitized;
+      }
+      return [...sanitized, createDefaultAdminApplication()].sort((a, b) =>
+        a.name.localeCompare(b.name)
+      );
+    }
+  );
 }
 
 export function persistApplicationsToLocalStorage(applications: ApplicationConfig[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(applications, null, 2));
+  writeJsonStorage(STORAGE_KEY, applications, 2);
 }
 
 export function upsertApplication(
