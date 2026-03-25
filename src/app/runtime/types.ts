@@ -33,6 +33,9 @@ export type ApplicationRuntimeState = {
   measureResultImageDataUrl: string | null;
   capturedMeasureImageDataUrl: string | null;
   measureResultHistory: MeasureResultHistoryEntry[];
+  measureVectorsJson: string | null;
+  measureStatusText: string;
+  measureLastUpdatedAtMs: number | null;
 };
 
 export type ApplicationRuntimeMessageArgs = ApplicationRuntimeMatchArgs & {
@@ -58,10 +61,17 @@ export type ApplicationRuntimeButtonArgs = ApplicationRuntimeMatchArgs & {
   actions: ApplicationRuntimeMessageActions;
 };
 
+export type ApplicationRuntimeWidgetArgs = ApplicationRuntimeMatchArgs & {
+  widget: CanvasWidget;
+  widgets: CanvasWidget[];
+  state: ApplicationRuntimeState;
+};
+
 export type ApplicationRuntimePlugin = {
   id: string;
   matches: (args: ApplicationRuntimeMatchArgs) => boolean;
   handleIncomingMessage?: (args: ApplicationRuntimeMessageArgs) => boolean;
+  decorateWidget?: (args: ApplicationRuntimeWidgetArgs) => CanvasWidget | null;
   getButtonPresentation?: (
     args: ApplicationRuntimeButtonArgs
   ) => ApplicationRuntimeButtonPresentation | null;

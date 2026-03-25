@@ -42,17 +42,10 @@ import {
   PETANQUE_ALPHA_PRESET_TOPIC,
   PETANQUE_ALPHA_TOPIC,
   PETANQUE_TOTAL_DURATION_TOPIC,
-  PLAY_PETANQUE_MEASURE_STATUS_TOPIC,
-  PLAY_PETANQUE_MEASURE_STREAM_WIDGET_ID,
-  PLAY_PETANQUE_MEASURE_VECTORS_TOPIC,
   isLocalMaxVelocityTopic,
 } from "./applicationTopics";
 import {
   MEASURE_DEMO_HISTORY_ENTRY,
-  PLAY_PETANQUE_MEASURES_SCREEN_ID,
-  formatMeasureStatusText,
-  formatMeasureVectorsText,
-  resolveMeasureResultOverlayText,
   type MeasureResultHistoryEntry,
   type MeasureViewMode,
 } from "../apps/petanque/measureRuntime";
@@ -332,12 +325,18 @@ export function ApplicationPage({
       measureResultImageDataUrl,
       capturedMeasureImageDataUrl,
       measureResultHistory,
+      measureVectorsJson,
+      measureStatusText,
+      measureLastUpdatedAtMs,
     }),
     [
       capturedMeasureImageDataUrl,
+      measureLastUpdatedAtMs,
       measureRequestPending,
       measureResultHistory,
       measureResultImageDataUrl,
+      measureStatusText,
+      measureVectorsJson,
       measureViewMode,
       petanqueFlowStage,
     ]
@@ -425,9 +424,6 @@ export function ApplicationPage({
     }),
     [canvasScale, canvasSize]
   );
-
-  const isMeasureScreen =
-    activeScreenId === PLAY_PETANQUE_MEASURES_SCREEN_ID;
 
   const resolveSliderChannel = (
     widget: Extract<CanvasWidget, { kind: "slider" }>
@@ -582,6 +578,18 @@ export function ApplicationPage({
   };
 
   const renderWidget = (widget: CanvasWidget) => {
+    const runtimeWidget = activeRuntimePlugins.reduce<CanvasWidget>((current, plugin) => {
+      return (
+        plugin.decorateWidget?.({
+          application: activeApplication,
+          activeScreenId,
+          widget: current,
+          widgets,
+          state: runtimePluginState,
+        }) ?? current
+      );
+    }, widget);
+
     if (widget.kind === "save-pose-button") {
       return (
         <SavePoseButtonWidget
@@ -658,17 +666,10 @@ export function ApplicationPage({
     }
 
     if (widget.kind === "text") {
-      const runtimeTextWidget =
-        isMeasureScreen && widget.topic === PLAY_PETANQUE_MEASURE_STATUS_TOPIC
-          ? {
-              ...widget,
-              text: formatMeasureStatusText(measureStatusText, measureLastUpdatedAtMs),
-            }
-          : widget;
       return (
         <TextWidget
           key={widget.id}
-          widget={runtimeTextWidget}
+          widget={runtimeWidget as Extract<CanvasWidget, { kind: "text" }>}
           selected={false}
           onSelect={() => {}}
           onRectChange={NOOP_RECT_CHANGE}
@@ -678,17 +679,10 @@ export function ApplicationPage({
     }
 
     if (widget.kind === "textarea") {
-      const runtimeTextareaWidget =
-        isMeasureScreen && widget.topic === PLAY_PETANQUE_MEASURE_VECTORS_TOPIC
-          ? {
-              ...widget,
-              text: formatMeasureVectorsText(measureVectorsJson),
-            }
-          : widget;
       return (
         <TextareaWidget
           key={widget.id}
-          widget={runtimeTextareaWidget}
+          widget={runtimeWidget as Extract<CanvasWidget, { kind: "textarea" }>}
           selected={false}
           onSelect={() => {}}
           onRectChange={NOOP_RECT_CHANGE}
@@ -1131,19 +1125,7 @@ export function ApplicationPage({
     }
 
     if (widget.kind === "stream-display") {
-      const runtimeStreamWidget =
-        isMeasureScreen &&
-        widget.id === PLAY_PETANQUE_MEASURE_STREAM_WIDGET_ID &&
-        measureViewMode === "result"
-          ? {
-              ...widget,
-              source: "visualization" as const,
-              streamUrl: measureResultImageDataUrl ?? "",
-              showWebcamPicker: false,
-              overlayText:
-                resolveMeasureResultOverlayText(measureResultImageDataUrl),
-            }
-          : widget;
+      const runtimeStreamWidget = runtimeWidget as Extract<CanvasWidget, { kind: "stream-display" }>;
       const url =
         runtimeStreamWidget.source === "camera"
           ? cameraStreamUrl

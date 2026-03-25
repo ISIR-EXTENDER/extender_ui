@@ -1,5 +1,9 @@
 import type { WsMeasureResultMessage } from "../../types/ws";
 import {
+  PLAY_PETANQUE_MEASURES_SCREEN_ID,
+  formatMeasureStatusText,
+  formatMeasureVectorsText,
+  resolveMeasureResultOverlayText,
   upsertMeasureResultHistory,
   type MeasureResultHistoryEntry,
   triggerMeasureButton,
@@ -17,7 +21,10 @@ import {
 } from "./buttonRuntime";
 import {
   PETANQUE_STATE_TOPIC,
+  PLAY_PETANQUE_MEASURE_STATUS_TOPIC,
   PLAY_PETANQUE_MEASURE_REQUEST_TOPIC,
+  PLAY_PETANQUE_MEASURE_STREAM_WIDGET_ID,
+  PLAY_PETANQUE_MEASURE_VECTORS_TOPIC,
 } from "../../pages/applicationTopics";
 
 const PETANQUE_RUNTIME_SCREEN_IDS = new Set([
@@ -88,6 +95,44 @@ export const petanqueRuntimePlugin: ApplicationRuntimePlugin = {
     }
 
     return false;
+  },
+  decorateWidget: (args) => {
+    if (args.activeScreenId !== PLAY_PETANQUE_MEASURES_SCREEN_ID) {
+      return null;
+    }
+
+    if (args.widget.kind === "text" && args.widget.topic === PLAY_PETANQUE_MEASURE_STATUS_TOPIC) {
+      return {
+        ...args.widget,
+        text: formatMeasureStatusText(
+          args.state.measureStatusText,
+          args.state.measureLastUpdatedAtMs
+        ),
+      };
+    }
+
+    if (args.widget.kind === "textarea" && args.widget.topic === PLAY_PETANQUE_MEASURE_VECTORS_TOPIC) {
+      return {
+        ...args.widget,
+        text: formatMeasureVectorsText(args.state.measureVectorsJson),
+      };
+    }
+
+    if (
+      args.widget.kind === "stream-display" &&
+      args.widget.id === PLAY_PETANQUE_MEASURE_STREAM_WIDGET_ID &&
+      args.state.measureViewMode === "result"
+    ) {
+      return {
+        ...args.widget,
+        source: "visualization",
+        streamUrl: args.state.measureResultImageDataUrl ?? "",
+        showWebcamPicker: false,
+        overlayText: resolveMeasureResultOverlayText(args.state.measureResultImageDataUrl),
+      };
+    }
+
+    return null;
   },
   getButtonPresentation: (args) => {
     const petanqueCommand = isPetanqueStateCommand(args.widget.payload)

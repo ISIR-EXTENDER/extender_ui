@@ -3,7 +3,11 @@ import { describe, expect, it, vi } from "vitest";
 import {
   PETANQUE_STATE_TOPIC,
   PLAY_PETANQUE_MEASURE_REFRESH_TOPIC,
+  PLAY_PETANQUE_MEASURE_STATUS_TOPIC,
+  PLAY_PETANQUE_MEASURE_STREAM_WIDGET_ID,
+  PLAY_PETANQUE_MEASURE_VECTORS_TOPIC,
 } from "../../pages/applicationTopics";
+import { MEASURE_DEMO_HISTORY_ENTRY } from "../../apps/petanque/measureRuntime";
 import { petanqueRuntimePlugin } from "../../apps/petanque/runtime";
 import { resolveApplicationRuntimePlugins } from "./registry";
 import type { ApplicationRuntimeButtonArgs, ApplicationRuntimeMessageArgs } from "./types";
@@ -15,6 +19,9 @@ const createRuntimeState = () => ({
   measureResultImageDataUrl: null,
   capturedMeasureImageDataUrl: null,
   measureResultHistory: [],
+  measureVectorsJson: null,
+  measureStatusText: "Live feed active (demo available)",
+  measureLastUpdatedAtMs: null,
 });
 
 const createRuntimeActions = () => ({
@@ -165,5 +172,85 @@ describe("petanqueRuntimePlugin", () => {
     expect(actions.sendMessage).toHaveBeenCalledWith({ type: "measure_refresh" });
     expect(actions.setMeasureViewMode).toHaveBeenCalledWith("result");
     expect(actions.markWidgetPulse).toHaveBeenCalledWith("refresh");
+  });
+
+  it("decorates measure status widgets from runtime state", () => {
+    const decorated = petanqueRuntimePlugin.decorateWidget?.({
+      application: null,
+      activeScreenId: "play_petanque_measures",
+      widget: {
+        id: "status",
+        kind: "text",
+        label: "Status",
+        topic: PLAY_PETANQUE_MEASURE_STATUS_TOPIC,
+        text: "placeholder",
+        fontSize: 12,
+        align: "left",
+        rect: { x: 0, y: 0, w: 10, h: 10 },
+      } as never,
+      widgets: [],
+      state: {
+        ...createRuntimeState(),
+        measureStatusText: "Measure result updated",
+        measureLastUpdatedAtMs: 123,
+        measureVectorsJson: null,
+      },
+    });
+
+    expect(decorated).toMatchObject({
+      kind: "text",
+    });
+    expect((decorated as { text: string }).text).toContain("Measure result updated");
+  });
+
+  it("decorates measure textarea and result stream widgets", () => {
+    const baseState = {
+      ...createRuntimeState(),
+      measureVectorsJson: '{"distance": 12}',
+      measureViewMode: "result" as const,
+      measureResultImageDataUrl: MEASURE_DEMO_HISTORY_ENTRY.imageDataUrl,
+    };
+
+    const textarea = petanqueRuntimePlugin.decorateWidget?.({
+      application: null,
+      activeScreenId: "play_petanque_measures",
+      widget: {
+        id: "vectors",
+        kind: "textarea",
+        label: "Vectors",
+        topic: PLAY_PETANQUE_MEASURE_VECTORS_TOPIC,
+        text: "",
+        fontSize: 12,
+        rect: { x: 0, y: 0, w: 10, h: 10 },
+      } as never,
+      widgets: [],
+      state: baseState,
+    });
+    expect((textarea as { text: string }).text).toContain('"distance": 12');
+
+    const stream = petanqueRuntimePlugin.decorateWidget?.({
+      application: null,
+      activeScreenId: "play_petanque_measures",
+      widget: {
+        id: PLAY_PETANQUE_MEASURE_STREAM_WIDGET_ID,
+        kind: "stream-display",
+        label: "Measure stream",
+        topic: "/measure/stream",
+        source: "camera",
+        streamUrl: "",
+        fitMode: "contain",
+        showStatus: true,
+        showUrl: true,
+        overlayText: "",
+        rect: { x: 0, y: 0, w: 10, h: 10 },
+      } as never,
+      widgets: [],
+      state: baseState,
+    });
+    expect(stream).toMatchObject({
+      kind: "stream-display",
+      source: "visualization",
+      overlayText: "demo measure",
+    });
   });
 });
