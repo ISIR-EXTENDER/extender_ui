@@ -38,6 +38,31 @@ import { wsClient } from "../services/wsClient";
 import { useTeleopStore } from "../store/teleopStore";
 import { useUiStore } from "../store/uiStore";
 import defaultMeasureDemoImage from "../assets/image_measures.png";
+import {
+  PETANQUE_ALPHA_PRESET_TOPIC,
+  PETANQUE_ALPHA_TOPIC,
+  PETANQUE_ANGLE_TOPIC,
+  PETANQUE_STATE_TOPIC,
+  PETANQUE_TOTAL_DURATION_TOPIC,
+  TELEOP_CONFIG_ANGULAR_SCALE_X_TOPIC,
+  TELEOP_CONFIG_ANGULAR_SCALE_Y_TOPIC,
+  TELEOP_CONFIG_ANGULAR_SCALE_Z_TOPIC,
+  TELEOP_CONFIG_INVERT_ANGULAR_X_TOPIC,
+  TELEOP_CONFIG_INVERT_ANGULAR_Y_TOPIC,
+  TELEOP_CONFIG_INVERT_ANGULAR_Z_TOPIC,
+  TELEOP_CONFIG_INVERT_LINEAR_X_TOPIC,
+  TELEOP_CONFIG_INVERT_LINEAR_Y_TOPIC,
+  TELEOP_CONFIG_INVERT_LINEAR_Z_TOPIC,
+  TELEOP_CONFIG_RESET_TOPIC,
+  TELEOP_CONFIG_ROTATION_GAIN_TOPIC,
+  TELEOP_CONFIG_SAVE_PROFILE_TOPIC,
+  TELEOP_CONFIG_SWAP_XY_TOPIC,
+  TELEOP_CONFIG_TRANSLATION_GAIN_TOPIC,
+  isLocalMaxVelocityTopic,
+  isTeleopLinearScaleXTopic,
+  isTeleopLinearScaleYTopic,
+  isTeleopLinearScaleZTopic,
+} from "./applicationTopics";
 
 type ApplicationPageProps = {
   applicationId: string;
@@ -49,11 +74,6 @@ type ApplicationPageProps = {
 
 const TOPIC_FRESHNESS_MS = 200;
 const TOPIC_FRESHNESS_TICK_MS = 100;
-const PETANQUE_STATE_TOPIC = "/petanque_state_machine/change_state";
-const PETANQUE_TOTAL_DURATION_TOPIC = "/petanque_throw/total_duration";
-const PETANQUE_ANGLE_TOPIC = "/petanque_throw/angle_between_start_and_finish";
-const PETANQUE_ALPHA_TOPIC = "/petanque_throw/alpha";
-const PETANQUE_ALPHA_PRESET_TOPIC = "/petanque_throw/alpha_preset";
 const PETANQUE_ALPHA_SAFE_MAX = 20;
 const PETANQUE_ALPHA_MAX = 40;
 const PETANQUE_ALPHA_POINTER = 20;
@@ -80,26 +100,6 @@ const MEASURE_DEMO_VECTORS_JSON = JSON.stringify(
   null,
   2
 );
-const TELEOP_CONFIG_TRANSLATION_GAIN_TOPIC = "/teleop_config/translation_gain";
-const TELEOP_CONFIG_ROTATION_GAIN_TOPIC = "/teleop_config/rotation_gain";
-const TELEOP_CONFIG_LINEAR_SCALE_X_TOPIC = "/teleop_config/linear_scale_x";
-const TELEOP_CONFIG_LINEAR_SCALE_Y_TOPIC = "/teleop_config/linear_scale_y";
-const TELEOP_CONFIG_LINEAR_SCALE_Z_TOPIC = "/teleop_config/linear_scale_z";
-const TELEOP_CONFIG_ANGULAR_SCALE_X_TOPIC = "/teleop_config/angular_scale_x";
-const TELEOP_CONFIG_ANGULAR_SCALE_Y_TOPIC = "/teleop_config/angular_scale_y";
-const TELEOP_CONFIG_ANGULAR_SCALE_Z_TOPIC = "/teleop_config/angular_scale_z";
-const TELEOP_CONFIG_LEGACY_SCALE_X_TOPIC = "/teleop_config/scale_x";
-const TELEOP_CONFIG_LEGACY_SCALE_Y_TOPIC = "/teleop_config/scale_y";
-const TELEOP_CONFIG_LEGACY_SCALE_Z_TOPIC = "/teleop_config/scale_z";
-const TELEOP_CONFIG_SWAP_XY_TOPIC = "/teleop_config/swap_xy";
-const TELEOP_CONFIG_INVERT_LINEAR_X_TOPIC = "/teleop_config/invert_linear_x";
-const TELEOP_CONFIG_INVERT_LINEAR_Y_TOPIC = "/teleop_config/invert_linear_y";
-const TELEOP_CONFIG_INVERT_LINEAR_Z_TOPIC = "/teleop_config/invert_linear_z";
-const TELEOP_CONFIG_INVERT_ANGULAR_X_TOPIC = "/teleop_config/invert_angular_x";
-const TELEOP_CONFIG_INVERT_ANGULAR_Y_TOPIC = "/teleop_config/invert_angular_y";
-const TELEOP_CONFIG_INVERT_ANGULAR_Z_TOPIC = "/teleop_config/invert_angular_z";
-const TELEOP_CONFIG_RESET_TOPIC = "/teleop_config/reset_defaults";
-const TELEOP_CONFIG_SAVE_PROFILE_TOPIC = "/teleop_config/save_profile";
 const PETANQUE_COMMANDS = [
   "teleop",
   "activate_throw",
@@ -1389,14 +1389,11 @@ export function ApplicationPage({
           ? translationGain
           : widget.topic === TELEOP_CONFIG_ROTATION_GAIN_TOPIC
             ? rotationGain
-            : widget.topic === TELEOP_CONFIG_LINEAR_SCALE_X_TOPIC ||
-                widget.topic === TELEOP_CONFIG_LEGACY_SCALE_X_TOPIC
+            : isTeleopLinearScaleXTopic(widget.topic)
               ? scaleX
-              : widget.topic === TELEOP_CONFIG_LINEAR_SCALE_Y_TOPIC ||
-                  widget.topic === TELEOP_CONFIG_LEGACY_SCALE_Y_TOPIC
+              : isTeleopLinearScaleYTopic(widget.topic)
                 ? scaleY
-                : widget.topic === TELEOP_CONFIG_LINEAR_SCALE_Z_TOPIC ||
-                    widget.topic === TELEOP_CONFIG_LEGACY_SCALE_Z_TOPIC
+                : isTeleopLinearScaleZTopic(widget.topic)
                   ? scaleZ
                   : widget.topic === TELEOP_CONFIG_ANGULAR_SCALE_X_TOPIC
                     ? angularScaleX
@@ -1499,22 +1496,13 @@ export function ApplicationPage({
             if (widget.topic === TELEOP_CONFIG_ROTATION_GAIN_TOPIC) {
               setRotationGain(resolvedNextValue);
             }
-            if (
-              widget.topic === TELEOP_CONFIG_LINEAR_SCALE_X_TOPIC ||
-              widget.topic === TELEOP_CONFIG_LEGACY_SCALE_X_TOPIC
-            ) {
+            if (isTeleopLinearScaleXTopic(widget.topic)) {
               setScaleX(resolvedNextValue);
             }
-            if (
-              widget.topic === TELEOP_CONFIG_LINEAR_SCALE_Y_TOPIC ||
-              widget.topic === TELEOP_CONFIG_LEGACY_SCALE_Y_TOPIC
-            ) {
+            if (isTeleopLinearScaleYTopic(widget.topic)) {
               setScaleY(resolvedNextValue);
             }
-            if (
-              widget.topic === TELEOP_CONFIG_LINEAR_SCALE_Z_TOPIC ||
-              widget.topic === TELEOP_CONFIG_LEGACY_SCALE_Z_TOPIC
-            ) {
+            if (isTeleopLinearScaleZTopic(widget.topic)) {
               setScaleZ(resolvedNextValue);
             }
             if (widget.topic === TELEOP_CONFIG_ANGULAR_SCALE_X_TOPIC) {
@@ -1544,23 +1532,7 @@ export function ApplicationPage({
                 alpha: resolvedNextValue,
               });
             }
-            if (
-              widget.topic !== "/cmd/max_velocity" &&
-              widget.topic !== TELEOP_CONFIG_TRANSLATION_GAIN_TOPIC &&
-              widget.topic !== TELEOP_CONFIG_ROTATION_GAIN_TOPIC &&
-              widget.topic !== TELEOP_CONFIG_LINEAR_SCALE_X_TOPIC &&
-              widget.topic !== TELEOP_CONFIG_LEGACY_SCALE_X_TOPIC &&
-              widget.topic !== TELEOP_CONFIG_LINEAR_SCALE_Y_TOPIC &&
-              widget.topic !== TELEOP_CONFIG_LEGACY_SCALE_Y_TOPIC &&
-              widget.topic !== TELEOP_CONFIG_LINEAR_SCALE_Z_TOPIC &&
-              widget.topic !== TELEOP_CONFIG_LEGACY_SCALE_Z_TOPIC &&
-              widget.topic !== TELEOP_CONFIG_ANGULAR_SCALE_X_TOPIC &&
-              widget.topic !== TELEOP_CONFIG_ANGULAR_SCALE_Y_TOPIC &&
-              widget.topic !== TELEOP_CONFIG_ANGULAR_SCALE_Z_TOPIC &&
-              widget.topic !== PETANQUE_TOTAL_DURATION_TOPIC &&
-              widget.topic !== PETANQUE_ANGLE_TOPIC &&
-              widget.topic !== PETANQUE_ALPHA_TOPIC
-            ) {
+            if (!isLocalMaxVelocityTopic(widget.topic)) {
               wsClient.send({
                 type: "ui_scalar",
                 topic: widget.topic,

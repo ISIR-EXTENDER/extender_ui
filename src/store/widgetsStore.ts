@@ -3,6 +3,7 @@ import { create } from "zustand";
 import type { TabId } from "../app/tabs";
 import type { WidgetInstance, WidgetType } from "../types/widgets";
 import { defaultWidgetsByTab, widgetCatalog, widgetTypesByTab } from "../app/widgetCatalog";
+import { readJsonStorage, writeJsonStorage } from "../utils/browserStorage";
 
 const STORAGE_KEY = "extender_ui.widgets.v1";
 
@@ -10,22 +11,14 @@ const cloneDefaults = (): Record<TabId, WidgetInstance[]> =>
   JSON.parse(JSON.stringify(defaultWidgetsByTab)) as Record<TabId, WidgetInstance[]>;
 
 const loadFromStorage = (): Record<TabId, WidgetInstance[]> => {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return cloneDefaults();
-    const parsed = JSON.parse(raw) as Record<TabId, WidgetInstance[]>;
-    return parsed ?? cloneDefaults();
-  } catch {
-    return cloneDefaults();
-  }
+  return readJsonStorage(STORAGE_KEY, cloneDefaults(), (parsed) => {
+    const typed = parsed as Record<TabId, WidgetInstance[]>;
+    return typed ?? cloneDefaults();
+  });
 };
 
 const saveToStorage = (widgetsByTab: Record<TabId, WidgetInstance[]>) => {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(widgetsByTab));
-  } catch {
-    // ignore storage errors
-  }
+  writeJsonStorage(STORAGE_KEY, widgetsByTab);
 };
 
 export type WidgetsState = {
