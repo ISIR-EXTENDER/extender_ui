@@ -1,8 +1,15 @@
 import { describe, expect, it } from "vitest";
 
 import { sandboxRuntimePlugin } from "./runtime";
+import { isSandboxScreenId } from "./topics";
 
 describe("sandboxRuntimePlugin", () => {
+  it("tracks sandbox screen ids through shared topic constants", () => {
+    expect(isSandboxScreenId("sandbox_control")).toBe(true);
+    expect(isSandboxScreenId("sandbox_teleop_config")).toBe(true);
+    expect(isSandboxScreenId("play_petanque_measures")).toBe(false);
+  });
+
   it("decorates the sandbox max-velocity widget with sandbox defaults", () => {
     const runtimeState = sandboxRuntimePlugin.getMaxVelocityState?.({
       application: {

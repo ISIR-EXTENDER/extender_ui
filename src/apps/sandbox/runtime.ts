@@ -1,10 +1,6 @@
 import type { ApplicationRuntimePlugin } from "../../app/runtime/types";
-import {
-  SANDBOX_MAX_VELOCITY_TOPIC,
-  resolveSandboxMaxVelocityPresentation,
-} from "./controlRuntime";
-
-const SANDBOX_SCREEN_IDS = new Set(["sandbox_control", "sandbox_teleop_config"]);
+import { resolveSandboxMaxVelocityPresentation } from "./controlRuntime";
+import { SANDBOX_MAX_VELOCITY_TOPIC, SANDBOX_SCREEN_IDS } from "./topics";
 
 export const sandboxRuntimePlugin: ApplicationRuntimePlugin = {
   id: "sandbox",

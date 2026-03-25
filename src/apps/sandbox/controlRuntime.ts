@@ -1,6 +1,5 @@
 import type { CanvasWidget } from "../../components/widgets";
-
-export const SANDBOX_MAX_VELOCITY_TOPIC = "/cmd/max_velocity";
+import { SANDBOX_MAX_VELOCITY_TOPIC } from "./topics";
 
 export const resolveSandboxMaxVelocityPresentation = (
   widget: Extract<CanvasWidget, { kind: "max-velocity" }>

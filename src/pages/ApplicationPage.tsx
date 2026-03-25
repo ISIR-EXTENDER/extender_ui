@@ -6,25 +6,6 @@ import { resolveApplicationRuntimePlugins } from "../app/runtime/registry";
 import { useApplicationRuntimeState } from "../app/runtime/useApplicationRuntimeState";
 import type { CanvasRect } from "../components/layout/CanvasItem";
 import {
-  ActionButtonWidget,
-  CurvesWidget,
-  DrinkWidget,
-  GripperControlWidget,
-  JoystickWidget,
-  LoadPoseButtonWidget,
-  LogsWidget,
-  MagnetControlWidget,
-  ModeButtonWidget,
-  MaxVelocityWidget,
-  NavigationBarWidget,
-  NavigationButtonWidget,
-  RosbagControlWidget,
-  SavePoseButtonWidget,
-  SliderWidget,
-  StreamDisplayWidget,
-  ThrowDrawWidget,
-  TextareaWidget,
-  TextWidget,
   DEFAULT_CANVAS_SETTINGS,
   resolveCanvasFitScale,
   resolveCanvasPresetSize,
@@ -33,21 +14,17 @@ import {
   persistConfigurationsToLocalStorage,
   type CanvasWidget,
   type PoseSnapshot,
-  type PoseTopicValue,
   type WidgetConfiguration,
 } from "../components/widgets";
 import { wsClient } from "../services/wsClient";
 import { useTeleopStore } from "../store/teleopStore";
 import { useUiStore } from "../store/uiStore";
-import { isLocalMaxVelocityTopic } from "./applicationTopics";
 import {
-  applyTeleopConfigScalarValue,
-  getTeleopConfigButtonLabel,
-  getTeleopConfigButtonState,
-  isTeleopConfigButtonTopic,
-  resolveTeleopConfigScalarValue,
-  triggerTeleopConfigButton,
-} from "./applicationTeleopConfig";
+  applyPoseSnapshot,
+  collectCurrentPoseTopics,
+  upsertPose,
+} from "./applicationPoseRuntime";
+import { RuntimeWidgetRenderer } from "./applicationRuntime/RuntimeWidgetRenderer";
 
 type ApplicationPageProps = {
   applicationId: string;
@@ -59,8 +36,6 @@ type ApplicationPageProps = {
 
 const TOPIC_FRESHNESS_MS = 200;
 const TOPIC_FRESHNESS_TICK_MS = 100;
-type SliderChannel = "z" | "rz";
-const clampSignedUnit = (value: number) => Math.max(-1, Math.min(1, value));
 
 const NOOP_RECT_CHANGE: (next: CanvasRect) => void = () => {};
 const NOOP_TEXT_CHANGE = Object.assign(
@@ -292,50 +267,6 @@ export function ApplicationPage({
     [canvasScale, canvasSize]
   );
 
-  const resolveSliderChannel = (
-    widget: Extract<CanvasWidget, { kind: "slider" }>
-  ): SliderChannel => {
-    const topic = widget.topic.toLowerCase();
-    const looksLikeRotationZ =
-      topic.includes("joystick_rz") ||
-      topic.includes("angular_z") ||
-      topic.endsWith("/rz");
-    if (looksLikeRotationZ) return "rz";
-
-    const looksLikeTranslationZ =
-      topic.includes("joystick_z") ||
-      topic.includes("linear_z") ||
-      topic.endsWith("/z");
-    if (looksLikeTranslationZ) return "z";
-
-    return widget.binding === "z" ? "z" : "rz";
-  };
-
-  const upsertPose = (poses: PoseSnapshot[], pose: PoseSnapshot) => {
-    const index = poses.findIndex((item) => item.name === pose.name);
-    if (index === -1) return [...poses, pose].sort((a, b) => a.name.localeCompare(b.name));
-    return poses.map((item, itemIndex) => (itemIndex === index ? pose : item));
-  };
-
-  const collectCurrentPoseTopics = (): Record<string, PoseTopicValue> => {
-    const topics: Record<string, PoseTopicValue> = {};
-
-    for (const widget of widgets) {
-      if (widget.kind === "slider") {
-        const channel = resolveSliderChannel(widget);
-        const value = channel === "z" ? z : rz;
-        topics[widget.topic] = { kind: "scalar", value };
-        continue;
-      }
-      if (widget.kind === "joystick") {
-        const source = widget.binding === "joy" ? { x: joyX, y: joyY } : { x: rotX, y: rotY };
-        topics[widget.topic] = { kind: "vector2", x: source.x, y: source.y };
-      }
-    }
-
-    return topics;
-  };
-
   const saveCurrentPose = () => {
     if (!activeConfiguration) return;
     const defaultPoseName = `pose-${(activeConfiguration.poses.length ?? 0) + 1}`;
@@ -347,7 +278,14 @@ export function ApplicationPage({
     const nextPose: PoseSnapshot = {
       name: poseName,
       savedAt: new Date().toISOString(),
-      topics: collectCurrentPoseTopics(),
+      topics: collectCurrentPoseTopics(widgets, {
+        joyX,
+        joyY,
+        rotX,
+        rotY,
+        z,
+        rz,
+      }),
     };
 
     setConfigurations((prev) =>
@@ -368,33 +306,13 @@ export function ApplicationPage({
     const pose = activeConfiguration.poses.find((item) => item.name === poseName);
     if (!pose) return;
 
-    for (const widget of widgets) {
-      const topicValue = pose.topics[widget.topic];
-      if (!topicValue) continue;
-
-      if (widget.kind === "slider" && topicValue.kind === "scalar") {
-        const clamped = Math.min(widget.max, Math.max(widget.min, topicValue.value));
-        const channel = resolveSliderChannel(widget);
-        if (channel === "z") {
-          setZ(clamped);
-        } else {
-          setRz(clamped);
-        }
-        markWidgetPulse(widget.id);
-        continue;
-      }
-
-      if (widget.kind === "joystick" && topicValue.kind === "vector2") {
-        const x = clampSignedUnit(topicValue.x);
-        const y = clampSignedUnit(topicValue.y);
-        if (widget.binding === "joy") {
-          setJoy(x, y);
-        } else {
-          setRot(x, y);
-        }
-        markWidgetPulse(widget.id);
-      }
-    }
+    applyPoseSnapshot(widgets, pose, {
+      setZ,
+      setRz,
+      setJoy,
+      setRot,
+      markWidgetPulse,
+    });
   };
 
   const toggleRosbagRecording = (widget: Extract<CanvasWidget, { kind: "rosbag-control" }>) => {
@@ -408,616 +326,83 @@ export function ApplicationPage({
       auto_timestamp: widget.autoTimestamp,
     });
   };
-
-  const renderWidget = (widget: CanvasWidget) => {
-    const runtimeWidget = activeRuntimePlugins.reduce<CanvasWidget>((current, plugin) => {
-      return (
-        plugin.decorateWidget?.({
-          application: activeApplication,
-          activeScreenId,
-          widget: current,
-          widgets,
-          state: runtimePluginState,
-        }) ?? current
-      );
-    }, widget);
-
-    if (widget.kind === "save-pose-button") {
-      return (
-        <SavePoseButtonWidget
-          key={widget.id}
-          widget={widget}
-          selected={false}
-          onSelect={() => {}}
-          onRectChange={NOOP_RECT_CHANGE}
-          onLabelChange={NOOP_TEXT_CHANGE}
-          onTrigger={saveCurrentPose}
-        />
-      );
-    }
-
-    if (widget.kind === "load-pose-button") {
-      const poseAvailable = (activeConfiguration?.poses ?? []).some(
-        (pose) => pose.name === widget.poseName
-      );
-      return (
-        <LoadPoseButtonWidget
-          key={widget.id}
-          widget={widget}
-          selected={false}
-          onSelect={() => {}}
-          onRectChange={NOOP_RECT_CHANGE}
-          onLabelChange={NOOP_TEXT_CHANGE}
-          onTrigger={() => loadPoseByName(widget.poseName)}
-          poseAvailable={poseAvailable}
-        />
-      );
-    }
-
-    if (widget.kind === "mode-button") {
-      return (
-        <ModeButtonWidget
-          key={widget.id}
-          widget={widget}
-          selected={false}
-          onSelect={() => {}}
-          onRectChange={NOOP_RECT_CHANGE}
-          onLabelChange={NOOP_TEXT_CHANGE}
-        />
-      );
-    }
-
-    if (widget.kind === "navigation-button") {
-      const canNavigate = allowedScreenIds.has(widget.targetScreenId);
-      return (
-        <NavigationButtonWidget
-          key={widget.id}
-          widget={widget}
-          selected={false}
-          onSelect={() => {}}
-          onRectChange={NOOP_RECT_CHANGE}
-          onLabelChange={NOOP_TEXT_CHANGE}
-          onNavigate={onNavigateToScreen}
-          canNavigate={canNavigate}
-        />
-      );
-    }
-
-    if (widget.kind === "navigation-bar") {
-      return (
-        <NavigationBarWidget
-          key={widget.id}
-          widget={widget}
-          selected={false}
-          onSelect={() => {}}
-          onRectChange={NOOP_RECT_CHANGE}
-          onNavigate={onNavigateToScreen}
-          allowedScreenIds={allowedScreenIds}
-        />
-      );
-    }
-
-    if (widget.kind === "text") {
-      return (
-        <TextWidget
-          key={widget.id}
-          widget={runtimeWidget as Extract<CanvasWidget, { kind: "text" }>}
-          selected={false}
-          onSelect={() => {}}
-          onRectChange={NOOP_RECT_CHANGE}
-          onTextChange={NOOP_TEXT_CHANGE}
-        />
-      );
-    }
-
-    if (widget.kind === "textarea") {
-      return (
-        <TextareaWidget
-          key={widget.id}
-          widget={runtimeWidget as Extract<CanvasWidget, { kind: "textarea" }>}
-          selected={false}
-          onSelect={() => {}}
-          onRectChange={NOOP_RECT_CHANGE}
-          onTextChange={NOOP_TEXT_CHANGE}
-        />
-      );
-    }
-
-    if (widget.kind === "button") {
-      const isTeleopConfigButton = isTeleopConfigButtonTopic(widget.topic);
-      const runtimeButtonPresentation = activeRuntimePlugins.reduce<{
-        disabled?: boolean;
-        active?: boolean;
-        tone?: "default" | "accent" | "success" | "danger";
-        label?: string;
-      } | null>((current, plugin) => {
-        if (current) return current;
-        return (
-          plugin.getButtonPresentation?.({
-            application: activeApplication,
-            activeScreenId,
-            widget,
-            widgets,
-            state: runtimePluginState,
-            actions: runtimePluginActions,
-          }) ?? null
-        );
-      }, null);
-      const teleopConfigButtonState = isTeleopConfigButton
-        ? getTeleopConfigButtonState(widget.topic, {
-            swapXY,
-            invertLinearX,
-            invertLinearY,
-            invertLinearZ,
-            invertAngularX,
-            invertAngularY,
-            invertAngularZ,
-          })
-        : null;
-      const runtimeButtonWidget = isTeleopConfigButton
-        ? {
-            ...widget,
-            label: getTeleopConfigButtonLabel(widget.topic, widget.label, {
-              swapXY,
-              invertLinearX,
-              invertLinearY,
-              invertLinearZ,
-              invertAngularX,
-              invertAngularY,
-              invertAngularZ,
-            }),
-          }
-        : runtimeButtonPresentation?.label
-          ? {
-              ...widget,
-              label: runtimeButtonPresentation.label,
-            }
-          : widget;
-
-      return (
-        <ActionButtonWidget
-          key={widget.id}
-          widget={runtimeButtonWidget}
-          selected={false}
-          onSelect={() => {}}
-          onRectChange={NOOP_RECT_CHANGE}
-          onLabelChange={NOOP_TEXT_CHANGE}
-          disabled={runtimeButtonPresentation?.disabled ?? false}
-          active={runtimeButtonPresentation?.active ?? teleopConfigButtonState?.active ?? false}
-          tone={
-            runtimeButtonPresentation?.tone ??
-            teleopConfigButtonState?.tone ??
-            widget.tone ??
-            "default"
-          }
-          onTrigger={() => {
-            for (const plugin of activeRuntimePlugins) {
-              const handled = plugin.handleButtonTrigger?.({
-                application: activeApplication,
-                activeScreenId,
-                widget,
-                widgets,
-                state: runtimePluginState,
-                actions: runtimePluginActions,
-              });
-              if (handled) return;
-            }
-
-            if (isTeleopConfigButton) {
-              const changed = triggerTeleopConfigButton(
-                widget.topic,
-                {
-                  swapXY,
-                  invertLinearX,
-                  invertLinearY,
-                  invertLinearZ,
-                  invertAngularX,
-                  invertAngularY,
-                  invertAngularZ,
-                },
-                {
-                  setSwapXY,
-                  setInvertLinearX,
-                  setInvertLinearY,
-                  setInvertLinearZ,
-                  setInvertAngularX,
-                  setInvertAngularY,
-                  setInvertAngularZ,
-                  resetTeleopConfig,
-                  saveTeleopProfile,
-                }
-              );
-              if (changed) {
-                markWidgetPulse(widget.id);
-              }
-              return;
-            }
-
-            wsClient.send({
-              type: "ui_button",
-              topic: widget.topic,
-              payload: widget.payload,
-              widget_id: widget.id,
-            });
-            markWidgetPulse(widget.id);
-          }}
-        />
-      );
-    }
-
-    if (widget.kind === "rosbag-control") {
-      return (
-        <RosbagControlWidget
-          key={widget.id}
-          widget={widget}
-          selected={false}
-          onSelect={() => {}}
-          onRectChange={NOOP_RECT_CHANGE}
-          onLabelChange={NOOP_TEXT_CHANGE}
-          isRecording={rosbagRecording}
-          statusText={rosbagStatus}
-          onToggleRecording={() => toggleRosbagRecording(widget)}
-        />
-      );
-    }
-
-    if (widget.kind === "throw-draw") {
-      const runtimeThrowDrawState = activeRuntimePlugins.reduce<{
-        angleValue: number;
-        durationValue: number;
-        alphaValue?: number;
-        hasAlphaControl: boolean;
-      } | null>((current, plugin) => {
-        if (current) return current;
-        return (
-          plugin.getThrowDrawState?.({
-            application: activeApplication,
-            activeScreenId,
-            widget,
-            widgets,
-            state: runtimePluginState,
-            actions: runtimePluginActions,
-          }) ?? null
-        );
-      }, null);
-
-      if (!runtimeThrowDrawState) {
-        return null;
-      }
-
-      return (
-        <ThrowDrawWidget
-          key={widget.id}
-          widget={widget}
-          selected={false}
-          onSelect={() => {}}
-          onRectChange={NOOP_RECT_CHANGE}
-          angleValue={runtimeThrowDrawState.angleValue}
-          durationValue={runtimeThrowDrawState.durationValue}
-          alphaValue={runtimeThrowDrawState.alphaValue}
-          onAlphaChange={
-            runtimeThrowDrawState.hasAlphaControl
-              ? (nextAlpha) => {
-                  for (const plugin of activeRuntimePlugins) {
-                    const handled = plugin.handleThrowDrawChange?.({
-                      application: activeApplication,
-                      activeScreenId,
-                      widget,
-                      widgets,
-                      state: runtimePluginState,
-                      actions: runtimePluginActions,
-                      next: {
-                        powerPercent: 0,
-                        alpha: nextAlpha,
-                      },
-                    });
-                    if (handled) return;
-                  }
-                }
-              : undefined
-          }
-          onValueChange={(next) => {
-            for (const plugin of activeRuntimePlugins) {
-              const handled = plugin.handleThrowDrawChange?.({
-                application: activeApplication,
-                activeScreenId,
-                widget,
-                widgets,
-                state: runtimePluginState,
-                actions: runtimePluginActions,
-                next,
-              });
-              if (handled) return;
-            }
-          }}
-        />
-      );
-    }
-
-    if (widget.kind === "max-velocity") {
-      const runtimeMaxVelocityState = activeRuntimePlugins.reduce<{
-        value?: number | null;
-        endpointLabels?: {
-          left?: string;
-          right?: string;
-        };
-        bubbleValueFormatter?: (value: number) => string;
-        reverseDirection?: boolean;
-        unsafeThreshold?: number;
-      } | null>((current, plugin) => {
-        if (current) return current;
-        return (
-          plugin.getMaxVelocityState?.({
-            application: activeApplication,
-            activeScreenId,
-            widget,
-            widgets,
-            state: runtimePluginState,
-            actions: runtimePluginActions,
-          }) ?? null
-        );
-      }, null);
-      const widgetValue =
-        resolveTeleopConfigScalarValue(widget.topic, {
-          maxVelocity,
-          translationGain,
-          rotationGain,
-          scaleX,
-          scaleY,
-          scaleZ,
-          angularScaleX,
-          angularScaleY,
-          angularScaleZ,
-        }) ??
-        (runtimeMaxVelocityState?.value ?? 1);
-      const {
-        reverseDirection,
-        endpointLabels,
-        bubbleValueFormatter,
-        unsafeThreshold,
-      } = runtimeMaxVelocityState ?? {
-        reverseDirection: widget.reverseDirection,
-        endpointLabels: undefined,
-        bubbleValueFormatter: undefined,
-        unsafeThreshold: undefined,
-      };
-      return (
-        <MaxVelocityWidget
-          key={widget.id}
-          widget={widget}
-          selected={false}
-          onSelect={() => {}}
-          onRectChange={NOOP_RECT_CHANGE}
-          onLabelChange={NOOP_TEXT_CHANGE}
-          value={widgetValue}
-          endpointLabels={endpointLabels}
-          bubbleValueFormatter={bubbleValueFormatter}
-          unsafeThreshold={unsafeThreshold}
-          reverseDirection={reverseDirection}
-          onValueChange={(nextValue) => {
-            const runtimeMaxVelocityChange = activeRuntimePlugins.reduce<{
-              value: number;
-            } | null>((current, plugin) => {
-              if (current) return current;
-              return (
-                plugin.handleMaxVelocityChange?.({
-                  application: activeApplication,
-                  activeScreenId,
-                  widget,
-                  widgets,
-                  state: runtimePluginState,
-                  actions: runtimePluginActions,
-                  nextValue,
-                }) ?? null
-              );
-            }, null);
-            const resolvedNextValue = runtimeMaxVelocityChange?.value ?? nextValue;
-            setMaxVelocityWidgetValues((prev) => ({
-              ...prev,
-              [widget.id]: resolvedNextValue,
-            }));
-            applyTeleopConfigScalarValue(widget.topic, resolvedNextValue, {
-              setMaxVelocity,
-              setTranslationGain,
-              setRotationGain,
-              setScaleX,
-              setScaleY,
-              setScaleZ,
-              setAngularScaleX,
-              setAngularScaleY,
-              setAngularScaleZ,
-            });
-            if (!isLocalMaxVelocityTopic(widget.topic)) {
-              wsClient.send({
-                type: "ui_scalar",
-                topic: widget.topic,
-                value: resolvedNextValue,
-                widget_id: widget.id,
-              });
-            }
-            markWidgetPulse(widget.id);
-          }}
-        />
-      );
-    }
-
-    if (widget.kind === "gripper-control") {
-      return (
-        <GripperControlWidget
-          key={widget.id}
-          widget={widget}
-          selected={false}
-          onSelect={() => {}}
-          onRectChange={NOOP_RECT_CHANGE}
-          onLabelChange={NOOP_TEXT_CHANGE}
-          activeState={
-            wsState?.gripper_state === "open" || wsState?.gripper_state === "close"
-              ? wsState.gripper_state
-              : null
-          }
-          onOpen={() => wsClient.send({ type: "gripper_cmd", action: "open" })}
-          onClose={() => wsClient.send({ type: "gripper_cmd", action: "close" })}
-        />
-      );
-    }
-
-    if (widget.kind === "magnet-control") {
-      return (
-        <MagnetControlWidget
-          key={widget.id}
-          widget={widget}
-          selected={false}
-          onSelect={() => {}}
-          onRectChange={NOOP_RECT_CHANGE}
-          onLabelChange={NOOP_TEXT_CHANGE}
-          onActivate={() => {
-            wsClient.send({
-              type: "ui_button",
-              topic: widget.topic,
-              payload: widget.onPayload,
-              widget_id: widget.id,
-            });
-            markWidgetPulse(widget.id);
-          }}
-          onDeactivate={() => {
-            wsClient.send({
-              type: "ui_button",
-              topic: widget.topic,
-              payload: widget.offPayload,
-              widget_id: widget.id,
-            });
-            markWidgetPulse(widget.id);
-          }}
-        />
-      );
-    }
-
-    if (widget.kind === "stream-display") {
-      const runtimeStreamWidget = runtimeWidget as Extract<CanvasWidget, { kind: "stream-display" }>;
-      const url =
-        runtimeStreamWidget.source === "camera"
-          ? cameraStreamUrl
-          : runtimeStreamWidget.source === "rviz"
-            ? rvizStreamUrl
-            : runtimeStreamWidget.source === "visualization"
-              ? resolveVisualizationUrlForRuntime(runtimeStreamWidget.streamUrl)
-              : runtimeStreamWidget.streamUrl;
-      const sourceStatus =
-        runtimeStreamWidget.source === "rviz"
-          ? "RViz stream"
-          : runtimeStreamWidget.source === "visualization"
-            ? "Visualization stream"
-            : runtimeStreamWidget.source === "webcam"
-              ? "Webcam stream"
-              : "Camera stream";
-      return (
-        <StreamDisplayWidget
-          key={widget.id}
-          widget={{
-            ...runtimeStreamWidget,
-            streamUrl: url || runtimeStreamWidget.streamUrl,
-            fitMode: runtimeStreamWidget.fitMode ?? "contain",
-            showStatus: runtimeStreamWidget.showStatus ?? true,
-            showUrl: runtimeStreamWidget.showUrl ?? true,
-            overlayText: runtimeStreamWidget.overlayText ?? "stream preview",
-          }}
-          selected={false}
-          onSelect={() => {}}
-          onRectChange={NOOP_RECT_CHANGE}
-          onLabelChange={NOOP_TEXT_CHANGE}
-          statusText={sourceStatus}
-        />
-      );
-    }
-
-    if (widget.kind === "drink") {
-      return (
-        <DrinkWidget
-          key={widget.id}
-          widget={widget}
-          selected={false}
-          onSelect={() => {}}
-          onRectChange={NOOP_RECT_CHANGE}
-          onLabelChange={NOOP_TEXT_CHANGE}
-        />
-      );
-    }
-
-    if (widget.kind === "curves") {
-      return (
-        <CurvesWidget
-          key={widget.id}
-          widget={widget}
-          selected={false}
-          onSelect={() => {}}
-          onRectChange={NOOP_RECT_CHANGE}
-          onLabelChange={NOOP_TEXT_CHANGE}
-        />
-      );
-    }
-
-    if (widget.kind === "logs") {
-      return (
-        <LogsWidget
-          key={widget.id}
-          widget={widget}
-          selected={false}
-          onSelect={() => {}}
-          onRectChange={NOOP_RECT_CHANGE}
-          onLabelChange={NOOP_TEXT_CHANGE}
-        />
-      );
-    }
-
-    if (widget.kind === "slider") {
-      const channel = resolveSliderChannel(widget);
-      const value = channel === "z" ? z : rz;
-      const onChange = channel === "z" ? setZ : setRz;
-      const topicPreview = `${widget.topic}: ${value.toFixed(2)}`;
-      return (
-        <SliderWidget
-          key={widget.id}
-          widget={widget}
-          value={value}
-          onValueChange={(nextValue) => {
-            onChange(nextValue);
-            markWidgetPulse(widget.id);
-          }}
-          topicPreview={topicPreview}
-          isTopicFresh={isWidgetFresh(widget.id)}
-          selected={false}
-          onSelect={() => {}}
-          onRectChange={NOOP_RECT_CHANGE}
-        />
-      );
-    }
-
-    const metrics =
-      widget.binding === "joy" ? { x: joyX, y: joyY, magnitude: Math.min(1, Math.hypot(joyX, joyY)) } : { x: rotX, y: rotY };
-    const topicPreview = `${widget.topic}: x=${metrics.x.toFixed(2)} y=${metrics.y.toFixed(2)}`;
-
-    return (
-      <JoystickWidget
-        key={widget.id}
-        widget={widget}
-        selected={false}
-        onSelect={() => {}}
-        onRectChange={NOOP_RECT_CHANGE}
-        onLabelChange={NOOP_TEXT_CHANGE}
-        onMove={(x, y) => {
-          if (widget.binding === "joy") {
-            setJoy(x, y);
-          } else {
-            setRot(x, y);
-          }
-          markWidgetPulse(widget.id);
-        }}
-        metrics={metrics}
-        topicPreview={topicPreview}
-        isTopicFresh={isWidgetFresh(widget.id)}
-      />
-    );
-  };
+  const runtimeWidgetElements = runtimeWidgets.map((widget) => (
+    <RuntimeWidgetRenderer
+      key={widget.id}
+      widget={widget}
+      activeApplication={activeApplication}
+      activeScreenId={activeScreenId}
+      activeConfiguration={activeConfiguration}
+      widgets={widgets}
+      allowedScreenIds={allowedScreenIds}
+      activeRuntimePlugins={activeRuntimePlugins}
+      runtimePluginState={runtimePluginState}
+      runtimePluginActions={runtimePluginActions}
+      teleopSnapshot={{
+        joyX,
+        joyY,
+        rotX,
+        rotY,
+        z,
+        rz,
+        maxVelocity,
+        translationGain,
+        rotationGain,
+        scaleX,
+        scaleY,
+        scaleZ,
+        angularScaleX,
+        angularScaleY,
+        angularScaleZ,
+        swapXY,
+        invertLinearX,
+        invertLinearY,
+        invertLinearZ,
+        invertAngularX,
+        invertAngularY,
+        invertAngularZ,
+      }}
+      teleopActions={{
+        setJoy,
+        setRot,
+        setZ,
+        setRz,
+        setMaxVelocity,
+        setTranslationGain,
+        setRotationGain,
+        setScaleX,
+        setScaleY,
+        setScaleZ,
+        setAngularScaleX,
+        setAngularScaleY,
+        setAngularScaleZ,
+        setSwapXY,
+        setInvertLinearX,
+        setInvertLinearY,
+        setInvertLinearZ,
+        setInvertAngularX,
+        setInvertAngularY,
+        setInvertAngularZ,
+        saveTeleopProfile,
+        resetTeleopConfig,
+      }}
+      onNavigateToScreen={onNavigateToScreen}
+      saveCurrentPose={saveCurrentPose}
+      loadPoseByName={loadPoseByName}
+      toggleRosbagRecording={toggleRosbagRecording}
+      rosbagRecording={rosbagRecording}
+      rosbagStatus={rosbagStatus}
+      wsState={wsState}
+      cameraStreamUrl={cameraStreamUrl}
+      rvizStreamUrl={rvizStreamUrl}
+      markWidgetPulse={markWidgetPulse}
+      isWidgetFresh={isWidgetFresh}
+      setMaxVelocityWidgetValues={setMaxVelocityWidgetValues}
+      resolveVisualizationUrlForRuntime={resolveVisualizationUrlForRuntime}
+      noopRectChange={NOOP_RECT_CHANGE}
+      noopTextChange={NOOP_TEXT_CHANGE}
+    />
+  ));
 
   const canvasViewportClassName = `controls-canvas-viewport controls-canvas-mode-${effectiveRuntimeMode}`;
   const canvasFrameStyle = {
@@ -1093,7 +478,7 @@ export function ApplicationPage({
               <div className="controls-canvas-frame" style={canvasFrameStyle}>
                 <div className="controls-canvas-transform" style={canvasTransformStyle}>
                   <div className="controls-canvas" style={{ width: `${canvasSize.width}px`, height: `${canvasSize.height}px` }}>
-                    {runtimeWidgets.map(renderWidget)}
+                    {runtimeWidgetElements}
                   </div>
                 </div>
               </div>
