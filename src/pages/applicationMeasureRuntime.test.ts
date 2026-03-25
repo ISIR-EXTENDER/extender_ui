@@ -10,7 +10,6 @@ import {
 } from "./applicationTopics";
 import {
   MEASURE_DEMO_HISTORY_ENTRY,
-  captureImageDataUrlFromStreamWidget,
   formatMeasureStatusText,
   formatMeasureVectorsText,
   resolveMeasureResultOverlayText,
@@ -19,6 +18,7 @@ import {
   triggerMeasureButton,
   upsertMeasureResultHistory,
 } from "../apps/petanque/measureRuntime";
+import { captureImageDataUrlFromStreamWidget } from "../app/runtime/streamCapture";
 
 describe("applicationMeasureRuntime", () => {
   it("formats status and vector text safely", () => {
@@ -48,6 +48,7 @@ describe("applicationMeasureRuntime", () => {
         {
           id: PLAY_PETANQUE_MEASURE_STREAM_WIDGET_ID,
           kind: "stream-display",
+          topic: "/tablet/camera/measures/compressed",
           source: "camera",
           streamUrl: "",
           x: 0,
@@ -64,6 +65,7 @@ describe("applicationMeasureRuntime", () => {
         {
           id: "webcam-fallback",
           kind: "stream-display",
+          topic: "/tablet/camera/fallback/compressed",
           source: "webcam",
           streamUrl: "",
           x: 0,
@@ -117,6 +119,7 @@ describe("applicationMeasureRuntime", () => {
             {
               id: PLAY_PETANQUE_MEASURE_STREAM_WIDGET_ID,
               kind: "stream-display",
+              topic: "/tablet/camera/measures/compressed",
               source: "camera",
               streamUrl: "",
               x: 0,
@@ -133,6 +136,12 @@ describe("applicationMeasureRuntime", () => {
     expect(actions.setCapturedMeasureImageDataUrl).toHaveBeenCalledWith(
       "data:image/jpeg;base64,captured"
     );
+    expect(actions.sendMessage).toHaveBeenCalledWith({
+      type: "camera_frame",
+      topic: "/tablet/camera/measures/compressed",
+      image_data_url: "data:image/jpeg;base64,captured",
+      widget_id: PLAY_PETANQUE_MEASURE_STREAM_WIDGET_ID,
+    });
     expect(actions.setMeasureStatusText).toHaveBeenCalledWith("Image captured");
 
     image.remove();
@@ -211,16 +220,101 @@ describe("applicationMeasureRuntime", () => {
         {
           capturedMeasureImageDataUrl: "data:image/jpeg;base64,captured",
           measureResultImageDataUrl: null,
-          widgets: [],
+          widgets: [
+            {
+              id: PLAY_PETANQUE_MEASURE_STREAM_WIDGET_ID,
+              kind: "stream-display",
+              topic: "/tablet/camera/measures/compressed",
+              source: "webcam",
+              streamUrl: "webcam:///dev/video2",
+              x: 0,
+              y: 0,
+              width: 10,
+              height: 10,
+              label: "Measure",
+            } as never,
+          ],
         },
         actions
       )
     ).toBe(true);
-    expect(actions.sendMessage).toHaveBeenCalledWith({
+    expect(actions.sendMessage).toHaveBeenNthCalledWith(1, {
+      type: "camera_frame",
+      topic: "/tablet/camera/measures/compressed",
+      image_data_url: "data:image/jpeg;base64,captured",
+      widget_id: PLAY_PETANQUE_MEASURE_STREAM_WIDGET_ID,
+    });
+    expect(actions.sendMessage).toHaveBeenNthCalledWith(2, {
       type: "measure_request",
       image_data_url: "data:image/jpeg;base64,captured",
     });
     expect(actions.setMeasureRequestPending).toHaveBeenCalledWith(true);
+  });
+
+  it("captures from the live widget and publishes camera_frame before requesting measure", () => {
+    const image = document.createElement("img");
+    image.dataset.streamWidgetId = PLAY_PETANQUE_MEASURE_STREAM_WIDGET_ID;
+    Object.defineProperty(image, "naturalWidth", { value: 320 });
+    Object.defineProperty(image, "naturalHeight", { value: 180 });
+    document.body.appendChild(image);
+
+    const drawImage = vi.fn();
+    const getContextSpy = vi
+      .spyOn(HTMLCanvasElement.prototype, "getContext")
+      .mockReturnValue({ drawImage } as unknown as CanvasRenderingContext2D);
+    const toDataURLSpy = vi
+      .spyOn(HTMLCanvasElement.prototype, "toDataURL")
+      .mockReturnValue("data:image/jpeg;base64,measured");
+
+    const actions = {
+      setMeasureViewMode: vi.fn(),
+      setMeasureStatusText: vi.fn(),
+      setCapturedMeasureImageDataUrl: vi.fn(),
+      setMeasureRequestPending: vi.fn(),
+      markWidgetPulse: vi.fn(),
+      sendMessage: vi.fn(),
+    };
+
+    expect(
+      triggerMeasureButton(
+        PLAY_PETANQUE_MEASURE_REQUEST_TOPIC,
+        "measure-request",
+        {
+          capturedMeasureImageDataUrl: null,
+          measureResultImageDataUrl: null,
+          widgets: [
+            {
+              id: PLAY_PETANQUE_MEASURE_STREAM_WIDGET_ID,
+              kind: "stream-display",
+              topic: "/tablet/camera/measures/compressed",
+              source: "webcam",
+              streamUrl: "webcam:///dev/video2",
+              x: 0,
+              y: 0,
+              width: 10,
+              height: 10,
+              label: "Measure",
+            } as never,
+          ],
+        },
+        actions
+      )
+    ).toBe(true);
+
+    expect(actions.sendMessage).toHaveBeenNthCalledWith(1, {
+      type: "camera_frame",
+      topic: "/tablet/camera/measures/compressed",
+      image_data_url: "data:image/jpeg;base64,measured",
+      widget_id: PLAY_PETANQUE_MEASURE_STREAM_WIDGET_ID,
+    });
+    expect(actions.sendMessage).toHaveBeenNthCalledWith(2, {
+      type: "measure_request",
+      image_data_url: "data:image/jpeg;base64,measured",
+    });
+
+    image.remove();
+    getContextSpy.mockRestore();
+    toDataURLSpy.mockRestore();
   });
 
   it("fails safely when a measure request has no captured image", () => {

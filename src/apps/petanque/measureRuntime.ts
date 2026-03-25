@@ -1,6 +1,11 @@
 import defaultMeasureDemoImage from "../../assets/image_measures.png";
 import type { CanvasWidget } from "../../components/widgets";
 import {
+  buildCameraFrameMessage,
+  captureImageDataUrlFromStreamWidget,
+  findStreamWidgetById,
+} from "../../app/runtime/streamCapture";
+import {
   PLAY_PETANQUE_MEASURE_CAPTURE_TOPIC,
   PLAY_PETANQUE_MEASURE_REFRESH_TOPIC,
   PLAY_PETANQUE_MEASURE_REQUEST_TOPIC,
@@ -102,48 +107,6 @@ export const resolveMeasureStreamWidgetId = (widgets: CanvasWidget[]) => {
   return fallback?.id ?? null;
 };
 
-export const captureImageDataUrlFromStreamWidget = (widgetId: string): string | null => {
-  if (typeof document === "undefined") return null;
-
-  const videoEl =
-    Array.from(document.querySelectorAll<HTMLVideoElement>("video[data-stream-widget-id]")).find(
-      (node) => node.dataset.streamWidgetId === widgetId
-    ) ?? null;
-  if (videoEl && videoEl.videoWidth > 0 && videoEl.videoHeight > 0) {
-    const canvas = document.createElement("canvas");
-    canvas.width = videoEl.videoWidth;
-    canvas.height = videoEl.videoHeight;
-    const context = canvas.getContext("2d");
-    if (!context) return null;
-    try {
-      context.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
-      return canvas.toDataURL("image/jpeg", 0.92);
-    } catch {
-      return null;
-    }
-  }
-
-  const imageEl =
-    Array.from(document.querySelectorAll<HTMLImageElement>("img[data-stream-widget-id]")).find(
-      (node) => node.dataset.streamWidgetId === widgetId
-    ) ?? null;
-  if (imageEl && imageEl.naturalWidth > 0 && imageEl.naturalHeight > 0) {
-    const canvas = document.createElement("canvas");
-    canvas.width = imageEl.naturalWidth;
-    canvas.height = imageEl.naturalHeight;
-    const context = canvas.getContext("2d");
-    if (!context) return null;
-    try {
-      context.drawImage(imageEl, 0, 0, canvas.width, canvas.height);
-      return canvas.toDataURL("image/jpeg", 0.92);
-    } catch {
-      return null;
-    }
-  }
-
-  return null;
-};
-
 type MeasureButtonSnapshot = {
   capturedMeasureImageDataUrl: string | null;
   measureResultImageDataUrl: string | null;
@@ -158,9 +121,29 @@ type MeasureButtonActions = {
   markWidgetPulse: (widgetId: string) => void;
   sendMessage: (
     message:
+      | {
+          type: "camera_frame";
+          topic: string;
+          image_data_url: string;
+          widget_id: string;
+        }
       | { type: "measure_request"; image_data_url: string }
       | { type: "measure_refresh" }
   ) => void;
+};
+
+const publishCameraFrameForMeasureWidget = (
+  widgets: CanvasWidget[],
+  widgetId: string | null,
+  imageDataUrl: string,
+  sendMessage: MeasureButtonActions["sendMessage"]
+) => {
+  if (!widgetId) return;
+  const widget = findStreamWidgetById(widgets, widgetId);
+  if (!widget) return;
+  const message = buildCameraFrameMessage(widget, imageDataUrl);
+  if (!message) return;
+  sendMessage(message);
 };
 
 export const triggerMeasureButton = (
@@ -193,15 +176,21 @@ export const triggerMeasureButton = (
       return true;
     }
     actions.setCapturedMeasureImageDataUrl(captured);
+    publishCameraFrameForMeasureWidget(
+      snapshot.widgets,
+      streamWidgetId,
+      captured,
+      actions.sendMessage
+    );
     actions.setMeasureStatusText("Image captured");
     actions.markWidgetPulse(widgetId);
     return true;
   }
 
   if (topic === PLAY_PETANQUE_MEASURE_REQUEST_TOPIC) {
+    const streamWidgetId = resolveMeasureStreamWidgetId(snapshot.widgets);
     let imageToSend = snapshot.capturedMeasureImageDataUrl;
     if (!imageToSend) {
-      const streamWidgetId = resolveMeasureStreamWidgetId(snapshot.widgets);
       imageToSend = streamWidgetId == null ? null : captureImageDataUrlFromStreamWidget(streamWidgetId);
     }
     if (!imageToSend) {
@@ -210,6 +199,12 @@ export const triggerMeasureButton = (
       return true;
     }
     actions.setCapturedMeasureImageDataUrl(imageToSend);
+    publishCameraFrameForMeasureWidget(
+      snapshot.widgets,
+      streamWidgetId,
+      imageToSend,
+      actions.sendMessage
+    );
     actions.sendMessage({
       type: "measure_request",
       image_data_url: imageToSend,
