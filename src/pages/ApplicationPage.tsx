@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { loadApplicationsFromLocalStorage } from "../app/applications";
@@ -109,7 +109,7 @@ const formatMaxVelocityPowerPercent = (
 
 const NOOP_RECT_CHANGE: (next: CanvasRect) => void = () => {};
 const NOOP_TEXT_CHANGE = Object.assign(
-  (_next: string) => {},
+  () => {},
   { __readonly: true as const }
 );
 const toScreenClassToken = (screenId: string) =>
@@ -210,7 +210,9 @@ export function ApplicationPage({
   const [measureStatusText, setMeasureStatusText] = useState("Live feed active (demo available)");
   const [measureLastUpdatedAtMs, setMeasureLastUpdatedAtMs] = useState<number | null>(null);
   const [measureRequestPending, setMeasureRequestPending] = useState(false);
-  const measureResultHistoryRef = useRef<MeasureResultHistoryEntry[]>([MEASURE_DEMO_HISTORY_ENTRY]);
+  const [measureResultHistory, setMeasureResultHistory] = useState<MeasureResultHistoryEntry[]>([
+    MEASURE_DEMO_HISTORY_ENTRY,
+  ]);
   const hasSentPetanqueDurationDefaultRef = useRef(false);
   const alphaUnsafeValidatedRef = useRef(false);
   const canvasViewportRef = useRef<HTMLDivElement | null>(null);
@@ -321,37 +323,48 @@ export function ApplicationPage({
       }),
     [activeApplication, activeScreenId]
   );
-  const markWidgetPulse = (widgetId: string) => {
+  const markWidgetPulse = useCallback((widgetId: string) => {
     setWidgetPulseMap((prev) => ({
       ...prev,
       [widgetId]: Date.now(),
     }));
-  };
+  }, []);
   const isWidgetFresh = (widgetId: string) =>
     freshnessClock - (widgetPulseMap[widgetId] ?? 0) <= TOPIC_FRESHNESS_MS;
-  const runtimePluginState = {
-    petanqueFlowStage,
-    measureViewMode,
-    measureRequestPending,
-    measureResultImageDataUrl,
-    capturedMeasureImageDataUrl,
-    measureResultHistory: measureResultHistoryRef.current,
-  };
-  const runtimePluginActions = {
-    setMeasureResultImageDataUrl,
-    setMeasureVectorsJson,
-    setMeasureLastUpdatedAtMs,
-    setMeasureStatusText,
-    setMeasureRequestPending,
-    setMeasureViewMode,
-    setMeasureResultHistory: (nextHistory: MeasureResultHistoryEntry[]) => {
-      measureResultHistoryRef.current = nextHistory;
-    },
-    setCapturedMeasureImageDataUrl,
-    setPetanqueFlowStage,
-    markWidgetPulse,
-    sendMessage: (payload: object) => wsClient.send(payload),
-  };
+  const runtimePluginState = useMemo(
+    () => ({
+      petanqueFlowStage,
+      measureViewMode,
+      measureRequestPending,
+      measureResultImageDataUrl,
+      capturedMeasureImageDataUrl,
+      measureResultHistory,
+    }),
+    [
+      capturedMeasureImageDataUrl,
+      measureRequestPending,
+      measureResultHistory,
+      measureResultImageDataUrl,
+      measureViewMode,
+      petanqueFlowStage,
+    ]
+  );
+  const runtimePluginActions = useMemo(
+    () => ({
+      setMeasureResultImageDataUrl,
+      setMeasureVectorsJson,
+      setMeasureLastUpdatedAtMs,
+      setMeasureStatusText,
+      setMeasureRequestPending,
+      setMeasureViewMode,
+      setMeasureResultHistory,
+      setCapturedMeasureImageDataUrl,
+      setPetanqueFlowStage,
+      markWidgetPulse,
+      sendMessage: (payload: object) => wsClient.send(payload),
+    }),
+    [markWidgetPulse]
+  );
 
   useEffect(() => {
     const unsubscribe = wsClient.onMessage((message) => {
