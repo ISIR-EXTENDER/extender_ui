@@ -3,6 +3,14 @@ export const PETANQUE_TOTAL_DURATION_TOPIC = "/petanque_throw/total_duration";
 export const PETANQUE_ANGLE_TOPIC = "/petanque_throw/angle_between_start_and_finish";
 export const PETANQUE_ALPHA_TOPIC = "/petanque_throw/alpha";
 export const PETANQUE_ALPHA_PRESET_TOPIC = "/petanque_throw/alpha_preset";
+export const PLAY_PETANQUE_MEASURE_STATUS_TOPIC = "/petanque_measure/status";
+export const PLAY_PETANQUE_MEASURE_VECTORS_TOPIC = "/petanque_measure/vectors";
+export const PLAY_PETANQUE_MEASURE_CAPTURE_TOPIC = "/petanque_measure/capture";
+export const PLAY_PETANQUE_MEASURE_REQUEST_TOPIC = "/petanque_measure/request";
+export const PLAY_PETANQUE_MEASURE_REFRESH_TOPIC = "/petanque_measure/refresh";
+export const PLAY_PETANQUE_MEASURE_VIEW_LIVE_TOPIC = "/petanque_measure/view_live";
+export const PLAY_PETANQUE_MEASURE_VIEW_RESULT_TOPIC = "/petanque_measure/view_result";
+export const PLAY_PETANQUE_MEASURE_STREAM_WIDGET_ID = "play-measure-stream";
 
 export const TELEOP_CONFIG_TRANSLATION_GAIN_TOPIC = "/teleop_config/translation_gain";
 export const TELEOP_CONFIG_ROTATION_GAIN_TOPIC = "/teleop_config/rotation_gain";

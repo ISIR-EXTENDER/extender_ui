@@ -37,32 +37,48 @@ import {
 import { wsClient } from "../services/wsClient";
 import { useTeleopStore } from "../store/teleopStore";
 import { useUiStore } from "../store/uiStore";
-import defaultMeasureDemoImage from "../assets/image_measures.png";
 import {
   PETANQUE_ALPHA_PRESET_TOPIC,
   PETANQUE_ALPHA_TOPIC,
   PETANQUE_ANGLE_TOPIC,
   PETANQUE_STATE_TOPIC,
   PETANQUE_TOTAL_DURATION_TOPIC,
-  TELEOP_CONFIG_ANGULAR_SCALE_X_TOPIC,
-  TELEOP_CONFIG_ANGULAR_SCALE_Y_TOPIC,
-  TELEOP_CONFIG_ANGULAR_SCALE_Z_TOPIC,
-  TELEOP_CONFIG_INVERT_ANGULAR_X_TOPIC,
-  TELEOP_CONFIG_INVERT_ANGULAR_Y_TOPIC,
-  TELEOP_CONFIG_INVERT_ANGULAR_Z_TOPIC,
-  TELEOP_CONFIG_INVERT_LINEAR_X_TOPIC,
-  TELEOP_CONFIG_INVERT_LINEAR_Y_TOPIC,
-  TELEOP_CONFIG_INVERT_LINEAR_Z_TOPIC,
-  TELEOP_CONFIG_RESET_TOPIC,
-  TELEOP_CONFIG_ROTATION_GAIN_TOPIC,
-  TELEOP_CONFIG_SAVE_PROFILE_TOPIC,
-  TELEOP_CONFIG_SWAP_XY_TOPIC,
-  TELEOP_CONFIG_TRANSLATION_GAIN_TOPIC,
+  PLAY_PETANQUE_MEASURE_REQUEST_TOPIC,
+  PLAY_PETANQUE_MEASURE_STATUS_TOPIC,
+  PLAY_PETANQUE_MEASURE_STREAM_WIDGET_ID,
+  PLAY_PETANQUE_MEASURE_VECTORS_TOPIC,
   isLocalMaxVelocityTopic,
-  isTeleopLinearScaleXTopic,
-  isTeleopLinearScaleYTopic,
-  isTeleopLinearScaleZTopic,
 } from "./applicationTopics";
+import {
+  MEASURE_DEMO_HISTORY_ENTRY,
+  PLAY_PETANQUE_MEASURES_SCREEN_ID,
+  formatMeasureStatusText,
+  formatMeasureVectorsText,
+  resolveMeasureResultOverlayText,
+  triggerMeasureButton,
+  upsertMeasureResultHistory,
+  type MeasureResultHistoryEntry,
+  type MeasureViewMode,
+} from "./applicationMeasureRuntime";
+import {
+  applyTeleopConfigScalarValue,
+  getTeleopConfigButtonLabel,
+  getTeleopConfigButtonState,
+  isTeleopConfigButtonTopic,
+  resolveTeleopConfigScalarValue,
+  triggerTeleopConfigButton,
+} from "./applicationTeleopConfig";
+import {
+  getMeasureButtonState,
+  getPetanqueButtonState,
+  isMeasureButtonTopic,
+  isPetanqueStateCommand,
+  resolvePetanqueFlowStageAfterCommand,
+  resolvePetanqueAlphaPreset,
+  type PetanqueAlphaPreset,
+  type PetanqueFlowStage,
+  type PetanqueStateCommand,
+} from "./applicationRuntimeButtons";
 
 type ApplicationPageProps = {
   applicationId: string;
@@ -82,50 +98,7 @@ const PETANQUE_TOTAL_DURATION_MIN_S = 0.9;
 const PETANQUE_TOTAL_DURATION_MAX_S = 3.0;
 const PETANQUE_DEFAULT_TOTAL_DURATION_S = 1.1;
 const PETANQUE_DEFAULT_ALPHA = 0;
-const PLAY_PETANQUE_MEASURES_SCREEN_ID = "play_petanque_measures";
-const PLAY_PETANQUE_MEASURE_STREAM_WIDGET_ID = "play-measure-stream";
-const PLAY_PETANQUE_MEASURE_STATUS_TOPIC = "/petanque_measure/status";
-const PLAY_PETANQUE_MEASURE_VECTORS_TOPIC = "/petanque_measure/vectors";
-const PLAY_PETANQUE_MEASURE_CAPTURE_TOPIC = "/petanque_measure/capture";
-const PLAY_PETANQUE_MEASURE_REQUEST_TOPIC = "/petanque_measure/request";
-const PLAY_PETANQUE_MEASURE_REFRESH_TOPIC = "/petanque_measure/refresh";
-const PLAY_PETANQUE_MEASURE_VIEW_LIVE_TOPIC = "/petanque_measure/view_live";
-const PLAY_PETANQUE_MEASURE_VIEW_RESULT_TOPIC = "/petanque_measure/view_result";
-const MEASURE_DEMO_HISTORY_ID = "measure-demo-image-measures";
-const MEASURE_DEMO_VECTORS_JSON = JSON.stringify(
-  {
-    source: "image_measures_demo",
-    distances_cm: [27.9],
-  },
-  null,
-  2
-);
-const PETANQUE_COMMANDS = [
-  "teleop",
-  "activate_throw",
-  "go_to_start",
-  "throw",
-  "pick_up",
-  "stop",
-  "test_loop",
-] as const;
-type PetanqueStateCommand = (typeof PETANQUE_COMMANDS)[number];
-type PetanqueFlowStage = "teleop" | "start_ready";
 type SliderChannel = "z" | "rz";
-type PetanqueAlphaPreset = "pointer" | "tirer";
-type MeasureViewMode = "live" | "result";
-type MeasureResultHistoryEntry = {
-  id: string;
-  imageDataUrl: string;
-  vectorsJson: string | null;
-  updatedAtMs: number | null;
-  source: "demo" | "opencv";
-};
-type TeleopConfigButtonState = {
-  active: boolean;
-  tone: "default" | "accent" | "success" | "danger";
-};
-
 const clampSignedUnit = (value: number) => Math.max(-1, Math.min(1, value));
 const clampPetanqueDuration = (durationSeconds: number) =>
   Math.max(PETANQUE_TOTAL_DURATION_MIN_S, Math.min(PETANQUE_TOTAL_DURATION_MAX_S, durationSeconds));
@@ -160,14 +133,6 @@ const resolveVisualizationUrlForRuntime = (rawUrl: string) => {
   } catch {
     return rawUrl;
   }
-};
-
-const MEASURE_DEMO_HISTORY_ENTRY: MeasureResultHistoryEntry = {
-  id: MEASURE_DEMO_HISTORY_ID,
-  imageDataUrl: defaultMeasureDemoImage,
-  vectorsJson: MEASURE_DEMO_VECTORS_JSON,
-  updatedAtMs: null,
-  source: "demo",
 };
 
 export function ApplicationPage({
@@ -363,13 +328,16 @@ export function ApplicationPage({
           typeof message.vectors_json === "string" ? message.vectors_json : null;
         if (resultImageDataUrl) {
           setMeasureResultImageDataUrl(resultImageDataUrl);
-          pushMeasureResultHistory({
-            id: `measure-${message.updated_at_ms ?? Date.now()}`,
-            imageDataUrl: resultImageDataUrl,
-            vectorsJson: resultVectorsJson,
-            updatedAtMs: message.updated_at_ms ?? Date.now(),
-            source: "opencv",
-          });
+          measureResultHistoryRef.current = upsertMeasureResultHistory(
+            measureResultHistoryRef.current,
+            {
+              id: `measure-${message.updated_at_ms ?? Date.now()}`,
+              imageDataUrl: resultImageDataUrl,
+              vectorsJson: resultVectorsJson,
+              updatedAtMs: message.updated_at_ms ?? Date.now(),
+              source: "opencv",
+            }
+          );
         }
         if (resultVectorsJson) {
           setMeasureVectorsJson(resultVectorsJson);
@@ -451,91 +419,6 @@ export function ApplicationPage({
   const isMeasureScreen =
     activeScreenId === PLAY_PETANQUE_MEASURES_SCREEN_ID;
 
-  const isMeasureButtonTopic = (topic: string) =>
-    topic === PLAY_PETANQUE_MEASURE_CAPTURE_TOPIC ||
-    topic === PLAY_PETANQUE_MEASURE_REQUEST_TOPIC ||
-    topic === PLAY_PETANQUE_MEASURE_REFRESH_TOPIC ||
-    topic === PLAY_PETANQUE_MEASURE_VIEW_LIVE_TOPIC ||
-    topic === PLAY_PETANQUE_MEASURE_VIEW_RESULT_TOPIC;
-
-  const resolveMeasureStreamWidgetId = () => {
-    const configured = widgets.find(
-      (item) =>
-        item.kind === "stream-display" &&
-        item.id === PLAY_PETANQUE_MEASURE_STREAM_WIDGET_ID
-    );
-    if (configured) return configured.id;
-
-    const fallback = widgets.find(
-      (item) => item.kind === "stream-display" && item.source === "webcam"
-    );
-    return fallback?.id ?? null;
-  };
-
-  const captureImageDataUrlFromStreamWidget = (widgetId: string): string | null => {
-    if (typeof document === "undefined") return null;
-
-    const videoEl =
-      Array.from(
-        document.querySelectorAll<HTMLVideoElement>("video[data-stream-widget-id]")
-      ).find((node) => node.dataset.streamWidgetId === widgetId) ?? null;
-    if (videoEl && videoEl.videoWidth > 0 && videoEl.videoHeight > 0) {
-      const canvas = document.createElement("canvas");
-      canvas.width = videoEl.videoWidth;
-      canvas.height = videoEl.videoHeight;
-      const context = canvas.getContext("2d");
-      if (!context) return null;
-      try {
-        context.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
-        return canvas.toDataURL("image/jpeg", 0.92);
-      } catch {
-        return null;
-      }
-    }
-
-    const imageEl =
-      Array.from(
-        document.querySelectorAll<HTMLImageElement>("img[data-stream-widget-id]")
-      ).find((node) => node.dataset.streamWidgetId === widgetId) ?? null;
-    if (imageEl && imageEl.naturalWidth > 0 && imageEl.naturalHeight > 0) {
-      const canvas = document.createElement("canvas");
-      canvas.width = imageEl.naturalWidth;
-      canvas.height = imageEl.naturalHeight;
-      const context = canvas.getContext("2d");
-      if (!context) return null;
-      try {
-        context.drawImage(imageEl, 0, 0, canvas.width, canvas.height);
-        return canvas.toDataURL("image/jpeg", 0.92);
-      } catch {
-        return null;
-      }
-    }
-
-    return null;
-  };
-
-  const pushMeasureResultHistory = (entry: MeasureResultHistoryEntry) => {
-    const demoEntry =
-      measureResultHistoryRef.current.find((item) => item.id === MEASURE_DEMO_HISTORY_ID) ??
-      MEASURE_DEMO_HISTORY_ENTRY;
-    const nonDemo = measureResultHistoryRef.current.filter(
-      (item) =>
-        item.id !== MEASURE_DEMO_HISTORY_ID &&
-        item.imageDataUrl !== entry.imageDataUrl
-    );
-    measureResultHistoryRef.current = [entry, ...nonDemo].slice(0, 7).concat(demoEntry);
-  };
-
-  const formatMeasureVectorsText = () => {
-    if (!measureVectorsJson || !measureVectorsJson.trim()) return "No vectors yet.";
-    try {
-      const parsed = JSON.parse(measureVectorsJson);
-      return JSON.stringify(parsed, null, 2);
-    } catch {
-      return measureVectorsJson;
-    }
-  };
-
   const resolveSliderChannel = (
     widget: Extract<CanvasWidget, { kind: "slider" }>
   ): SliderChannel => {
@@ -555,209 +438,10 @@ export function ApplicationPage({
     return widget.binding === "z" ? "z" : "rz";
   };
 
-  const isPetanqueStateCommand = (value: string): value is PetanqueStateCommand =>
-    (PETANQUE_COMMANDS as readonly string[]).includes(value);
-
-  const resolvePetanqueAlphaPreset = (value: string): PetanqueAlphaPreset | null => {
-    const normalized = value.trim().toLowerCase();
-    if (normalized === "pointer") return "pointer";
-    if (normalized === "tirer") return "tirer";
-    return null;
-  };
-
-  const isTeleopConfigButtonTopic = (topic: string) =>
-    topic === TELEOP_CONFIG_SWAP_XY_TOPIC ||
-    topic === TELEOP_CONFIG_INVERT_LINEAR_X_TOPIC ||
-    topic === TELEOP_CONFIG_INVERT_LINEAR_Y_TOPIC ||
-    topic === TELEOP_CONFIG_INVERT_LINEAR_Z_TOPIC ||
-    topic === TELEOP_CONFIG_INVERT_ANGULAR_X_TOPIC ||
-    topic === TELEOP_CONFIG_INVERT_ANGULAR_Y_TOPIC ||
-    topic === TELEOP_CONFIG_INVERT_ANGULAR_Z_TOPIC ||
-    topic === TELEOP_CONFIG_RESET_TOPIC ||
-    topic === TELEOP_CONFIG_SAVE_PROFILE_TOPIC;
-
-  const getTeleopConfigButtonState = (topic: string): TeleopConfigButtonState | null => {
-    if (topic === TELEOP_CONFIG_SWAP_XY_TOPIC) {
-      return { active: swapXY, tone: swapXY ? "accent" : "default" };
-    }
-    if (topic === TELEOP_CONFIG_INVERT_LINEAR_X_TOPIC) {
-      return { active: invertLinearX, tone: invertLinearX ? "success" : "default" };
-    }
-    if (topic === TELEOP_CONFIG_INVERT_LINEAR_Y_TOPIC) {
-      return { active: invertLinearY, tone: invertLinearY ? "success" : "default" };
-    }
-    if (topic === TELEOP_CONFIG_INVERT_LINEAR_Z_TOPIC) {
-      return { active: invertLinearZ, tone: invertLinearZ ? "success" : "default" };
-    }
-    if (topic === TELEOP_CONFIG_INVERT_ANGULAR_X_TOPIC) {
-      return { active: invertAngularX, tone: invertAngularX ? "danger" : "default" };
-    }
-    if (topic === TELEOP_CONFIG_INVERT_ANGULAR_Y_TOPIC) {
-      return { active: invertAngularY, tone: invertAngularY ? "danger" : "default" };
-    }
-    if (topic === TELEOP_CONFIG_INVERT_ANGULAR_Z_TOPIC) {
-      return { active: invertAngularZ, tone: invertAngularZ ? "danger" : "default" };
-    }
-    if (topic === TELEOP_CONFIG_RESET_TOPIC) {
-      return { active: false, tone: "accent" };
-    }
-    if (topic === TELEOP_CONFIG_SAVE_PROFILE_TOPIC) {
-      return { active: false, tone: "success" };
-    }
-    return null;
-  };
-
-  const getTeleopConfigButtonLabel = (widget: Extract<CanvasWidget, { kind: "button" }>) => {
-    if (widget.topic === TELEOP_CONFIG_SWAP_XY_TOPIC) {
-      return swapXY ? "Swap XY ON" : "Swap XY OFF";
-    }
-    if (widget.topic === TELEOP_CONFIG_INVERT_LINEAR_X_TOPIC) {
-      return invertLinearX ? "LX -" : "LX +";
-    }
-    if (widget.topic === TELEOP_CONFIG_INVERT_LINEAR_Y_TOPIC) {
-      return invertLinearY ? "LY -" : "LY +";
-    }
-    if (widget.topic === TELEOP_CONFIG_INVERT_LINEAR_Z_TOPIC) {
-      return invertLinearZ ? "LZ -" : "LZ +";
-    }
-    if (widget.topic === TELEOP_CONFIG_INVERT_ANGULAR_X_TOPIC) {
-      return invertAngularX ? "AX -" : "AX +";
-    }
-    if (widget.topic === TELEOP_CONFIG_INVERT_ANGULAR_Y_TOPIC) {
-      return invertAngularY ? "AY -" : "AY +";
-    }
-    if (widget.topic === TELEOP_CONFIG_INVERT_ANGULAR_Z_TOPIC) {
-      return invertAngularZ ? "AZ -" : "AZ +";
-    }
-    return widget.label;
-  };
-
-  const triggerTeleopConfigButton = (topic: string) => {
-    if (topic === TELEOP_CONFIG_SWAP_XY_TOPIC) {
-      setSwapXY(!swapXY);
-      return true;
-    }
-    if (topic === TELEOP_CONFIG_INVERT_LINEAR_X_TOPIC) {
-      setInvertLinearX(!invertLinearX);
-      return true;
-    }
-    if (topic === TELEOP_CONFIG_INVERT_LINEAR_Y_TOPIC) {
-      setInvertLinearY(!invertLinearY);
-      return true;
-    }
-    if (topic === TELEOP_CONFIG_INVERT_LINEAR_Z_TOPIC) {
-      setInvertLinearZ(!invertLinearZ);
-      return true;
-    }
-    if (topic === TELEOP_CONFIG_INVERT_ANGULAR_X_TOPIC) {
-      setInvertAngularX(!invertAngularX);
-      return true;
-    }
-    if (topic === TELEOP_CONFIG_INVERT_ANGULAR_Y_TOPIC) {
-      setInvertAngularY(!invertAngularY);
-      return true;
-    }
-    if (topic === TELEOP_CONFIG_INVERT_ANGULAR_Z_TOPIC) {
-      setInvertAngularZ(!invertAngularZ);
-      return true;
-    }
-    if (topic === TELEOP_CONFIG_RESET_TOPIC) {
-      resetTeleopConfig();
-      return true;
-    }
-    if (topic === TELEOP_CONFIG_SAVE_PROFILE_TOPIC) {
-      saveTeleopProfile("explorer");
-      return true;
-    }
-    return false;
-  };
-
-  const getPetanqueButtonState = (command: PetanqueStateCommand) => {
-    if (command === "teleop") {
-      return {
-        disabled: false,
-        active: petanqueFlowStage === "teleop",
-        tone: "default" as const,
-      };
-    }
-    if (command === "activate_throw") {
-      return {
-        disabled: false,
-        active: petanqueFlowStage === "start_ready",
-        tone: "accent" as const,
-      };
-    }
-    if (command === "go_to_start") {
-      return {
-        disabled: petanqueFlowStage === "teleop",
-        active: petanqueFlowStage === "start_ready",
-        tone: "success" as const,
-      };
-    }
-    if (command === "throw") {
-      return {
-        disabled: petanqueFlowStage !== "start_ready",
-        active: false,
-        tone: "danger" as const,
-      };
-    }
-    if (command === "pick_up") {
-      return {
-        disabled: false,
-        active: false,
-        tone: "accent" as const,
-      };
-    }
-    if (command === "stop") {
-      return {
-        disabled: petanqueFlowStage !== "start_ready",
-        active: false,
-        tone: "danger" as const,
-      };
-    }
-    if (command === "test_loop") {
-      return {
-        disabled: false,
-        active: false,
-        tone: "accent" as const,
-      };
-    }
-    return {
-      disabled: false,
-      active: false,
-      tone: "danger" as const,
-    };
-  };
-
   const advancePetanqueFlow = (command: PetanqueStateCommand) => {
-    if (command === "teleop" || command === "stop") {
-      setPetanqueFlowStage("teleop");
-      return;
-    }
-    if (command === "activate_throw") {
-      // Current state machine flow auto-transitions activate_throw -> go_to_start.
-      // Mark UI as "start ready" immediately so START + HOME are both lit
-      // and the next action is directly THROW.
-      setPetanqueFlowStage("start_ready");
-      return;
-    }
-    if (command === "go_to_start") {
-      setPetanqueFlowStage("start_ready");
-      return;
-    }
-    if (command === "pick_up") {
-      // pick_up sequence returns to teleop mode in current state machine.
-      setPetanqueFlowStage("teleop");
-      return;
-    }
-    if (command === "throw") {
-      // Throwing controller remains active after throw; keep throw-ready state.
-      setPetanqueFlowStage("start_ready");
-      return;
-    }
-    if (command === "test_loop") {
-      // test_loop is independent from the throw-ready UI flow.
-      return;
+    const nextStage = resolvePetanqueFlowStageAfterCommand(command);
+    if (nextStage) {
+      setPetanqueFlowStage(nextStage);
     }
   };
 
@@ -983,12 +667,7 @@ export function ApplicationPage({
         isMeasureScreen && widget.topic === PLAY_PETANQUE_MEASURE_STATUS_TOPIC
           ? {
               ...widget,
-              text:
-                measureLastUpdatedAtMs != null
-                  ? `${measureStatusText} (updated ${new Date(
-                      measureLastUpdatedAtMs
-                    ).toLocaleTimeString()})`
-                  : measureStatusText,
+              text: formatMeasureStatusText(measureStatusText, measureLastUpdatedAtMs),
             }
           : widget;
       return (
@@ -1008,7 +687,7 @@ export function ApplicationPage({
         isMeasureScreen && widget.topic === PLAY_PETANQUE_MEASURE_VECTORS_TOPIC
           ? {
               ...widget,
-              text: formatMeasureVectorsText(),
+              text: formatMeasureVectorsText(measureVectorsJson),
             }
           : widget;
       return (
@@ -1036,7 +715,7 @@ export function ApplicationPage({
       const isMeasureButton =
         isMeasureScreen && isMeasureButtonTopic(widget.topic);
       const petanqueButtonState = isStateMachineButton && petanqueCommand
-        ? getPetanqueButtonState(petanqueCommand)
+        ? getPetanqueButtonState(petanqueCommand, petanqueFlowStage)
         : null;
       const petanqueAlphaPresetDisabled =
         isPetanqueAlphaPresetButton && petanqueFlowStage !== "start_ready";
@@ -1047,28 +726,37 @@ export function ApplicationPage({
             ? "danger"
             : widget.tone ?? "default";
       const teleopConfigButtonState = isTeleopConfigButton
-        ? getTeleopConfigButtonState(widget.topic)
+        ? getTeleopConfigButtonState(widget.topic, {
+            swapXY,
+            invertLinearX,
+            invertLinearY,
+            invertLinearZ,
+            invertAngularX,
+            invertAngularY,
+            invertAngularZ,
+          })
         : null;
-      const measureButtonActive =
-        widget.topic === PLAY_PETANQUE_MEASURE_VIEW_LIVE_TOPIC
-          ? measureViewMode === "live"
-          : widget.topic === PLAY_PETANQUE_MEASURE_VIEW_RESULT_TOPIC
-            ? measureViewMode === "result"
-            : false;
-      const measureButtonTone =
-        widget.topic === PLAY_PETANQUE_MEASURE_REQUEST_TOPIC
-          ? "success"
-          : widget.topic === PLAY_PETANQUE_MEASURE_CAPTURE_TOPIC
-            ? "accent"
-            : widget.topic === PLAY_PETANQUE_MEASURE_VIEW_RESULT_TOPIC && measureButtonActive
-              ? "accent"
-              : widget.topic === PLAY_PETANQUE_MEASURE_VIEW_LIVE_TOPIC && measureButtonActive
-                ? "accent"
-                : widget.tone ?? "default";
-      const measureButtonDisabled =
-        widget.topic === PLAY_PETANQUE_MEASURE_REQUEST_TOPIC && measureRequestPending;
+      const measureButtonState = isMeasureButton
+        ? getMeasureButtonState(
+            widget.topic,
+            measureViewMode,
+            measureRequestPending,
+            widget.tone ?? "default"
+          )
+        : null;
       const runtimeButtonWidget = isTeleopConfigButton
-        ? { ...widget, label: getTeleopConfigButtonLabel(widget) }
+        ? {
+            ...widget,
+            label: getTeleopConfigButtonLabel(widget.topic, widget.label, {
+              swapXY,
+              invertLinearX,
+              invertLinearY,
+              invertLinearZ,
+              invertAngularX,
+              invertAngularY,
+              invertAngularZ,
+            }),
+          }
         : isMeasureButton && widget.topic === PLAY_PETANQUE_MEASURE_REQUEST_TOPIC && measureRequestPending
           ? { ...widget, label: "Measuring..." }
           : widget;
@@ -1083,21 +771,21 @@ export function ApplicationPage({
           onLabelChange={NOOP_TEXT_CHANGE}
           disabled={
             isMeasureButton
-              ? measureButtonDisabled
+              ? (measureButtonState?.disabled ?? false)
               : isPetanqueAlphaPresetButton
                 ? petanqueAlphaPresetDisabled
               : (petanqueButtonState?.disabled ?? false)
           }
           active={
             isMeasureButton
-              ? measureButtonActive
+              ? (measureButtonState?.active ?? false)
               : isPetanqueAlphaPresetButton
                 ? false
               : (petanqueButtonState?.active ?? teleopConfigButtonState?.active ?? false)
           }
           tone={
             isMeasureButton
-              ? measureButtonTone
+              ? (measureButtonState?.tone ?? (widget.tone ?? "default"))
               : isPetanqueAlphaPresetButton
                 ? petanqueAlphaPresetTone
               : (
@@ -1109,77 +797,24 @@ export function ApplicationPage({
           }
           onTrigger={() => {
             if (isMeasureButton) {
-              if (widget.topic === PLAY_PETANQUE_MEASURE_VIEW_LIVE_TOPIC) {
-                setMeasureViewMode("live");
-                setMeasureStatusText("Live feed active");
-                markWidgetPulse(widget.id);
-                return;
-              }
-
-              if (widget.topic === PLAY_PETANQUE_MEASURE_VIEW_RESULT_TOPIC) {
-                setMeasureViewMode("result");
-                setMeasureStatusText(
-                  measureResultImageDataUrl === MEASURE_DEMO_HISTORY_ENTRY.imageDataUrl
-                    ? "Showing demo measure image"
-                    : measureResultImageDataUrl
-                      ? "Showing cached measure result"
-                      : "No measure result available yet"
-                );
-                markWidgetPulse(widget.id);
-                return;
-              }
-
-              if (widget.topic === PLAY_PETANQUE_MEASURE_CAPTURE_TOPIC) {
-                const streamWidgetId = resolveMeasureStreamWidgetId();
-                const captured =
-                  streamWidgetId == null
-                    ? null
-                    : captureImageDataUrlFromStreamWidget(streamWidgetId);
-                if (!captured) {
-                  setMeasureStatusText("Capture failed: no visible frame");
-                  markWidgetPulse(widget.id);
-                  return;
+              const handled = triggerMeasureButton(
+                widget.topic,
+                widget.id,
+                {
+                  capturedMeasureImageDataUrl,
+                  measureResultImageDataUrl,
+                  widgets,
+                },
+                {
+                  setMeasureViewMode,
+                  setMeasureStatusText,
+                  setCapturedMeasureImageDataUrl,
+                  setMeasureRequestPending,
+                  markWidgetPulse,
+                  sendMessage: (message) => wsClient.send(message),
                 }
-                setCapturedMeasureImageDataUrl(captured);
-                setMeasureStatusText("Image captured");
-                markWidgetPulse(widget.id);
-                return;
-              }
-
-              if (widget.topic === PLAY_PETANQUE_MEASURE_REQUEST_TOPIC) {
-                let imageToSend = capturedMeasureImageDataUrl;
-                if (!imageToSend) {
-                  const streamWidgetId = resolveMeasureStreamWidgetId();
-                  imageToSend =
-                    streamWidgetId == null
-                      ? null
-                      : captureImageDataUrlFromStreamWidget(streamWidgetId);
-                }
-                if (!imageToSend) {
-                  setMeasureStatusText(
-                    "Measure failed: capture an image first or switch to live feed"
-                  );
-                  markWidgetPulse(widget.id);
-                  return;
-                }
-                setCapturedMeasureImageDataUrl(imageToSend);
-                wsClient.send({
-                  type: "measure_request",
-                  image_data_url: imageToSend,
-                });
-                setMeasureRequestPending(true);
-                setMeasureStatusText("Measure request sent");
-                markWidgetPulse(widget.id);
-                return;
-              }
-
-              if (widget.topic === PLAY_PETANQUE_MEASURE_REFRESH_TOPIC) {
-                wsClient.send({ type: "measure_refresh" });
-                setMeasureViewMode("result");
-                setMeasureStatusText("Requested latest measure result");
-                markWidgetPulse(widget.id);
-                return;
-              }
+              );
+              if (handled) return;
             }
 
             if (isPetanqueAlphaPresetButton && petanqueAlphaPreset) {
@@ -1197,7 +832,29 @@ export function ApplicationPage({
             }
 
             if (isTeleopConfigButton) {
-              const changed = triggerTeleopConfigButton(widget.topic);
+              const changed = triggerTeleopConfigButton(
+                widget.topic,
+                {
+                  swapXY,
+                  invertLinearX,
+                  invertLinearY,
+                  invertLinearZ,
+                  invertAngularX,
+                  invertAngularY,
+                  invertAngularZ,
+                },
+                {
+                  setSwapXY,
+                  setInvertLinearX,
+                  setInvertLinearY,
+                  setInvertLinearZ,
+                  setInvertAngularX,
+                  setInvertAngularY,
+                  setInvertAngularZ,
+                  resetTeleopConfig,
+                  saveTeleopProfile,
+                }
+              );
               if (changed) {
                 markWidgetPulse(widget.id);
               }
@@ -1385,33 +1042,26 @@ export function ApplicationPage({
 
     if (widget.kind === "max-velocity") {
       const widgetValue =
-        widget.topic === TELEOP_CONFIG_TRANSLATION_GAIN_TOPIC
-          ? translationGain
-          : widget.topic === TELEOP_CONFIG_ROTATION_GAIN_TOPIC
-            ? rotationGain
-            : isTeleopLinearScaleXTopic(widget.topic)
-              ? scaleX
-              : isTeleopLinearScaleYTopic(widget.topic)
-                ? scaleY
-                : isTeleopLinearScaleZTopic(widget.topic)
-                  ? scaleZ
-                  : widget.topic === TELEOP_CONFIG_ANGULAR_SCALE_X_TOPIC
-                    ? angularScaleX
-                    : widget.topic === TELEOP_CONFIG_ANGULAR_SCALE_Y_TOPIC
-                      ? angularScaleY
-                      : widget.topic === TELEOP_CONFIG_ANGULAR_SCALE_Z_TOPIC
-                        ? angularScaleZ
-            : typeof maxVelocityWidgetValues[widget.id] === "number"
-              ? maxVelocityWidgetValues[widget.id]
-              : widget.topic === PETANQUE_TOTAL_DURATION_TOPIC
-                ? PETANQUE_DEFAULT_TOTAL_DURATION_S
-                : widget.topic === PETANQUE_ANGLE_TOPIC
-                  ? 0
-                  : widget.topic === PETANQUE_ALPHA_TOPIC
-                    ? PETANQUE_DEFAULT_ALPHA
-                  : widget.topic === "/cmd/max_velocity"
-                    ? maxVelocity
-                    : 1;
+        resolveTeleopConfigScalarValue(widget.topic, {
+          maxVelocity,
+          translationGain,
+          rotationGain,
+          scaleX,
+          scaleY,
+          scaleZ,
+          angularScaleX,
+          angularScaleY,
+          angularScaleZ,
+        }) ??
+        (typeof maxVelocityWidgetValues[widget.id] === "number"
+          ? maxVelocityWidgetValues[widget.id]
+          : widget.topic === PETANQUE_TOTAL_DURATION_TOPIC
+            ? PETANQUE_DEFAULT_TOTAL_DURATION_S
+            : widget.topic === PETANQUE_ANGLE_TOPIC
+              ? 0
+              : widget.topic === PETANQUE_ALPHA_TOPIC
+                ? PETANQUE_DEFAULT_ALPHA
+                : 1);
       const reverseDirection =
         widget.reverseDirection ??
         widget.topic === PETANQUE_TOTAL_DURATION_TOPIC;
@@ -1487,33 +1137,17 @@ export function ApplicationPage({
               ...prev,
               [widget.id]: resolvedNextValue,
             }));
-            if (widget.topic === "/cmd/max_velocity") {
-              setMaxVelocity(resolvedNextValue);
-            }
-            if (widget.topic === TELEOP_CONFIG_TRANSLATION_GAIN_TOPIC) {
-              setTranslationGain(resolvedNextValue);
-            }
-            if (widget.topic === TELEOP_CONFIG_ROTATION_GAIN_TOPIC) {
-              setRotationGain(resolvedNextValue);
-            }
-            if (isTeleopLinearScaleXTopic(widget.topic)) {
-              setScaleX(resolvedNextValue);
-            }
-            if (isTeleopLinearScaleYTopic(widget.topic)) {
-              setScaleY(resolvedNextValue);
-            }
-            if (isTeleopLinearScaleZTopic(widget.topic)) {
-              setScaleZ(resolvedNextValue);
-            }
-            if (widget.topic === TELEOP_CONFIG_ANGULAR_SCALE_X_TOPIC) {
-              setAngularScaleX(resolvedNextValue);
-            }
-            if (widget.topic === TELEOP_CONFIG_ANGULAR_SCALE_Y_TOPIC) {
-              setAngularScaleY(resolvedNextValue);
-            }
-            if (widget.topic === TELEOP_CONFIG_ANGULAR_SCALE_Z_TOPIC) {
-              setAngularScaleZ(resolvedNextValue);
-            }
+            applyTeleopConfigScalarValue(widget.topic, resolvedNextValue, {
+              setMaxVelocity,
+              setTranslationGain,
+              setRotationGain,
+              setScaleX,
+              setScaleY,
+              setScaleZ,
+              setAngularScaleX,
+              setAngularScaleY,
+              setAngularScaleZ,
+            });
             if (widget.topic === PETANQUE_TOTAL_DURATION_TOPIC) {
               wsClient.send({
                 type: "petanque_cfg",
@@ -1608,11 +1242,7 @@ export function ApplicationPage({
               streamUrl: measureResultImageDataUrl ?? "",
               showWebcamPicker: false,
               overlayText:
-                measureResultImageDataUrl === MEASURE_DEMO_HISTORY_ENTRY.imageDataUrl
-                  ? "demo measure"
-                  : measureResultImageDataUrl
-                    ? "latest measure"
-                    : "no measured image yet",
+                resolveMeasureResultOverlayText(measureResultImageDataUrl),
             }
           : widget;
       const url =
