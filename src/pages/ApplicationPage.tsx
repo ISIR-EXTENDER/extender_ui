@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 
 import { loadApplicationsFromLocalStorage } from "../app/applications";
 import { resolveApplicationRuntimePlugins } from "../app/runtime/registry";
+import { useApplicationRuntimeState } from "../app/runtime/useApplicationRuntimeState";
 import type { CanvasRect } from "../components/layout/CanvasItem";
 import {
   ActionButtonWidget,
@@ -38,15 +39,7 @@ import {
 import { wsClient } from "../services/wsClient";
 import { useTeleopStore } from "../store/teleopStore";
 import { useUiStore } from "../store/uiStore";
-import {
-  PETANQUE_TOTAL_DURATION_TOPIC,
-  isLocalMaxVelocityTopic,
-} from "./applicationTopics";
-import {
-  MEASURE_DEMO_HISTORY_ENTRY,
-  type MeasureResultHistoryEntry,
-  type MeasureViewMode,
-} from "../apps/petanque/measureRuntime";
+import { isLocalMaxVelocityTopic } from "./applicationTopics";
 import {
   applyTeleopConfigScalarValue,
   getTeleopConfigButtonLabel,
@@ -55,19 +48,6 @@ import {
   resolveTeleopConfigScalarValue,
   triggerTeleopConfigButton,
 } from "./applicationTeleopConfig";
-import {
-  resolvePetanqueFlowStageAfterCommand,
-  type PetanqueFlowStage,
-  type PetanqueStateCommand,
-} from "../apps/petanque/buttonRuntime";
-import {
-  PETANQUE_ALPHA_MAX,
-  PETANQUE_ALPHA_SAFE_MAX,
-  PETANQUE_DEFAULT_TOTAL_DURATION_S,
-  buildPetanqueStateCommandMessage,
-  clampPetanqueDuration,
-  syncPetanqueAlphaWidgets,
-} from "../apps/petanque/controlRuntime";
 
 type ApplicationPageProps = {
   applicationId: string;
@@ -166,30 +146,6 @@ export function ApplicationPage({
   const [freshnessClock, setFreshnessClock] = useState<number>(() => Date.now());
   const [rosbagRecording, setRosbagRecording] = useState(false);
   const [rosbagStatus, setRosbagStatus] = useState("idle");
-  const [petanqueFlowStage, setPetanqueFlowStage] = useState<PetanqueFlowStage>("teleop");
-  const [maxVelocityWidgetValues, setMaxVelocityWidgetValues] = useState<Record<string, number>>({});
-  const [throwDrawWidgetValues, setThrowDrawWidgetValues] = useState<
-    Record<string, { angle: number; duration: number }>
-  >({});
-  const [throwDrawAlphaValues, setThrowDrawAlphaValues] = useState<Record<string, number>>({});
-  const [measureViewMode, setMeasureViewMode] = useState<MeasureViewMode>("live");
-  const [capturedMeasureImageDataUrl, setCapturedMeasureImageDataUrl] = useState<string | null>(
-    null
-  );
-  const [measureResultImageDataUrl, setMeasureResultImageDataUrl] = useState<string | null>(
-    () => MEASURE_DEMO_HISTORY_ENTRY.imageDataUrl
-  );
-  const [measureVectorsJson, setMeasureVectorsJson] = useState<string | null>(
-    () => MEASURE_DEMO_HISTORY_ENTRY.vectorsJson
-  );
-  const [measureStatusText, setMeasureStatusText] = useState("Live feed active (demo available)");
-  const [measureLastUpdatedAtMs, setMeasureLastUpdatedAtMs] = useState<number | null>(null);
-  const [measureRequestPending, setMeasureRequestPending] = useState(false);
-  const [measureResultHistory, setMeasureResultHistory] = useState<MeasureResultHistoryEntry[]>([
-    MEASURE_DEMO_HISTORY_ENTRY,
-  ]);
-  const hasSentPetanqueDurationDefaultRef = useRef(false);
-  const alphaUnsafeValidatedRef = useRef(false);
   const canvasViewportRef = useRef<HTMLDivElement | null>(null);
   const [canvasViewportSize, setCanvasViewportSize] = useState<{ width: number; height: number }>({
     width: 0,
@@ -262,29 +218,6 @@ export function ApplicationPage({
   }, [configurations]);
 
   useEffect(() => {
-    if (wsStatus !== "connected") {
-      hasSentPetanqueDurationDefaultRef.current = false;
-      return;
-    }
-
-    if (activeScreenId !== "petanque") return;
-    if (hasSentPetanqueDurationDefaultRef.current) return;
-
-    const hasDurationWidget = widgets.some(
-      (widget) =>
-        widget.kind === "max-velocity" &&
-        widget.topic === PETANQUE_TOTAL_DURATION_TOPIC
-    );
-    if (!hasDurationWidget) return;
-
-    wsClient.send({
-      type: "petanque_cfg",
-      total_duration: clampPetanqueDuration(PETANQUE_DEFAULT_TOTAL_DURATION_S),
-    });
-    hasSentPetanqueDurationDefaultRef.current = true;
-  }, [activeScreenId, widgets, wsStatus]);
-
-  useEffect(() => {
     if (!activeScreenId) return;
     if (routeScreenId === activeScreenId) return;
     onNavigateToScreen(activeScreenId);
@@ -304,126 +237,20 @@ export function ApplicationPage({
       [widgetId]: Date.now(),
     }));
   }, []);
-  const setPetanqueAlpha = useCallback(
-    (nextValue: number) => {
-      const clamped = Math.max(0, Math.min(PETANQUE_ALPHA_MAX, nextValue));
-      if (clamped <= PETANQUE_ALPHA_SAFE_MAX) {
-        alphaUnsafeValidatedRef.current = false;
-      }
-      setThrowDrawAlphaValues((prev) =>
-        syncPetanqueAlphaWidgets(widgets, clamped, prev, maxVelocityWidgetValues)
-          .nextThrowDrawAlphaValues
-      );
-      setMaxVelocityWidgetValues((prev) =>
-        syncPetanqueAlphaWidgets(widgets, clamped, throwDrawAlphaValues, prev)
-          .nextMaxVelocityWidgetValues
-      );
-      wsClient.send({
-        type: "petanque_cfg",
-        alpha: clamped,
-      });
-    },
-    [maxVelocityWidgetValues, throwDrawAlphaValues, widgets]
-  );
-  const advancePetanqueFlow = useCallback((command: PetanqueStateCommand) => {
-    const nextStage = resolvePetanqueFlowStageAfterCommand(command);
-    if (nextStage) {
-      setPetanqueFlowStage(nextStage);
-    }
-  }, []);
-
-  const sendPetanqueStateCommand = useCallback(
-    (command: PetanqueStateCommand) => {
-      wsClient.send(buildPetanqueStateCommandMessage(command));
-      advancePetanqueFlow(command);
-    },
-    [advancePetanqueFlow]
-  );
+  const {
+    runtimePluginState,
+    runtimePluginActions,
+    setMaxVelocityWidgetValues,
+  } = useApplicationRuntimeState({
+    activeApplication,
+    activeScreenId,
+    activeRuntimePlugins,
+    widgets,
+    wsStatus,
+    markWidgetPulse,
+  });
   const isWidgetFresh = (widgetId: string) =>
     freshnessClock - (widgetPulseMap[widgetId] ?? 0) <= TOPIC_FRESHNESS_MS;
-  const runtimePluginState = useMemo(
-    () => ({
-      petanqueFlowStage,
-      measureViewMode,
-      measureRequestPending,
-      measureResultImageDataUrl,
-      capturedMeasureImageDataUrl,
-      measureResultHistory,
-      measureVectorsJson,
-      measureStatusText,
-      measureLastUpdatedAtMs,
-      maxVelocityWidgetValues,
-      throwDrawWidgetValues,
-      throwDrawAlphaValues,
-      petanqueAlphaUnsafeValidated: alphaUnsafeValidatedRef.current,
-    }),
-    [
-      capturedMeasureImageDataUrl,
-      maxVelocityWidgetValues,
-      measureLastUpdatedAtMs,
-      measureRequestPending,
-      measureResultHistory,
-      measureResultImageDataUrl,
-      measureStatusText,
-      measureVectorsJson,
-      measureViewMode,
-      petanqueFlowStage,
-      throwDrawAlphaValues,
-      throwDrawWidgetValues,
-    ]
-  );
-  const runtimePluginActions = useMemo(
-    () => ({
-      setMeasureResultImageDataUrl,
-      setMeasureVectorsJson,
-      setMeasureLastUpdatedAtMs,
-      setMeasureStatusText,
-      setMeasureRequestPending,
-      setMeasureViewMode,
-      setMeasureResultHistory,
-      setCapturedMeasureImageDataUrl,
-      setPetanqueFlowStage,
-      setPetanqueAlpha,
-      setPetanqueAlphaUnsafeValidated: (value: boolean) => {
-        alphaUnsafeValidatedRef.current = value;
-      },
-      setMaxVelocityWidgetValues,
-      setThrowDrawWidgetValues,
-      setThrowDrawAlphaValues,
-      confirmAction: (message: string) => window.confirm(message),
-      sendPetanqueStateCommand,
-      markWidgetPulse,
-      sendMessage: (payload: object) => wsClient.send(payload),
-    }),
-    [markWidgetPulse, sendPetanqueStateCommand, setPetanqueAlpha]
-  );
-
-  useEffect(() => {
-    const unsubscribe = wsClient.onMessage((message) => {
-      for (const plugin of activeRuntimePlugins) {
-        const handled = plugin.handleIncomingMessage?.({
-          application: activeApplication,
-          activeScreenId,
-          message,
-          widgets,
-          state: runtimePluginState,
-          actions: runtimePluginActions,
-        });
-        if (handled) return;
-      }
-    });
-
-    return () => {
-      unsubscribe();
-    };
-  }, [
-    activeApplication,
-    activeRuntimePlugins,
-    activeScreenId,
-    runtimePluginActions,
-    runtimePluginState,
-    widgets,
-  ]);
 
   const allowedScreenIds = useMemo(
     () => new Set(activeApplication?.screenIds ?? []),
