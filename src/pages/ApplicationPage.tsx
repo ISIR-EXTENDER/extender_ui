@@ -1544,6 +1544,30 @@ export function ApplicationPage({
                 alpha: resolvedNextValue,
               });
             }
+            if (
+              widget.topic !== "/cmd/max_velocity" &&
+              widget.topic !== TELEOP_CONFIG_TRANSLATION_GAIN_TOPIC &&
+              widget.topic !== TELEOP_CONFIG_ROTATION_GAIN_TOPIC &&
+              widget.topic !== TELEOP_CONFIG_LINEAR_SCALE_X_TOPIC &&
+              widget.topic !== TELEOP_CONFIG_LEGACY_SCALE_X_TOPIC &&
+              widget.topic !== TELEOP_CONFIG_LINEAR_SCALE_Y_TOPIC &&
+              widget.topic !== TELEOP_CONFIG_LEGACY_SCALE_Y_TOPIC &&
+              widget.topic !== TELEOP_CONFIG_LINEAR_SCALE_Z_TOPIC &&
+              widget.topic !== TELEOP_CONFIG_LEGACY_SCALE_Z_TOPIC &&
+              widget.topic !== TELEOP_CONFIG_ANGULAR_SCALE_X_TOPIC &&
+              widget.topic !== TELEOP_CONFIG_ANGULAR_SCALE_Y_TOPIC &&
+              widget.topic !== TELEOP_CONFIG_ANGULAR_SCALE_Z_TOPIC &&
+              widget.topic !== PETANQUE_TOTAL_DURATION_TOPIC &&
+              widget.topic !== PETANQUE_ANGLE_TOPIC &&
+              widget.topic !== PETANQUE_ALPHA_TOPIC
+            ) {
+              wsClient.send({
+                type: "ui_scalar",
+                topic: widget.topic,
+                value: resolvedNextValue,
+                widget_id: widget.id,
+              });
+            }
             markWidgetPulse(widget.id);
           }}
         />
