@@ -1,13 +1,14 @@
 import { useEffect } from "react";
 
 import { useUiStore } from "../store/uiStore";
+import { readStorageItem, writeStorageItem } from "../utils/browserStorage";
 
 export function useThemeMode() {
   const themeMode = useUiStore((s) => s.themeMode);
   const setThemeMode = useUiStore((s) => s.setThemeMode);
 
   useEffect(() => {
-    const stored = localStorage.getItem("themeMode");
+    const stored = readStorageItem("themeMode");
     if (stored === "light" || stored === "dark" || stored === "system") {
       setThemeMode(stored);
     }
@@ -20,6 +21,6 @@ export function useThemeMode() {
     } else {
       root.setAttribute("data-theme", themeMode);
     }
-    localStorage.setItem("themeMode", themeMode);
+    writeStorageItem("themeMode", themeMode);
   }, [themeMode]);
 }

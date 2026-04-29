@@ -7,6 +7,7 @@ import {
 } from "./canvasSettings";
 import { ADMIN_DEMO_SCREEN_IDS } from "../../app/demoDefaults";
 import { createWidgetFromCatalogType, type WidgetCatalogType } from "./widgetCatalog";
+import { readJsonStorage, writeJsonStorage } from "../../utils/browserStorage";
 
 export type PoseTopicValue =
   | { kind: "scalar"; value: number }
@@ -2253,10 +2254,7 @@ const applyConfigurationMigrations = (
   );
 
 export function loadConfigurationsFromLocalStorage(): WidgetConfiguration[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return cloneDefaultConfigurations();
-    const parsed = JSON.parse(raw);
+  return readJsonStorage(STORAGE_KEY, cloneDefaultConfigurations(), (parsed) => {
     if (!Array.isArray(parsed)) return cloneDefaultConfigurations();
     const sanitized = parsed
       .filter((item): item is WidgetConfiguration => {
@@ -2271,13 +2269,11 @@ export function loadConfigurationsFromLocalStorage(): WidgetConfiguration[] {
         updatedAt: typeof item.updatedAt === "string" ? item.updatedAt : new Date().toISOString(),
       }));
     return applyConfigurationMigrations(sanitized);
-  } catch {
-    return cloneDefaultConfigurations();
-  }
+  });
 }
 
 export function persistConfigurationsToLocalStorage(configurations: WidgetConfiguration[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(configurations));
+  writeJsonStorage(STORAGE_KEY, configurations);
 }
 
 export function upsertConfiguration(
