@@ -29,6 +29,7 @@ import {
   ThrowDrawWidget,
   TextareaWidget,
   TextWidget,
+  TogglePublisherWidget,
   WIDGET_CATALOG,
   cloneWidgets,
   createWidgetFromCatalogType,
@@ -1523,6 +1524,61 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
       );
     }
 
+    if (widget.kind === "toggle-publisher") {
+      return (
+        <TogglePublisherWidget
+          key={widget.id}
+          widget={widget}
+          selected={selected}
+          onSelect={() => setSelectedWidgetId(widget.id)}
+          onRectChange={(next) => handleWidgetRectChange(widget.id, next)}
+          onLabelChange={(nextLabel) =>
+            updateWidget(widget.id, (current) =>
+              current.kind === "toggle-publisher" ? { ...current, label: nextLabel } : current
+            )
+          }
+          onActivate={() => {
+            if (widget.outputMode === "boolean") {
+              wsClient.send({
+                type: "ui_bool",
+                topic: widget.topic,
+                value: true,
+                widget_id: widget.id,
+              });
+            } else {
+              wsClient.send({
+                type: "ui_scalar",
+                topic: widget.topic,
+                value: 1,
+                widget_id: widget.id,
+              });
+            }
+            markWidgetPulse(widget.id);
+            setStatusMessage(`Toggle "${widget.label}" published ON.`);
+          }}
+          onDeactivate={() => {
+            if (widget.outputMode === "boolean") {
+              wsClient.send({
+                type: "ui_bool",
+                topic: widget.topic,
+                value: false,
+                widget_id: widget.id,
+              });
+            } else {
+              wsClient.send({
+                type: "ui_scalar",
+                topic: widget.topic,
+                value: 0,
+                widget_id: widget.id,
+              });
+            }
+            markWidgetPulse(widget.id);
+            setStatusMessage(`Toggle "${widget.label}" published OFF.`);
+          }}
+        />
+      );
+    }
+
     if (widget.kind === "stream-display") {
       const url =
         widget.source === "camera"
@@ -2972,6 +3028,47 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
                       <div className="controls-hint">
                         Sends `open` and `close` commands to the backend bridge.
                       </div>
+                    </>
+                  ) : selectedWidget.kind === "toggle-publisher" ? (
+                    <>
+                      <div className="controls-property-title">Toggle Publisher</div>
+                      <div className="controls-hint">
+                        Publishes ON/OFF through the configured ROS topic.
+                      </div>
+                      <label className="controls-field">
+                        <span>Output Topic</span>
+                        <input
+                          className="editor-input"
+                          value={selectedWidget.topic}
+                          onChange={(event) =>
+                            updateWidget(selectedWidget.id, (current) =>
+                              current.kind === "toggle-publisher"
+                                ? { ...current, topic: event.target.value }
+                                : current
+                            )
+                          }
+                        />
+                      </label>
+                      <label className="controls-field">
+                        <span>Output Mode</span>
+                        <select
+                          className="editor-input"
+                          value={selectedWidget.outputMode}
+                          onChange={(event) =>
+                            updateWidget(selectedWidget.id, (current) =>
+                              current.kind === "toggle-publisher"
+                                ? {
+                                    ...current,
+                                    outputMode: event.target.value === "boolean" ? "boolean" : "numeric",
+                                  }
+                                : current
+                            )
+                          }
+                        >
+                          <option value="numeric">numeric 0 / 1</option>
+                          <option value="boolean">boolean true / false</option>
+                        </select>
+                      </label>
                     </>
                   ) : selectedWidget.kind === "stream-display" ? (
                     <>

@@ -16,6 +16,7 @@ export {
   ThrowDrawWidget,
   TextareaWidget,
   TextWidget,
+  TogglePublisherWidget,
 } from "./AuxWidgets";
 export {
   SavePoseButtonWidget,
@@ -39,6 +40,8 @@ export {
   type MaxVelocityWidget as MaxVelocityWidgetModel,
   type GripperControlWidget as GripperControlWidgetModel,
   type MagnetControlWidget as MagnetControlWidgetModel,
+  type TogglePublisherWidget as TogglePublisherWidgetModel,
+  type TogglePublisherOutputMode,
   type StreamDisplayWidget as StreamDisplayWidgetModel,
   type ThrowDrawWidget as ThrowDrawWidgetModel,
   type CurvesWidget as CurvesWidgetModel,
