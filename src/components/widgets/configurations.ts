@@ -206,6 +206,12 @@ export const DEFAULT_DEMO_CONFIGURATIONS: WidgetConfiguration[] = [
       showAdvancedControls: false,
       rect: { w: 188, h: 92 },
     }),
+    createDemoWidget("sandbox-toggle-output", "toggle-publisher", 1048, 17, {
+      label: "Digital Output",
+      topic: "/sandbox/digital_output",
+      outputMode: "numeric",
+      rect: { w: 188, h: 92 },
+    }),
   ]),
 
   createDemoConfiguration("live_teleop", [
@@ -1804,6 +1810,33 @@ const ensurePetanqueGripperControl = (
   });
 };
 
+const ensureSandboxTogglePublisher = (
+  configurations: WidgetConfiguration[]
+): WidgetConfiguration[] => {
+  const latestSandbox = DEFAULT_DEMO_CONFIGURATIONS.find(
+    (configuration) => configuration.name === "sandbox_control"
+  );
+  if (!latestSandbox) return configurations;
+
+  const toggleTemplate = latestSandbox.widgets.find(
+    (widget) => widget.id === "sandbox-toggle-output"
+  );
+  if (!toggleTemplate) return configurations;
+
+  return configurations.map((configuration) => {
+    if (configuration.name !== "sandbox_control") return configuration;
+    if (configuration.widgets.some((widget) => widget.id === "sandbox-toggle-output")) {
+      return configuration;
+    }
+
+    return {
+      ...configuration,
+      widgets: [...configuration.widgets, cloneWidgets([toggleTemplate])[0]],
+      updatedAt: new Date().toISOString(),
+    };
+  });
+};
+
 const removePetanqueLegacyNavigationButtons = (
   configurations: WidgetConfiguration[]
 ): WidgetConfiguration[] => {
@@ -2231,14 +2264,16 @@ const applyConfigurationMigrations = (
         ensurePlayPetanqueLancerActionButtons(
           normalizePetanqueSliderDisplayOptions(
             normalizePetanqueSliderRanges(
-              ensurePetanqueGripperControl(
-                ensurePetanqueElectromagnetControl(
-                  removePetanqueLegacyNavigationButtons(
-                    migratePetanqueTeleopConfigLayout(
-                      disablePetanqueViewerWidget(
-                        migrateLegacyPetanque(
-                          migrateLegacyDefaultControl(
-                            mergeMissingDemoConfigurations(configurations)
+              ensureSandboxTogglePublisher(
+                ensurePetanqueGripperControl(
+                  ensurePetanqueElectromagnetControl(
+                    removePetanqueLegacyNavigationButtons(
+                      migratePetanqueTeleopConfigLayout(
+                        disablePetanqueViewerWidget(
+                          migrateLegacyPetanque(
+                            migrateLegacyDefaultControl(
+                              mergeMissingDemoConfigurations(configurations)
+                            )
                           )
                         )
                       )

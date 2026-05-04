@@ -19,6 +19,7 @@ import {
   StreamDisplayWidget,
   TextareaWidget,
   TextWidget,
+  TogglePublisherWidget,
   ThrowDrawWidget,
   type CanvasWidget,
   type WidgetConfiguration,
@@ -588,6 +589,55 @@ export function RuntimeWidgetRenderer({
             payload: widget.offPayload,
             widget_id: widget.id,
           });
+          markWidgetPulse(widget.id);
+        }}
+      />
+    );
+  }
+
+  if (widget.kind === "toggle-publisher") {
+    return (
+      <TogglePublisherWidget
+        key={widget.id}
+        widget={widget}
+        selected={false}
+        onSelect={NOOP_SELECT}
+        onRectChange={noopRectChange}
+        onLabelChange={noopTextChange}
+        onActivate={() => {
+          if (widget.outputMode === "boolean") {
+            wsClient.send({
+              type: "ui_bool",
+              topic: widget.topic,
+              value: true,
+              widget_id: widget.id,
+            });
+          } else {
+            wsClient.send({
+              type: "ui_scalar",
+              topic: widget.topic,
+              value: 1,
+              widget_id: widget.id,
+            });
+          }
+          markWidgetPulse(widget.id);
+        }}
+        onDeactivate={() => {
+          if (widget.outputMode === "boolean") {
+            wsClient.send({
+              type: "ui_bool",
+              topic: widget.topic,
+              value: false,
+              widget_id: widget.id,
+            });
+          } else {
+            wsClient.send({
+              type: "ui_scalar",
+              topic: widget.topic,
+              value: 0,
+              widget_id: widget.id,
+            });
+          }
           markWidgetPulse(widget.id);
         }}
       />

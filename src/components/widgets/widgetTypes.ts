@@ -10,6 +10,7 @@ export type TextAlign = "left" | "center" | "right";
 export type StreamSource = "camera" | "rviz" | "visualization" | "webcam";
 export type StreamFitMode = "contain" | "cover";
 export type LogLevelFilter = "all" | "info" | "warn" | "error";
+export type TogglePublisherOutputMode = "numeric" | "boolean";
 
 export type WidgetKind =
   | "joystick"
@@ -26,6 +27,7 @@ export type WidgetKind =
   | "max-velocity"
   | "gripper-control"
   | "magnet-control"
+  | "toggle-publisher"
   | "stream-display"
   | "throw-draw"
   | "drink"
@@ -145,6 +147,11 @@ export type MagnetControlWidget = WidgetBase & {
   offPayload: string;
 };
 
+export type TogglePublisherWidget = WidgetBase & {
+  kind: "toggle-publisher";
+  outputMode: TogglePublisherOutputMode;
+};
+
 export type StreamDisplayWidget = WidgetBase & {
   kind: "stream-display";
   source: StreamSource;
@@ -210,6 +217,7 @@ export type CanvasWidget =
   | MaxVelocityWidget
   | GripperControlWidget
   | MagnetControlWidget
+  | TogglePublisherWidget
   | StreamDisplayWidget
   | ThrowDrawWidget
   | DrinkWidget

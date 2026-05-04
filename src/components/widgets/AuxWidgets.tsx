@@ -31,6 +31,7 @@ import type {
   ThrowDrawWidget as ThrowDrawWidgetModel,
   TextareaWidget as TextareaWidgetModel,
   TextWidget as TextWidgetModel,
+  TogglePublisherWidget as TogglePublisherWidgetModel,
   WidgetIcon,
 } from "./widgetTypes";
 
@@ -135,6 +136,14 @@ type StreamDisplayWidgetProps = BaseWidgetProps & {
   widget: StreamDisplayWidgetModel;
   onLabelChange: (nextLabel: string) => void;
   statusText: string;
+};
+
+type TogglePublisherWidgetProps = BaseWidgetProps & {
+  widget: TogglePublisherWidgetModel;
+  onLabelChange: (nextLabel: string) => void;
+  onActivate: () => void;
+  onDeactivate: () => void;
+  activeState?: "on" | "off" | null;
 };
 
 type DrinkWidgetProps = BaseWidgetProps & {
@@ -1376,6 +1385,66 @@ export function MagnetControlWidget({
   const activeSide = activeState ?? localActiveSide;
   const isOn = activeSide === "on";
   const statusLabel = isOn ? "ON" : activeSide === "off" ? "OFF" : "Unknown";
+
+  return (
+    <CanvasItem
+      x={widget.rect.x}
+      y={widget.rect.y}
+      w={widget.rect.w}
+      h={widget.rect.h}
+      onChange={onRectChange}
+      onSelect={onSelect}
+      selected={selected}
+      minSize={{ w: 180, h: 92 }}
+      className="controls-magnet-item"
+    >
+      <div className="controls-magnet-widget">
+        <div className="controls-magnet-title">
+          <InlineEditableText value={widget.label} onCommit={onLabelChange} className="controls-inline-label" />
+        </div>
+        <div className="controls-switch-row">
+          <div className="controls-switch-meta" aria-live="polite">
+            <span className="controls-switch-caption">State</span>
+            <span className="controls-switch-state">{statusLabel}</span>
+          </div>
+          <button
+            type="button"
+            className={`controls-toggle-switch ${isOn ? "is-on" : "is-off"}`.trim()}
+            role="switch"
+            aria-checked={isOn}
+            aria-label={`${widget.label} toggle`}
+            onClick={() => {
+              if (isOn) {
+                setLocalActiveSide("off");
+                onDeactivate();
+                return;
+              }
+              setLocalActiveSide("on");
+              onActivate();
+            }}
+          >
+            <span className="controls-toggle-switch-thumb" />
+          </button>
+        </div>
+      </div>
+    </CanvasItem>
+  );
+}
+
+export function TogglePublisherWidget({
+  widget,
+  selected,
+  onSelect,
+  onRectChange,
+  onLabelChange,
+  onActivate,
+  onDeactivate,
+  activeState,
+}: TogglePublisherWidgetProps) {
+  const [localActiveSide, setLocalActiveSide] = useState<"on" | "off" | null>(null);
+  const resolvedActiveSide = activeState ?? localActiveSide;
+  const isOn = resolvedActiveSide === "on";
+  const statusLabel = isOn ? "ON" : resolvedActiveSide === "off" ? "OFF" : "Unknown";
 
   return (
     <CanvasItem

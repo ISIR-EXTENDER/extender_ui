@@ -19,6 +19,7 @@ import type {
   SliderWidget,
   TextareaWidget,
   TextWidget,
+  TogglePublisherWidget,
 } from "./widgetTypes";
 import { nextWidgetId } from "./widgetTypes";
 
@@ -37,6 +38,7 @@ export type WidgetCatalogType =
   | "max-velocity"
   | "gripper-control"
   | "magnet-control"
+  | "toggle-publisher"
   | "stream-display"
   | "throw-draw"
   | "drink"
@@ -70,6 +72,7 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
   { type: "max-velocity", label: "Max Velocity", enabled: true, defaultSize: { w: 260, h: 90 } },
   { type: "gripper-control", label: "Gripper Control", enabled: true, defaultSize: { w: 300, h: 170 } },
   { type: "magnet-control", label: "Magnet Control", enabled: true, defaultSize: { w: 240, h: 120 } },
+  { type: "toggle-publisher", label: "Toggle Publisher", enabled: true, defaultSize: { w: 240, h: 120 } },
   { type: "stream-display", label: "Stream Display", enabled: true, defaultSize: { w: 360, h: 260 } },
   { type: "throw-draw", label: "Throw Draw", enabled: true, defaultSize: { w: 640, h: 360 } },
   { type: "drink", label: "Drink Button", enabled: true, defaultSize: { w: 180, h: 58 } },
@@ -273,6 +276,18 @@ export function createWidgetFromCatalogType(
       topic: "/hub/digital_output",
       onPayload: "electromagnet_on",
       offPayload: "electromagnet_off",
+      rect: { x, y, w: 240, h: 120 },
+    };
+    return widget;
+  }
+
+  if (type === "toggle-publisher") {
+    const widget: TogglePublisherWidget = {
+      id: nextWidgetId(),
+      kind: "toggle-publisher",
+      label: "Toggle",
+      topic: "/ui/toggle",
+      outputMode: "numeric",
       rect: { x, y, w: 240, h: 120 },
     };
     return widget;
