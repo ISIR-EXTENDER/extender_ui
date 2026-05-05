@@ -1,5 +1,9 @@
 export { JoystickWidget } from "./JoystickWidget";
 export { SliderWidget } from "./SliderWidget";
+export { TogglePublisherFields } from "./togglePublisher/TogglePublisherFields";
+export { TogglePublisherWidget } from "./togglePublisher/TogglePublisherWidget";
+export { RosMessageToggleFields } from "./rosMessageToggle/RosMessageToggleFields";
+export { RosMessageToggleWidget } from "./rosMessageToggle/RosMessageToggleWidget";
 export {
   ActionButtonWidget,
   CurvesWidget,
@@ -16,7 +20,6 @@ export {
   ThrowDrawWidget,
   TextareaWidget,
   TextWidget,
-  TogglePublisherWidget,
 } from "./AuxWidgets";
 export {
   SavePoseButtonWidget,
@@ -41,7 +44,7 @@ export {
   type GripperControlWidget as GripperControlWidgetModel,
   type MagnetControlWidget as MagnetControlWidgetModel,
   type TogglePublisherWidget as TogglePublisherWidgetModel,
-  type TogglePublisherOutputMode,
+  type RosMessageToggleWidget as RosMessageToggleWidgetModel,
   type StreamDisplayWidget as StreamDisplayWidgetModel,
   type ThrowDrawWidget as ThrowDrawWidgetModel,
   type CurvesWidget as CurvesWidgetModel,
@@ -52,6 +55,7 @@ export {
   type LogLevelFilter,
   type StreamSource,
   type TextAlign,
+  type TogglePublisherOutputMode,
   type WidgetKind,
   type SliderDirection,
   type SliderBinding,
@@ -84,6 +88,23 @@ export {
   type TsWidgetPreset,
   type TsPresetWidget,
 } from "./tsPresets";
+export {
+  buildTogglePublisherWsMessage,
+  normalizeTogglePublisherWidget,
+  type TogglePublisherWsMessage,
+} from "./togglePublisher/model";
+export {
+  buildRosMessageToggleCliExample,
+  buildRosMessageToggleWsMessage,
+  COMMON_ROS_MESSAGE_TYPES,
+  DEFAULT_ROS_MESSAGE_TOGGLE_MESSAGE_TYPE,
+  findMatchingRosMessageTogglePreset,
+  getDefaultRosMessageTogglePayloads,
+  normalizeRosMessageToggleWidget,
+  ROS_MESSAGE_TOGGLE_PRESETS,
+  type RosMessageTogglePreset,
+  type RosMessageToggleWsMessage,
+} from "./rosMessageToggle/model";
 export {
   CANVAS_PRESETS,
   DEFAULT_CANVAS_SETTINGS,

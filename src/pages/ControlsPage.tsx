@@ -22,15 +22,20 @@ import {
   MaxVelocityWidget,
   NavigationBarWidget,
   NavigationButtonWidget,
+  RosMessageToggleFields,
+  RosMessageToggleWidget,
   RosbagControlWidget,
   SavePoseButtonWidget,
   SliderWidget,
   StreamDisplayWidget,
   ThrowDrawWidget,
+  TogglePublisherFields,
   TextareaWidget,
   TextWidget,
   TogglePublisherWidget,
   WIDGET_CATALOG,
+  buildRosMessageToggleWsMessage,
+  buildTogglePublisherWsMessage,
   cloneWidgets,
   createWidgetFromCatalogType,
   DEFAULT_WIDGETS,
@@ -52,10 +57,12 @@ import {
   type NavigationButtonWidgetModel,
   type PoseSnapshot,
   type PoseTopicValue,
+  type RosMessageToggleWidgetModel,
   type RosbagControlWidgetModel,
   type SliderWidgetModel,
   type StreamDisplayWidgetModel,
   type ThrowDrawWidgetModel,
+  type TogglePublisherWidgetModel,
   type TextAlign,
   type TextareaWidgetModel,
   type TextWidgetModel,
@@ -773,6 +780,16 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
   };
   const updateSelectedDrink = (updater: (widget: DrinkWidgetModel) => DrinkWidgetModel) => {
     updateSelectedWidget((widget) => (widget.kind === "drink" ? updater(widget) : widget));
+  };
+  const updateSelectedTogglePublisher = (
+    updater: (widget: TogglePublisherWidgetModel) => TogglePublisherWidgetModel
+  ) => {
+    updateSelectedWidget((widget) => (widget.kind === "toggle-publisher" ? updater(widget) : widget));
+  };
+  const updateSelectedRosMessageToggle = (
+    updater: (widget: RosMessageToggleWidgetModel) => RosMessageToggleWidgetModel
+  ) => {
+    updateSelectedWidget((widget) => (widget.kind === "ros-message-toggle" ? updater(widget) : widget));
   };
   const updateSelectedCurves = (updater: (widget: CurvesWidgetModel) => CurvesWidgetModel) => {
     updateSelectedWidget((widget) => (widget.kind === "curves" ? updater(widget) : widget));
@@ -1538,42 +1555,41 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
             )
           }
           onActivate={() => {
-            if (widget.outputMode === "boolean") {
-              wsClient.send({
-                type: "ui_bool",
-                topic: widget.topic,
-                value: true,
-                widget_id: widget.id,
-              });
-            } else {
-              wsClient.send({
-                type: "ui_scalar",
-                topic: widget.topic,
-                value: 1,
-                widget_id: widget.id,
-              });
-            }
+            wsClient.send(buildTogglePublisherWsMessage(widget, "on"));
             markWidgetPulse(widget.id);
             setStatusMessage(`Toggle "${widget.label}" published ON.`);
           }}
           onDeactivate={() => {
-            if (widget.outputMode === "boolean") {
-              wsClient.send({
-                type: "ui_bool",
-                topic: widget.topic,
-                value: false,
-                widget_id: widget.id,
-              });
-            } else {
-              wsClient.send({
-                type: "ui_scalar",
-                topic: widget.topic,
-                value: 0,
-                widget_id: widget.id,
-              });
-            }
+            wsClient.send(buildTogglePublisherWsMessage(widget, "off"));
             markWidgetPulse(widget.id);
             setStatusMessage(`Toggle "${widget.label}" published OFF.`);
+          }}
+        />
+      );
+    }
+
+    if (widget.kind === "ros-message-toggle") {
+      return (
+        <RosMessageToggleWidget
+          key={widget.id}
+          widget={widget}
+          selected={selected}
+          onSelect={() => setSelectedWidgetId(widget.id)}
+          onRectChange={(next) => handleWidgetRectChange(widget.id, next)}
+          onLabelChange={(nextLabel) =>
+            updateWidget(widget.id, (current) =>
+              current.kind === "ros-message-toggle" ? { ...current, label: nextLabel } : current
+            )
+          }
+          onActivate={() => {
+            wsClient.send(buildRosMessageToggleWsMessage(widget, "on"));
+            markWidgetPulse(widget.id);
+            setStatusMessage(`ROS toggle "${widget.label}" published ON.`);
+          }}
+          onDeactivate={() => {
+            wsClient.send(buildRosMessageToggleWsMessage(widget, "off"));
+            markWidgetPulse(widget.id);
+            setStatusMessage(`ROS toggle "${widget.label}" published OFF.`);
           }}
         />
       );
@@ -3030,46 +3046,19 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
                       </div>
                     </>
                   ) : selectedWidget.kind === "toggle-publisher" ? (
-                    <>
-                      <div className="controls-property-title">Toggle Publisher</div>
-                      <div className="controls-hint">
-                        Publishes ON/OFF through the configured ROS topic.
-                      </div>
-                      <label className="controls-field">
-                        <span>Output Topic</span>
-                        <input
-                          className="editor-input"
-                          value={selectedWidget.topic}
-                          onChange={(event) =>
-                            updateWidget(selectedWidget.id, (current) =>
-                              current.kind === "toggle-publisher"
-                                ? { ...current, topic: event.target.value }
-                                : current
-                            )
-                          }
-                        />
-                      </label>
-                      <label className="controls-field">
-                        <span>Output Mode</span>
-                        <select
-                          className="editor-input"
-                          value={selectedWidget.outputMode}
-                          onChange={(event) =>
-                            updateWidget(selectedWidget.id, (current) =>
-                              current.kind === "toggle-publisher"
-                                ? {
-                                    ...current,
-                                    outputMode: event.target.value === "boolean" ? "boolean" : "numeric",
-                                  }
-                                : current
-                            )
-                          }
-                        >
-                          <option value="numeric">numeric 0 / 1</option>
-                          <option value="boolean">boolean true / false</option>
-                        </select>
-                      </label>
-                    </>
+                    <TogglePublisherFields
+                      widget={selectedWidget}
+                      onChange={(nextWidget: TogglePublisherWidgetModel) =>
+                        updateSelectedTogglePublisher(() => nextWidget)
+                      }
+                    />
+                  ) : selectedWidget.kind === "ros-message-toggle" ? (
+                    <RosMessageToggleFields
+                      widget={selectedWidget}
+                      onChange={(nextWidget: RosMessageToggleWidgetModel) =>
+                        updateSelectedRosMessageToggle(() => nextWidget)
+                      }
+                    />
                   ) : selectedWidget.kind === "stream-display" ? (
                     <>
                       <div className="controls-property-title">Stream Display</div>

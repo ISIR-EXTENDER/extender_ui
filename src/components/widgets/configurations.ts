@@ -7,6 +7,7 @@ import {
 } from "./canvasSettings";
 import { ADMIN_DEMO_SCREEN_IDS } from "../../app/demoDefaults";
 import { createWidgetFromCatalogType, type WidgetCatalogType } from "./widgetCatalog";
+import { normalizeRosMessageToggleWidget } from "./rosMessageToggle/model";
 import { readJsonStorage, writeJsonStorage } from "../../utils/browserStorage";
 
 export type PoseTopicValue =
@@ -206,10 +207,12 @@ export const DEFAULT_DEMO_CONFIGURATIONS: WidgetConfiguration[] = [
       showAdvancedControls: false,
       rect: { w: 188, h: 92 },
     }),
-    createDemoWidget("sandbox-toggle-output", "toggle-publisher", 1048, 17, {
+    createDemoWidget("sandbox-toggle-output", "ros-message-toggle", 1048, 17, {
       label: "Digital Output",
       topic: "/sandbox/digital_output",
-      outputMode: "numeric",
+      messageType: "std_msgs/msg/Float64",
+      onPayload: "{data: 1.0}",
+      offPayload: "{data: 0.0}",
       rect: { w: 188, h: 92 },
     }),
   ]),
@@ -1810,7 +1813,7 @@ const ensurePetanqueGripperControl = (
   });
 };
 
-const ensureSandboxTogglePublisher = (
+const ensureSandboxRosMessageToggle = (
   configurations: WidgetConfiguration[]
 ): WidgetConfiguration[] => {
   const latestSandbox = DEFAULT_DEMO_CONFIGURATIONS.find(
@@ -1832,6 +1835,63 @@ const ensureSandboxTogglePublisher = (
     return {
       ...configuration,
       widgets: [...configuration.widgets, cloneWidgets([toggleTemplate])[0]],
+      updatedAt: new Date().toISOString(),
+    };
+  });
+};
+
+const migrateRosMessageToggleWidgets = (
+  configurations: WidgetConfiguration[]
+): WidgetConfiguration[] => {
+  return configurations.map((configuration) => {
+    let changed = false;
+    const nextWidgets = configuration.widgets.map((widget) => {
+      if (widget.kind === "ros-message-toggle") {
+        const normalizedWidget = normalizeRosMessageToggleWidget(widget);
+        const widgetChanged =
+          (widget as Partial<typeof normalizedWidget>).messageType !== normalizedWidget.messageType ||
+          (widget as Partial<typeof normalizedWidget>).onPayload !== normalizedWidget.onPayload ||
+          (widget as Partial<typeof normalizedWidget>).offPayload !== normalizedWidget.offPayload;
+        if (widgetChanged) {
+          changed = true;
+        }
+        return normalizedWidget;
+      }
+
+      if (
+        widget.kind !== "toggle-publisher" ||
+        !("messageType" in widget || "onPayload" in widget || "offPayload" in widget)
+      ) {
+        return widget;
+      }
+
+      changed = true;
+      return normalizeRosMessageToggleWidget({
+        id: widget.id,
+        kind: "ros-message-toggle",
+        label: widget.label,
+        topic: widget.topic,
+        rect: widget.rect,
+        outputMode: widget.outputMode,
+        messageType:
+          typeof (widget as { messageType?: unknown }).messageType === "string"
+            ? (widget as { messageType?: string }).messageType
+            : undefined,
+        onPayload:
+          typeof (widget as { onPayload?: unknown }).onPayload === "string"
+            ? (widget as { onPayload?: string }).onPayload
+            : undefined,
+        offPayload:
+          typeof (widget as { offPayload?: unknown }).offPayload === "string"
+            ? (widget as { offPayload?: string }).offPayload
+            : undefined,
+      });
+    });
+
+    if (!changed) return configuration;
+    return {
+      ...configuration,
+      widgets: nextWidgets,
       updatedAt: new Date().toISOString(),
     };
   });
@@ -2264,15 +2324,17 @@ const applyConfigurationMigrations = (
         ensurePlayPetanqueLancerActionButtons(
           normalizePetanqueSliderDisplayOptions(
             normalizePetanqueSliderRanges(
-              ensureSandboxTogglePublisher(
-                ensurePetanqueGripperControl(
-                  ensurePetanqueElectromagnetControl(
-                    removePetanqueLegacyNavigationButtons(
-                      migratePetanqueTeleopConfigLayout(
-                        disablePetanqueViewerWidget(
-                          migrateLegacyPetanque(
-                            migrateLegacyDefaultControl(
-                              mergeMissingDemoConfigurations(configurations)
+              migrateRosMessageToggleWidgets(
+                ensureSandboxRosMessageToggle(
+                  ensurePetanqueGripperControl(
+                    ensurePetanqueElectromagnetControl(
+                      removePetanqueLegacyNavigationButtons(
+                        migratePetanqueTeleopConfigLayout(
+                          disablePetanqueViewerWidget(
+                            migrateLegacyPetanque(
+                              migrateLegacyDefaultControl(
+                                mergeMissingDemoConfigurations(configurations)
+                              )
                             )
                           )
                         )

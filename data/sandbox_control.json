@@ -36,10 +36,10 @@
       "max": 3,
       "step": 0.1,
       "rect": {
-        "x": 237,
-        "y": 95,
-        "w": 382,
-        "h": 159
+        "x": 281,
+        "y": 116,
+        "w": 359,
+        "h": 146
       },
       "reverseDirection": true,
       "endpointLeftLabel": "Slow",
@@ -173,15 +173,32 @@
     },
     {
       "id": "sandbox-toggle-output",
-      "kind": "toggle-publisher",
+      "kind": "ros-message-toggle",
       "label": "Digital Output",
       "topic": "/sandbox/digital_output",
-      "outputMode": "numeric",
+      "messageType": "std_msgs/msg/Float64",
+      "onPayload": "{data: 1.0}",
+      "offPayload": "{data: 0.0}",
       "rect": {
         "x": 640,
         "y": 17,
         "w": 188,
         "h": 92
+      }
+    },
+    {
+      "id": "widget-1777993123607-1d1c3",
+      "kind": "ros-message-toggle",
+      "label": "ROS Toggle",
+      "topic": "/ui/ros_toggle",
+      "messageType": "std_msgs/msg/Int32MultiArray",
+      "onPayload": "{data: [13, 1]}",
+      "offPayload": "{data: [13, 0]}",
+      "rect": {
+        "x": 394,
+        "y": 17,
+        "w": 203,
+        "h": 91
       }
     }
   ],
@@ -190,5 +207,5 @@
     "presetId": "hd",
     "runtimeMode": "fit"
   },
-  "updatedAt": "2026-05-04T15:30:07.342Z"
+  "updatedAt": "2026-05-05T15:02:06.803Z"
 }

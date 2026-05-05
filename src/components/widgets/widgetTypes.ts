@@ -28,6 +28,7 @@ export type WidgetKind =
   | "gripper-control"
   | "magnet-control"
   | "toggle-publisher"
+  | "ros-message-toggle"
   | "stream-display"
   | "throw-draw"
   | "drink"
@@ -152,6 +153,14 @@ export type TogglePublisherWidget = WidgetBase & {
   outputMode: TogglePublisherOutputMode;
 };
 
+export type RosMessageToggleWidget = WidgetBase & {
+  kind: "ros-message-toggle";
+  presetId?: string;
+  messageType: string;
+  onPayload: string;
+  offPayload: string;
+};
+
 export type StreamDisplayWidget = WidgetBase & {
   kind: "stream-display";
   source: StreamSource;
@@ -218,6 +227,7 @@ export type CanvasWidget =
   | GripperControlWidget
   | MagnetControlWidget
   | TogglePublisherWidget
+  | RosMessageToggleWidget
   | StreamDisplayWidget
   | ThrowDrawWidget
   | DrinkWidget

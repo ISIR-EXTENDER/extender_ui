@@ -13,6 +13,7 @@ import {
   ModeButtonWidget,
   NavigationBarWidget,
   NavigationButtonWidget,
+  RosMessageToggleWidget,
   RosbagControlWidget,
   SavePoseButtonWidget,
   SliderWidget,
@@ -23,6 +24,8 @@ import {
   ThrowDrawWidget,
   type CanvasWidget,
   type WidgetConfiguration,
+  buildRosMessageToggleWsMessage,
+  buildTogglePublisherWsMessage,
 } from "../../components/widgets";
 import { wsClient } from "../../services/wsClient";
 import type { WsState } from "../../types/ws";
@@ -605,39 +608,32 @@ export function RuntimeWidgetRenderer({
         onRectChange={noopRectChange}
         onLabelChange={noopTextChange}
         onActivate={() => {
-          if (widget.outputMode === "boolean") {
-            wsClient.send({
-              type: "ui_bool",
-              topic: widget.topic,
-              value: true,
-              widget_id: widget.id,
-            });
-          } else {
-            wsClient.send({
-              type: "ui_scalar",
-              topic: widget.topic,
-              value: 1,
-              widget_id: widget.id,
-            });
-          }
+          wsClient.send(buildTogglePublisherWsMessage(widget, "on"));
           markWidgetPulse(widget.id);
         }}
         onDeactivate={() => {
-          if (widget.outputMode === "boolean") {
-            wsClient.send({
-              type: "ui_bool",
-              topic: widget.topic,
-              value: false,
-              widget_id: widget.id,
-            });
-          } else {
-            wsClient.send({
-              type: "ui_scalar",
-              topic: widget.topic,
-              value: 0,
-              widget_id: widget.id,
-            });
-          }
+          wsClient.send(buildTogglePublisherWsMessage(widget, "off"));
+          markWidgetPulse(widget.id);
+        }}
+      />
+    );
+  }
+
+  if (widget.kind === "ros-message-toggle") {
+    return (
+      <RosMessageToggleWidget
+        key={widget.id}
+        widget={widget}
+        selected={false}
+        onSelect={NOOP_SELECT}
+        onRectChange={noopRectChange}
+        onLabelChange={noopTextChange}
+        onActivate={() => {
+          wsClient.send(buildRosMessageToggleWsMessage(widget, "on"));
+          markWidgetPulse(widget.id);
+        }}
+        onDeactivate={() => {
+          wsClient.send(buildRosMessageToggleWsMessage(widget, "off"));
           markWidgetPulse(widget.id);
         }}
       />

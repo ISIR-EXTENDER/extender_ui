@@ -12,6 +12,7 @@ import type {
   MaxVelocityWidget,
   NavigationBarWidget,
   NavigationButtonWidget,
+  RosMessageToggleWidget,
   RosbagControlWidget,
   StreamDisplayWidget,
   ThrowDrawWidget,
@@ -22,6 +23,10 @@ import type {
   TogglePublisherWidget,
 } from "./widgetTypes";
 import { nextWidgetId } from "./widgetTypes";
+import {
+  DEFAULT_ROS_MESSAGE_TOGGLE_MESSAGE_TYPE,
+  getDefaultRosMessageTogglePayloads,
+} from "./rosMessageToggle/model";
 
 export type WidgetCatalogType =
   | "joystick"
@@ -39,6 +44,7 @@ export type WidgetCatalogType =
   | "gripper-control"
   | "magnet-control"
   | "toggle-publisher"
+  | "ros-message-toggle"
   | "stream-display"
   | "throw-draw"
   | "drink"
@@ -73,6 +79,7 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
   { type: "gripper-control", label: "Gripper Control", enabled: true, defaultSize: { w: 300, h: 170 } },
   { type: "magnet-control", label: "Magnet Control", enabled: true, defaultSize: { w: 240, h: 120 } },
   { type: "toggle-publisher", label: "Toggle Publisher", enabled: true, defaultSize: { w: 240, h: 120 } },
+  { type: "ros-message-toggle", label: "ROS Message Toggle", enabled: true, defaultSize: { w: 240, h: 120 } },
   { type: "stream-display", label: "Stream Display", enabled: true, defaultSize: { w: 360, h: 260 } },
   { type: "throw-draw", label: "Throw Draw", enabled: true, defaultSize: { w: 640, h: 360 } },
   { type: "drink", label: "Drink Button", enabled: true, defaultSize: { w: 180, h: 58 } },
@@ -288,6 +295,21 @@ export function createWidgetFromCatalogType(
       label: "Toggle",
       topic: "/ui/toggle",
       outputMode: "numeric",
+      rect: { x, y, w: 240, h: 120 },
+    };
+    return widget;
+  }
+
+  if (type === "ros-message-toggle") {
+    const payloads = getDefaultRosMessageTogglePayloads(DEFAULT_ROS_MESSAGE_TOGGLE_MESSAGE_TYPE);
+    const widget: RosMessageToggleWidget = {
+      id: nextWidgetId(),
+      kind: "ros-message-toggle",
+      label: "ROS Toggle",
+      topic: "/ui/ros_toggle",
+      messageType: DEFAULT_ROS_MESSAGE_TOGGLE_MESSAGE_TYPE,
+      onPayload: payloads.onPayload,
+      offPayload: payloads.offPayload,
       rect: { x, y, w: 240, h: 120 },
     };
     return widget;
