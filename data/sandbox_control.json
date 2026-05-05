@@ -173,10 +173,12 @@
     },
     {
       "id": "sandbox-toggle-output",
-      "kind": "toggle-publisher",
+      "kind": "ros-message-toggle",
       "label": "Digital Output",
       "topic": "/sandbox/digital_output",
-      "outputMode": "numeric",
+      "messageType": "std_msgs/msg/Float64",
+      "onPayload": "{data: 1.0}",
+      "offPayload": "{data: 0.0}",
       "rect": {
         "x": 640,
         "y": 17,
@@ -190,5 +192,5 @@
     "presetId": "hd",
     "runtimeMode": "fit"
   },
-  "updatedAt": "2026-05-04T15:30:07.342Z"
+  "updatedAt": "2026-05-05T15:02:06.803Z"
 }
