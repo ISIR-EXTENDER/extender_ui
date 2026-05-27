@@ -42,7 +42,7 @@ export function useTeleopPublisher() {
   // Clear axes that don't apply to the current mode
   useEffect(() => {
     const rotationActive = mode === 0 || mode === 1 || mode === 3;
-    const translationActive = mode === 0 || mode === 2 || mode === 3;
+    const translationActive = mode === 0 || mode === 2 || mode === 3 || mode === 4;
     const state = useTeleopStore.getState();
 
     if (!translationActive && z !== 0) {
