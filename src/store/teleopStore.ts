@@ -186,6 +186,7 @@ const modeLabelMap: Record<TeleopMode, string> = {
   1: "ROTATION",
   2: "TRANSLATION",
   3: "BOTH",
+  4: "SNAKE"
 };
 
 export const useTeleopStore = create<TeleopState>((set, get) => ({
@@ -224,7 +225,7 @@ export const useTeleopStore = create<TeleopState>((set, get) => ({
   setZ: (value) => set({ z: value }),
   setRz: (value) => set({ rz: value }),
   setMode: (mode) => set({ mode }),
-  cycleMode: () => set((state) => ({ mode: ((state.mode + 1) % 4) as TeleopMode })),
+  cycleMode: () => set((state) => ({ mode: ((state.mode + 1) % 5) as TeleopMode })),
   setWsStatus: (status) => set({ wsStatus: status }),
   setWsState: (state) => set({ wsState: state }),
   setMaxVelocity: (value) => set({ maxVelocity: value }),
@@ -353,7 +354,7 @@ export const useTeleopStore = create<TeleopState>((set, get) => ({
     } = get();
 
     const rotationActive = mode === 0 || mode === 1 || mode === 3;
-    const translationActive = mode === 0 || mode === 2 || mode === 3;
+    const translationActive = mode === 0 || mode === 2 || mode === 3 || mode === 4;
 
     const linearSourceX = swapXY ? joyY : joyX;
     const linearSourceY = swapXY ? joyX : joyY;
