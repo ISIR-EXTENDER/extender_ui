@@ -189,6 +189,14 @@ const modeLabelMap: Record<TeleopMode, string> = {
   4: "SNAKE"
 };
 
+const TABLET_MODE_CYCLE: TeleopMode[] = [0, 3, 4];
+
+export const selectNextTabletMode = (mode: TeleopMode): TeleopMode => {
+  const currentIndex = TABLET_MODE_CYCLE.indexOf(mode);
+  if (currentIndex === -1) return TABLET_MODE_CYCLE[1] ?? 3;
+  return TABLET_MODE_CYCLE[(currentIndex + 1) % TABLET_MODE_CYCLE.length] ?? 3;
+};
+
 export const useTeleopStore = create<TeleopState>((set, get) => ({
   joyX: 0,
   joyY: 0,
@@ -225,7 +233,7 @@ export const useTeleopStore = create<TeleopState>((set, get) => ({
   setZ: (value) => set({ z: value }),
   setRz: (value) => set({ rz: value }),
   setMode: (mode) => set({ mode }),
-  cycleMode: () => set((state) => ({ mode: ((state.mode + 1) % 5) as TeleopMode })),
+  cycleMode: () => set((state) => ({ mode: selectNextTabletMode(state.mode) })),
   setWsStatus: (status) => set({ wsStatus: status }),
   setWsState: (state) => set({ wsState: state }),
   setMaxVelocity: (value) => set({ maxVelocity: value }),
