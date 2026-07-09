@@ -81,6 +81,19 @@ At runtime it sends `ui_typed` websocket messages, so the existing `tablet_inter
 
 The same `snake_control` screen keeps the 2D joystick on the existing `teleop_cmd` websocket flow and uses the regular mode button as a two-state `B1` / `B2` toggle.
 
+## Widget Interaction Notes
+
+Interactive widgets should compute pointer positions from the rendered DOM rectangle with `getBoundingClientRect()`. This keeps controls aligned when the canvas is zoomed, resized, or rendered in fit mode.
+
+The joystick is implemented with pointer events directly in `src/components/teleop/NippleJoystick.tsx`. It clamps motion to the circular base, applies the configured deadzone before publishing, and visually moves the knob to the edge at saturation. The faint horizontal and vertical guide lines become brighter when the stick is aligned with one main axis, which helps users drive only `x/-x` or only `y/-y`.
+
+The max velocity widget uses the same pointer-position rule. Its value source depends on the configured topic:
+
+- known teleop configuration topics, such as `/cmd/max_velocity`, read and write the shared teleop store.
+- custom topics keep an independent per-widget value in the controls page, so several max velocity widgets no longer force each other to the same value.
+
+When a screen is saved or synchronized to a folder, `updatedAt` is preserved if the screen content is unchanged. This avoids timestamp-only JSON diffs when no widget, pose, or canvas setting actually changed.
+
 ## Apps
 
 - `SandboxV0.0`: generic teleop/sandbox app used for experiments

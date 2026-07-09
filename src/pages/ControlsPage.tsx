@@ -90,6 +90,10 @@ import {
   resolvePendingResizeSourcePreset,
 } from "./controls/canvasPresetResizing";
 import { useCanvasHistory } from "./controls/useCanvasHistory";
+import {
+  applyTeleopConfigScalarValue,
+  resolveTeleopConfigScalarValue,
+} from "./applicationTeleopConfig";
 
 type ControlsPageProps = {
   focusOnly?: boolean;
@@ -211,7 +215,23 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
   const setZ = useTeleopStore((s) => s.setZ);
   const setRz = useTeleopStore((s) => s.setRz);
   const maxVelocity = useTeleopStore((s) => s.maxVelocity);
+  const translationGain = useTeleopStore((s) => s.translationGain);
+  const rotationGain = useTeleopStore((s) => s.rotationGain);
+  const scaleX = useTeleopStore((s) => s.scaleX);
+  const scaleY = useTeleopStore((s) => s.scaleY);
+  const scaleZ = useTeleopStore((s) => s.scaleZ);
+  const angularScaleX = useTeleopStore((s) => s.angularScaleX);
+  const angularScaleY = useTeleopStore((s) => s.angularScaleY);
+  const angularScaleZ = useTeleopStore((s) => s.angularScaleZ);
   const setMaxVelocity = useTeleopStore((s) => s.setMaxVelocity);
+  const setTranslationGain = useTeleopStore((s) => s.setTranslationGain);
+  const setRotationGain = useTeleopStore((s) => s.setRotationGain);
+  const setScaleX = useTeleopStore((s) => s.setScaleX);
+  const setScaleY = useTeleopStore((s) => s.setScaleY);
+  const setScaleZ = useTeleopStore((s) => s.setScaleZ);
+  const setAngularScaleX = useTeleopStore((s) => s.setAngularScaleX);
+  const setAngularScaleY = useTeleopStore((s) => s.setAngularScaleY);
+  const setAngularScaleZ = useTeleopStore((s) => s.setAngularScaleZ);
   const wsState = useTeleopStore((s) => s.wsState);
   const cameraStreamUrl = useUiStore((s) => s.cameraStreamUrl);
   const rvizStreamUrl = useUiStore((s) => s.rvizStreamUrl);
@@ -242,6 +262,7 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
     Record<string, { angle: number; duration: number }>
   >({});
   const [throwDrawAlphaValues, setThrowDrawAlphaValues] = useState<Record<string, number>>({});
+  const [maxVelocityWidgetValues, setMaxVelocityWidgetValues] = useState<Record<string, number>>({});
   const [freshnessClock, setFreshnessClock] = useState<number>(() => Date.now());
   const [rosbagRecording, setRosbagRecording] = useState(false);
   const [rosbagStatus, setRosbagStatus] = useState("idle");
@@ -449,6 +470,28 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
   const hasCanvasSettingsDiff = canvasSettingsSignature !== savedBaseline.canvasSignature;
   const hasNameDiff = trimmedNameInput.length > 0 && trimmedNameInput !== savedBaseline.name;
   const isCanvasDirty = hasWidgetDiff || hasCanvasSettingsDiff || hasNameDiff;
+  const teleopConfigScalarSnapshot = {
+    maxVelocity,
+    translationGain,
+    rotationGain,
+    scaleX,
+    scaleY,
+    scaleZ,
+    angularScaleX,
+    angularScaleY,
+    angularScaleZ,
+  };
+  const teleopConfigScalarActions = {
+    setMaxVelocity,
+    setTranslationGain,
+    setRotationGain,
+    setScaleX,
+    setScaleY,
+    setScaleZ,
+    setAngularScaleX,
+    setAngularScaleY,
+    setAngularScaleZ,
+  };
 
   const editorCanvasSize = useMemo(
     () => resolveCanvasArtboardSize(widgets, canvasSettings),
@@ -1443,6 +1486,11 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
     }
 
     if (widget.kind === "max-velocity") {
+      const clampToWidgetRange = (raw: number) => Math.max(widget.min, Math.min(widget.max, raw));
+      const fallbackValue = clampToWidgetRange(maxVelocityWidgetValues[widget.id] ?? 1);
+      const widgetValue =
+        resolveTeleopConfigScalarValue(widget.topic, teleopConfigScalarSnapshot) ??
+        fallbackValue;
       const reverseDirection =
         widget.reverseDirection ??
         widget.topic === PETANQUE_TOTAL_DURATION_TOPIC;
@@ -1471,7 +1519,7 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
               current.kind === "max-velocity" ? { ...current, label: nextLabel } : current
             )
           }
-          value={maxVelocity}
+          value={clampToWidgetRange(widgetValue)}
           endpointLabels={endpointLabels}
           bubbleValueFormatter={resolveMaxVelocityBubbleFormatter(widget, reverseDirection)}
           unsafeThreshold={
@@ -1482,7 +1530,21 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
                 : undefined
           }
           reverseDirection={reverseDirection}
-          onValueChange={setMaxVelocity}
+          onValueChange={(nextValue) => {
+            const resolvedNextValue = clampToWidgetRange(nextValue);
+            const appliedToTeleopConfig = applyTeleopConfigScalarValue(
+              widget.topic,
+              resolvedNextValue,
+              teleopConfigScalarActions
+            );
+            if (!appliedToTeleopConfig) {
+              setMaxVelocityWidgetValues((prev) => ({
+                ...prev,
+                [widget.id]: resolvedNextValue,
+              }));
+            }
+            markWidgetPulse(widget.id);
+          }}
         />
       );
     }
