@@ -1,7 +1,7 @@
 {
   "id": "application-95a8",
   "name": "SandboxV0.0",
-  "screenIds": ["sandbox_control", "sandbox_teleop_config", "snake_control"],
+  "screenIds": ["sandbox_control", "sandbox_teleop_config", "snake_control", "visual_servoing"],
   "homeScreenId": "sandbox_control",
   "updatedAt": "2026-07-09T14:15:59.915Z"
 }

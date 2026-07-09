@@ -22,6 +22,7 @@ const SANDBOX_APP_NAME = "SandboxV0.0";
 const SANDBOX_CONTROL_SCREEN_ID = "sandbox_control";
 const SANDBOX_TELEOP_CONFIG_SCREEN_ID = "sandbox_teleop_config";
 const SNAKE_CONTROL_SCREEN_ID = "snake_control";
+const VISUAL_SERVOING_SCREEN_ID = "visual_servoing";
 const PEPR_PETANQUE_APP_ID = "application-a50f";
 const PEPR_PETANQUE_APP_NAME = "PEPR-Petanque";
 const PLAY_PETANQUE_APP_ID = "application-play-petanque";
@@ -120,6 +121,7 @@ const ensureSandboxDemoScreens = (application: ApplicationConfig): ApplicationCo
     SANDBOX_CONTROL_SCREEN_ID,
     SANDBOX_TELEOP_CONFIG_SCREEN_ID,
     SNAKE_CONTROL_SCREEN_ID,
+    VISUAL_SERVOING_SCREEN_ID,
   ]);
   const homeScreenId =
     application.homeScreenId && screenIds.includes(application.homeScreenId)
@@ -205,6 +207,7 @@ const createDefaultSandboxApplication = (): ApplicationConfig => ({
     SANDBOX_CONTROL_SCREEN_ID,
     SANDBOX_TELEOP_CONFIG_SCREEN_ID,
     SNAKE_CONTROL_SCREEN_ID,
+    VISUAL_SERVOING_SCREEN_ID,
   ],
   homeScreenId: SANDBOX_CONTROL_SCREEN_ID,
   updatedAt: new Date().toISOString(),
