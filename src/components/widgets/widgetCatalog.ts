@@ -370,6 +370,7 @@ export function createWidgetFromCatalogType(
           messageType: "extender_msgs/msg/SharedControlGoalArray",
         },
       ],
+      showSummary: true,
       showRaw: false,
       rect: { x, y, w: 460, h: 250 },
     };

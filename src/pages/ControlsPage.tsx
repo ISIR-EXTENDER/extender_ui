@@ -3484,6 +3484,22 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
                     <>
                       <div className="controls-property-title">Topic Monitor</div>
                       <label className="controls-field">
+                        <span>Summary</span>
+                        <select
+                          className="editor-input"
+                          value={(selectedWidget.showSummary ?? true) ? "visible" : "hidden"}
+                          onChange={(event) =>
+                            updateSelectedTopicMonitor((widget) => ({
+                              ...widget,
+                              showSummary: event.target.value === "visible",
+                            }))
+                          }
+                        >
+                          <option value="visible">visible</option>
+                          <option value="hidden">hidden</option>
+                        </select>
+                      </label>
+                      <label className="controls-field">
                         <span>Raw JSON</span>
                         <select
                           className="editor-input"

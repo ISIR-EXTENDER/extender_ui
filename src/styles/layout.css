@@ -2567,7 +2567,7 @@ body,
 .controls-topic-monitor-widget {
   padding: 0.5rem 0.65rem;
   display: grid;
-  grid-template-rows: auto 1fr;
+  grid-template-rows: auto auto 1fr;
   gap: 0.45rem;
 }
 
@@ -2588,6 +2588,48 @@ body,
 .controls-topic-monitor-age {
   font-size: 0.72rem;
   color: var(--muted);
+}
+
+.controls-topic-monitor-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.45rem;
+}
+
+.controls-topic-monitor-summary-card {
+  min-width: 0;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--border) 84%, transparent);
+  background: color-mix(in srgb, var(--panel-2) 90%, transparent);
+  padding: 0.42rem 0.5rem;
+  display: grid;
+  gap: 0.12rem;
+}
+
+.controls-topic-monitor-summary-card.is-live {
+  border-color: color-mix(in srgb, #22c55e 42%, var(--border));
+}
+
+.controls-topic-monitor-summary-card.is-error {
+  border-color: color-mix(in srgb, #ef4444 55%, var(--border));
+}
+
+.controls-topic-monitor-summary-card span {
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.controls-topic-monitor-summary-card strong {
+  min-width: 0;
+  color: var(--text);
+  font-family: "JetBrains Mono", "Fira Code", "SFMono-Regular", Consolas, monospace;
+  font-size: 1rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .controls-topic-monitor-list {
@@ -2805,6 +2847,7 @@ body,
 .application-runtime-page .controls-logs-meta,
 .application-runtime-page .controls-topic-monitor-meta,
 .application-runtime-page .controls-topic-monitor-age,
+.application-runtime-page .controls-topic-monitor-summary-card span,
 .application-runtime-page .controls-log-entry,
 .application-runtime-page .controls-log-empty,
 .application-runtime-page .controls-logs-footer,

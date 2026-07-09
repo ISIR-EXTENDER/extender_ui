@@ -2261,6 +2261,19 @@ const formatVector = (value: unknown) => {
   return `x=${x.toFixed(3)} y=${y.toFixed(3)} z=${z.toFixed(3)}`;
 };
 
+const getVectorComponents = (value: unknown) => {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  const x = typeof record.x === "number" ? record.x : null;
+  const y = typeof record.y === "number" ? record.y : null;
+  const z = typeof record.z === "number" ? record.z : null;
+  if (x == null || y == null || z == null) return null;
+  return { x, y, z };
+};
+
+const formatMagnitude = (value: number | null) =>
+  value == null ? "-" : value.toFixed(3);
+
 const getArraySummary = (value: unknown): string | null => {
   if (Array.isArray(value)) return `${value.length} item${value.length === 1 ? "" : "s"}`;
   if (!value || typeof value !== "object") return null;
@@ -2272,6 +2285,29 @@ const getArraySummary = (value: unknown): string | null => {
     }
   }
   return null;
+};
+
+const getArrayCount = (value: unknown): number | null => {
+  if (Array.isArray(value)) return value.length;
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  for (const key of ["detections", "goals", "markers", "tags", "data"]) {
+    const candidate = record[key];
+    if (Array.isArray(candidate)) return candidate.length;
+  }
+  return null;
+};
+
+const getTwistMagnitudes = (value: unknown) => {
+  if (!value || typeof value !== "object") return { linear: null, angular: null };
+  const record = value as Record<string, unknown>;
+  const twist = record.twist as Record<string, unknown> | undefined;
+  const linear = getVectorComponents(twist?.linear ?? record.linear);
+  const angular = getVectorComponents(twist?.angular ?? record.angular);
+  return {
+    linear: linear ? Math.hypot(linear.x, linear.y, linear.z) : null,
+    angular: angular ? Math.hypot(angular.x, angular.y, angular.z) : null,
+  };
 };
 
 const summarizeTopicData = (snapshot: WsTopicSnapshotMessage | undefined) => {
@@ -2297,6 +2333,61 @@ const summarizeTopicData = (snapshot: WsTopicSnapshotMessage | undefined) => {
   return keys.length ? keys.join(", ") : "empty message";
 };
 
+const resolveMonitorSummary = (
+  topics: TopicMonitorWidgetModel["topics"],
+  topicSnapshots: Record<string, WsTopicSnapshotMessage>
+) => {
+  const findSnapshot = (matcher: (topic: TopicMonitorWidgetModel["topics"][number]) => boolean) => {
+    const topic = topics.find(matcher);
+    if (!topic) return undefined;
+    return topicSnapshots[topicSnapshotKey(topic.topic, topic.messageType)];
+  };
+
+  const detectionsSnapshot = findSnapshot((topic) =>
+    `${topic.label} ${topic.topic}`.toLowerCase().includes("detection") ||
+    topic.topic.toLowerCase().includes("tag")
+  );
+  const commandSnapshot = findSnapshot((topic) =>
+    `${topic.label} ${topic.topic}`.toLowerCase().includes("command")
+  );
+  const errorSnapshot = findSnapshot((topic) =>
+    `${topic.label} ${topic.topic}`.toLowerCase().includes("error")
+  );
+  const commandMagnitudes = getTwistMagnitudes(commandSnapshot?.data);
+  const errorMagnitudes = getTwistMagnitudes(errorSnapshot?.data);
+  const activeSnapshots = [detectionsSnapshot, commandSnapshot, errorSnapshot].filter(
+    (snapshot): snapshot is WsTopicSnapshotMessage => Boolean(snapshot)
+  );
+  const freshestUpdatedAt = activeSnapshots.reduce<number | null>((freshest, snapshot) => {
+    if (snapshot.updated_at_ms == null) return freshest;
+    if (freshest == null) return snapshot.updated_at_ms;
+    return Math.max(freshest, snapshot.updated_at_ms);
+  }, null);
+
+  return [
+    {
+      label: "Tags",
+      value: `${getArrayCount(detectionsSnapshot?.data) ?? 0}`,
+      status: detectionsSnapshot?.error ? "error" : detectionsSnapshot ? "live" : "waiting",
+    },
+    {
+      label: "Cmd |v|",
+      value: formatMagnitude(commandMagnitudes.linear),
+      status: commandSnapshot?.error ? "error" : commandSnapshot ? "live" : "waiting",
+    },
+    {
+      label: "Err |v|",
+      value: formatMagnitude(errorMagnitudes.linear),
+      status: errorSnapshot?.error ? "error" : errorSnapshot ? "live" : "waiting",
+    },
+    {
+      label: "Age",
+      value: formatTopicAge(freshestUpdatedAt),
+      status: freshestUpdatedAt == null ? "waiting" : "live",
+    },
+  ];
+};
+
 export function TopicMonitorWidget({
   widget,
   selected,
@@ -2308,6 +2399,10 @@ export function TopicMonitorWidget({
   const subscriptionSignature = useMemo(
     () => widget.topics.map((topic) => `${topic.topic}|${topic.messageType}`).join("\n"),
     [widget.topics]
+  );
+  const summaryItems = useMemo(
+    () => resolveMonitorSummary(widget.topics, topicSnapshots),
+    [topicSnapshots, widget.topics]
   );
 
   useEffect(() => {
@@ -2343,6 +2438,19 @@ export function TopicMonitorWidget({
           </div>
           <div className="controls-topic-monitor-meta">{widget.topics.length} topics</div>
         </div>
+        {widget.showSummary ?? true ? (
+          <div className="controls-topic-monitor-summary-grid">
+            {summaryItems.map((item) => (
+              <div
+                key={item.label}
+                className={`controls-topic-monitor-summary-card is-${item.status}`}
+              >
+                <span>{item.label}</span>
+                <strong>{item.value}</strong>
+              </div>
+            ))}
+          </div>
+        ) : null}
         <div className="controls-topic-monitor-list">
           {widget.topics.map((topic) => {
             const snapshot =

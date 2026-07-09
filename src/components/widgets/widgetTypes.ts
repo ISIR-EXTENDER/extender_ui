@@ -229,6 +229,7 @@ export type LogsWidget = WidgetBase & {
 export type TopicMonitorWidget = WidgetBase & {
   kind: "topic-monitor";
   topics: TopicMonitorTopic[];
+  showSummary?: boolean;
   showRaw: boolean;
 };
 

@@ -440,6 +440,7 @@ export const DEFAULT_DEMO_CONFIGURATIONS: WidgetConfiguration[] = [
           messageType: "geometry_msgs/msg/TwistStamped",
         },
       ],
+      showSummary: true,
       showRaw: false,
       rect: { w: 1240, h: 600 },
     }),
