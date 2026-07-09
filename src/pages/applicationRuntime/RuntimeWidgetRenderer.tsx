@@ -10,6 +10,7 @@ import {
   LogsWidget,
   MagnetControlWidget,
   MaxVelocityWidget,
+  MomentaryRosMessageWidget,
   ModeButtonWidget,
   NavigationBarWidget,
   NavigationButtonWidget,
@@ -25,6 +26,7 @@ import {
   type CanvasWidget,
   type WidgetConfiguration,
   buildRosMessageToggleWsMessage,
+  buildMomentaryRosMessageWsMessage,
   buildTogglePublisherWsMessage,
 } from "../../components/widgets";
 import { wsClient } from "../../services/wsClient";
@@ -634,6 +636,27 @@ export function RuntimeWidgetRenderer({
         }}
         onDeactivate={() => {
           wsClient.send(buildRosMessageToggleWsMessage(widget, "off"));
+          markWidgetPulse(widget.id);
+        }}
+      />
+    );
+  }
+
+  if (widget.kind === "momentary-ros-message") {
+    return (
+      <MomentaryRosMessageWidget
+        key={widget.id}
+        widget={widget}
+        selected={false}
+        onSelect={NOOP_SELECT}
+        onRectChange={noopRectChange}
+        onLabelChange={noopTextChange}
+        onPress={() => {
+          wsClient.send(buildMomentaryRosMessageWsMessage(widget, "pressed"));
+          markWidgetPulse(widget.id);
+        }}
+        onRelease={() => {
+          wsClient.send(buildMomentaryRosMessageWsMessage(widget, "released"));
           markWidgetPulse(widget.id);
         }}
       />

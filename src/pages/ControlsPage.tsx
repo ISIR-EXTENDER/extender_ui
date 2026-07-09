@@ -19,6 +19,8 @@ import {
   LogsWidget,
   MagnetControlWidget,
   ModeButtonWidget,
+  MomentaryRosMessageFields,
+  MomentaryRosMessageWidget,
   MaxVelocityWidget,
   NavigationBarWidget,
   NavigationButtonWidget,
@@ -34,6 +36,7 @@ import {
   TextWidget,
   TogglePublisherWidget,
   WIDGET_CATALOG,
+  buildMomentaryRosMessageWsMessage,
   buildRosMessageToggleWsMessage,
   buildTogglePublisherWsMessage,
   cloneWidgets,
@@ -53,6 +56,7 @@ import {
   type LoadPoseButtonWidgetModel,
   type LogsWidgetModel,
   type MaxVelocityWidgetModel,
+  type MomentaryRosMessageWidgetModel,
   type NavigationBarWidgetModel,
   type NavigationButtonWidgetModel,
   type PoseSnapshot,
@@ -790,6 +794,13 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
     updater: (widget: RosMessageToggleWidgetModel) => RosMessageToggleWidgetModel
   ) => {
     updateSelectedWidget((widget) => (widget.kind === "ros-message-toggle" ? updater(widget) : widget));
+  };
+  const updateSelectedMomentaryRosMessage = (
+    updater: (widget: MomentaryRosMessageWidgetModel) => MomentaryRosMessageWidgetModel
+  ) => {
+    updateSelectedWidget((widget) =>
+      widget.kind === "momentary-ros-message" ? updater(widget) : widget
+    );
   };
   const updateSelectedCurves = (updater: (widget: CurvesWidgetModel) => CurvesWidgetModel) => {
     updateSelectedWidget((widget) => (widget.kind === "curves" ? updater(widget) : widget));
@@ -1590,6 +1601,33 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
             wsClient.send(buildRosMessageToggleWsMessage(widget, "off"));
             markWidgetPulse(widget.id);
             setStatusMessage(`ROS toggle "${widget.label}" published OFF.`);
+          }}
+        />
+      );
+    }
+
+    if (widget.kind === "momentary-ros-message") {
+      return (
+        <MomentaryRosMessageWidget
+          key={widget.id}
+          widget={widget}
+          selected={selected}
+          onSelect={() => setSelectedWidgetId(widget.id)}
+          onRectChange={(next) => handleWidgetRectChange(widget.id, next)}
+          onLabelChange={(nextLabel) =>
+            updateWidget(widget.id, (current) =>
+              current.kind === "momentary-ros-message" ? { ...current, label: nextLabel } : current
+            )
+          }
+          onPress={() => {
+            wsClient.send(buildMomentaryRosMessageWsMessage(widget, "pressed"));
+            markWidgetPulse(widget.id);
+            setStatusMessage(`Momentary "${widget.label}" published PRESSED.`);
+          }}
+          onRelease={() => {
+            wsClient.send(buildMomentaryRosMessageWsMessage(widget, "released"));
+            markWidgetPulse(widget.id);
+            setStatusMessage(`Momentary "${widget.label}" published RELEASED.`);
           }}
         />
       );
@@ -3057,6 +3095,13 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
                       widget={selectedWidget}
                       onChange={(nextWidget: RosMessageToggleWidgetModel) =>
                         updateSelectedRosMessageToggle(() => nextWidget)
+                      }
+                    />
+                  ) : selectedWidget.kind === "momentary-ros-message" ? (
+                    <MomentaryRosMessageFields
+                      widget={selectedWidget}
+                      onChange={(nextWidget: MomentaryRosMessageWidgetModel) =>
+                        updateSelectedMomentaryRosMessage(() => nextWidget)
                       }
                     />
                   ) : selectedWidget.kind === "stream-display" ? (

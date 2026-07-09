@@ -182,14 +182,14 @@ export type TeleopState = {
 };
 
 const modeLabelMap: Record<TeleopMode, string> = {
-  0: "TRANSLATION_ROTATION",
+  0: "B1",
   1: "ROTATION",
   2: "TRANSLATION",
-  3: "BOTH",
+  3: "B2",
   4: "SNAKE"
 };
 
-const TABLET_MODE_CYCLE: TeleopMode[] = [0, 3, 4];
+const TABLET_MODE_CYCLE: TeleopMode[] = [0, 3];
 
 export const selectNextTabletMode = (mode: TeleopMode): TeleopMode => {
   const currentIndex = TABLET_MODE_CYCLE.indexOf(mode);
