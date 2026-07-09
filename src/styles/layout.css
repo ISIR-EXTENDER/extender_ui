@@ -1536,6 +1536,45 @@ body,
   font-weight: 700;
 }
 
+.controls-mode-button-widget.is-binary-mode {
+  border-color: color-mix(in srgb, #22c55e 50%, var(--border));
+  background: color-mix(in srgb, #16a34a 34%, var(--panel) 66%);
+}
+
+.controls-mode-button-widget.is-binary-mode .controls-mode-button-value {
+  border-color: color-mix(in srgb, #22c55e 56%, var(--border));
+  color: #dcfce7;
+}
+
+.controls-mode-options {
+  display: inline-grid;
+  grid-template-columns: repeat(2, minmax(2rem, 1fr));
+  gap: 0.18rem;
+  min-width: 4.7rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, #22c55e 46%, var(--border));
+  background: color-mix(in srgb, #0b1220 64%, var(--panel) 36%);
+  padding: 0.12rem;
+}
+
+.controls-mode-option {
+  border-radius: 999px;
+  color: #bbf7d0;
+  font-size: 0.65rem;
+  font-weight: 900;
+  line-height: 1;
+  opacity: 0.62;
+  padding: 0.22rem 0.36rem;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.controls-mode-option.is-active {
+  background: #22c55e;
+  color: #052e16;
+  opacity: 1;
+}
+
 .controls-mode-button-value {
   border-radius: 999px;
   border: 1px solid color-mix(in srgb, #38bdf8 45%, var(--border));
@@ -2590,6 +2629,7 @@ body,
   font-size: 0.75rem;
 }
 
+.application-runtime-page .controls-mode-option,
 .application-runtime-page .controls-momentary-state {
   font-size: 0.75rem;
 }
@@ -2710,6 +2750,8 @@ body,
   padding: 0.2rem 0.5rem;
 }
 
+.application-runtime-screen-default-control .controls-mode-option,
+.controls-page-focus-screen-default-control .controls-mode-option,
 .application-runtime-screen-default-control .controls-momentary-state,
 .controls-page-focus-screen-default-control .controls-momentary-state {
   font-size: 0.86rem;

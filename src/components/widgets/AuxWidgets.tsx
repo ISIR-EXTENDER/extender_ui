@@ -407,6 +407,8 @@ export function ModeButtonWidget({
 }: ModeButtonWidgetProps) {
   const mode = useTeleopStore((s) => s.mode);
   const cycleMode = useTeleopStore((s) => s.cycleMode);
+  const isBinaryModeButton = widget.label.toLowerCase().includes("b1");
+  const modeLabel = selectModeLabel(mode);
 
   return (
     <CanvasItem
@@ -422,14 +424,27 @@ export function ModeButtonWidget({
     >
       <button
         type="button"
-        className="controls-mode-button-widget"
+        className={`controls-mode-button-widget ${isBinaryModeButton ? "is-binary-mode" : ""}`.trim()}
         data-canvas-interactive="true"
         onClick={cycleMode}
       >
         <span className="controls-mode-button-label">
           <InlineEditableText value={widget.label} onCommit={onLabelChange} className="controls-inline-label" />
         </span>
-        <span className="controls-mode-button-value">{selectModeLabel(mode)}</span>
+        {isBinaryModeButton ? (
+          <span className="controls-mode-options" aria-label={`Mode actif ${modeLabel}`}>
+            {(["B1", "B2"] as const).map((label) => (
+              <span
+                key={label}
+                className={`controls-mode-option ${modeLabel === label ? "is-active" : ""}`.trim()}
+              >
+                {label}
+              </span>
+            ))}
+          </span>
+        ) : (
+          <span className="controls-mode-button-value">{modeLabel}</span>
+        )}
       </button>
     </CanvasItem>
   );

@@ -708,6 +708,46 @@ export const DEFAULT_DEMO_CONFIGURATIONS: WidgetConfiguration[] = [
     }),
   ]),
 
+  createDemoConfiguration("snake_control", [
+    createDemoWidget("snake-title", "text", 20, 20, {
+      label: "Snake Control",
+      topic: "/ui/title/snake_control",
+      text: "Snake Control",
+      align: "left",
+      fontSize: 30,
+      rect: { w: 420, h: 58 },
+    }),
+    createDemoWidget("snake-mode-toggle", "mode-button", 210, 116, {
+      label: "B1 / B2",
+      topic: "/cmd/mode",
+      rect: { w: 210, h: 76 },
+    }),
+    createDemoWidget("snake-hold", "momentary-ros-message", 860, 116, {
+      label: "Hold Snake",
+      topic: "/snake_control/enable",
+      messageType: "std_msgs/msg/Bool",
+      pressedPayload: "{data: true}",
+      releasedPayload: "{data: false}",
+      rect: { w: 220, h: 76 },
+    }),
+    createDemoWidget("snake-joystick", "joystick", 430, 271, {
+      binding: "joy",
+      label: "Joystick",
+      topic: "/cmd/joystick",
+      showTopicInfo: false,
+      color: "#4a9eff",
+      deadzone: 0.1,
+      diskSize: 96,
+      labels: {
+        top: "Haut",
+        right: "Droite",
+        bottom: "Bas",
+        left: "Gauche",
+      },
+      rect: { w: 420, h: 420 },
+    }),
+  ]),
+
   createDemoConfiguration("sandbox_teleop_config", [
     createDemoWidget("sandbox-cfg-lin-gain", "max-velocity", 20, 94, {
       label: "Translation Gain",
