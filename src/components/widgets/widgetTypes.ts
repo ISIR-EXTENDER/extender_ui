@@ -12,6 +12,12 @@ export type StreamFitMode = "contain" | "cover";
 export type LogLevelFilter = "all" | "info" | "warn" | "error";
 export type TogglePublisherOutputMode = "numeric" | "boolean";
 
+export type TopicMonitorTopic = {
+  label: string;
+  topic: string;
+  messageType: string;
+};
+
 export type WidgetKind =
   | "joystick"
   | "slider"
@@ -34,7 +40,8 @@ export type WidgetKind =
   | "throw-draw"
   | "drink"
   | "curves"
-  | "logs";
+  | "logs"
+  | "topic-monitor";
 
 type WidgetBase = {
   id: string;
@@ -219,6 +226,12 @@ export type LogsWidget = WidgetBase & {
   showTimestamp: boolean;
 };
 
+export type TopicMonitorWidget = WidgetBase & {
+  kind: "topic-monitor";
+  topics: TopicMonitorTopic[];
+  showRaw: boolean;
+};
+
 export type CanvasWidget =
   | JoystickWidget
   | SliderWidget
@@ -241,7 +254,8 @@ export type CanvasWidget =
   | ThrowDrawWidget
   | DrinkWidget
   | CurvesWidget
-  | LogsWidget;
+  | LogsWidget
+  | TopicMonitorWidget;
 
 export const DEFAULT_WIDGETS: CanvasWidget[] = [
   {

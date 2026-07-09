@@ -50,7 +50,7 @@
         "x": 800,
         "y": 90,
         "w": 460,
-        "h": 300
+        "h": 260
       }
     },
     {
@@ -63,9 +63,9 @@
       "offPayload": "{data: false}",
       "rect": {
         "x": 800,
-        "y": 410,
+        "y": 370,
         "w": 220,
-        "h": 120
+        "h": 110
       }
     },
     {
@@ -77,23 +77,23 @@
       "tone": "success",
       "rect": {
         "x": 1040,
-        "y": 410,
+        "y": 370,
         "w": 220,
         "h": 58
       }
     },
     {
-      "id": "servo-topic-notes",
-      "kind": "textarea",
-      "label": "AprilTag Topics",
-      "topic": "/ui/text/visual_servoing/topics",
-      "text": "Camera: /image_raw\nDetections: /tag_detections\nControl: /ui/visual_servoing/on\nSave target: /ui/visual_servoing/save\nCommand: /visual_servoing/velocity_command\nError: /visual_servoing/error_TAGtoTAGd",
-      "fontSize": 14,
+      "id": "servo-open-monitor",
+      "kind": "navigation-button",
+      "label": "Monitor",
+      "topic": "/ui/navigation/visual_servoing_monitor",
+      "targetScreenId": "visual_servoing_monitor",
+      "icon": "arrow-right",
       "rect": {
-        "x": 800,
-        "y": 550,
-        "w": 460,
-        "h": 150
+        "x": 1040,
+        "y": 445,
+        "w": 220,
+        "h": 58
       }
     }
   ],

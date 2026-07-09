@@ -7,6 +7,7 @@ export const ADMIN_DEMO_SCREEN_IDS = [
   "articular",
   "camera",
   "visual_servoing",
+  "visual_servoing_monitor",
   "logs",
   "poses",
   "petanque",

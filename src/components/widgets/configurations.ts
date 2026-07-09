@@ -381,30 +381,67 @@ export const DEFAULT_DEMO_CONFIGURATIONS: WidgetConfiguration[] = [
       showUrl: false,
       showWebcamPicker: true,
       overlayText: "webcam preview",
-      rect: { w: 460, h: 300 },
+      rect: { w: 460, h: 260 },
     }),
-    createDemoWidget("servo-enable", "ros-message-toggle", 800, 410, {
+    createDemoWidget("servo-enable", "ros-message-toggle", 800, 370, {
       label: "Visual Servoing",
       topic: "/ui/visual_servoing/on",
       messageType: "std_msgs/msg/Bool",
       onPayload: "{data: true}",
       offPayload: "{data: false}",
-      rect: { w: 220, h: 120 },
+      rect: { w: 220, h: 110 },
     }),
-    createDemoWidget("servo-save", "button", 1040, 410, {
+    createDemoWidget("servo-save", "button", 1040, 370, {
       label: "Save Tag",
       topic: "/ui/visual_servoing/save",
       payload: "save",
       tone: "success",
       rect: { w: 220, h: 58 },
     }),
-    createDemoWidget("servo-topic-notes", "textarea", 800, 550, {
-      label: "AprilTag Topics",
-      topic: "/ui/text/visual_servoing/topics",
-      text:
-        "Camera: /image_raw\nDetections: /tag_detections\nControl: /ui/visual_servoing/on\nSave target: /ui/visual_servoing/save\nCommand: /visual_servoing/velocity_command\nError: /visual_servoing/error_TAGtoTAGd",
-      fontSize: 14,
-      rect: { w: 460, h: 150 },
+    createDemoWidget("servo-open-monitor", "navigation-button", 1040, 445, {
+      label: "Monitor",
+      topic: "/ui/navigation/visual_servoing_monitor",
+      targetScreenId: "visual_servoing_monitor",
+      icon: "arrow-right",
+      rect: { w: 220, h: 58 },
+    }),
+  ]),
+
+  createDemoConfiguration("visual_servoing_monitor", [
+    createDemoWidget("servo-monitor-title", "text", 20, 20, {
+      text: "Visual Servoing Monitor",
+      fontSize: 26,
+      rect: { w: 420, h: 56 },
+    }),
+    createDemoWidget("servo-monitor-back", "navigation-button", 1080, 20, {
+      label: "Control",
+      topic: "/ui/navigation/visual_servoing",
+      targetScreenId: "visual_servoing",
+      icon: "home",
+      rect: { w: 180, h: 58 },
+    }),
+    createDemoWidget("servo-topic-monitor", "topic-monitor", 20, 100, {
+      label: "ROS Topic Monitor",
+      topic: "/ui/visual_servoing/topics",
+      topics: [
+        {
+          label: "AprilTag detections",
+          topic: "/tag_detections",
+          messageType: "extender_msgs/msg/SharedControlGoalArray",
+        },
+        {
+          label: "Velocity command",
+          topic: "/visual_servoing/velocity_command",
+          messageType: "geometry_msgs/msg/TwistStamped",
+        },
+        {
+          label: "Servo error",
+          topic: "/visual_servoing/error_TAGtoTAGd",
+          messageType: "geometry_msgs/msg/TwistStamped",
+        },
+      ],
+      showRaw: false,
+      rect: { w: 1240, h: 600 },
     }),
   ]),
 
@@ -1897,7 +1934,7 @@ const migrateVisualServoingLayout = (
     "servo-camera",
     "servo-enable",
     "servo-save",
-    "servo-topic-notes",
+    "servo-open-monitor",
   ]);
   const legacyLabelPattern = /^(alignment|servo gain|start servo|stop servo)$/i;
 

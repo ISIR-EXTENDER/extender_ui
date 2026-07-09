@@ -21,6 +21,7 @@ import {
   StreamDisplayWidget,
   TextareaWidget,
   TextWidget,
+  TopicMonitorWidget,
   TogglePublisherWidget,
   ThrowDrawWidget,
   type CanvasWidget,
@@ -730,6 +731,19 @@ export function RuntimeWidgetRenderer({
   if (widget.kind === "logs") {
     return (
       <LogsWidget
+        key={widget.id}
+        widget={widget}
+        selected={false}
+        onSelect={NOOP_SELECT}
+        onRectChange={noopRectChange}
+        onLabelChange={noopTextChange}
+      />
+    );
+  }
+
+  if (widget.kind === "topic-monitor") {
+    return (
+      <TopicMonitorWidget
         key={widget.id}
         widget={widget}
         selected={false}

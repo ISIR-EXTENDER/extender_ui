@@ -21,6 +21,7 @@ import type {
   SliderWidget,
   TextareaWidget,
   TextWidget,
+  TopicMonitorWidget,
   TogglePublisherWidget,
 } from "./widgetTypes";
 import { nextWidgetId } from "./widgetTypes";
@@ -57,6 +58,7 @@ export type WidgetCatalogType =
   | "drink"
   | "curves"
   | "logs"
+  | "topic-monitor"
   | "linear-joystick"
   | "gauge"
   | "toggle"
@@ -93,6 +95,7 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
   { type: "drink", label: "Drink Button", enabled: true, defaultSize: { w: 180, h: 58 } },
   { type: "curves", label: "Curves", enabled: true, defaultSize: { w: 420, h: 240 } },
   { type: "logs", label: "Logs", enabled: true, defaultSize: { w: 360, h: 220 } },
+  { type: "topic-monitor", label: "Topic Monitor", enabled: true, defaultSize: { w: 460, h: 250 } },
   { type: "linear-joystick", label: "Linear Joystick", enabled: false, defaultSize: { w: 250, h: 60 } },
   { type: "gauge", label: "Gauge", enabled: false, defaultSize: { w: 150, h: 150 } },
   { type: "toggle", label: "Toggle", enabled: false, defaultSize: { w: 120, h: 80 } },
@@ -350,6 +353,25 @@ export function createWidgetFromCatalogType(
       showUrl: true,
       overlayText: "stream preview",
       rect: { x, y, w: 360, h: 260 },
+    };
+    return widget;
+  }
+
+  if (type === "topic-monitor") {
+    const widget: TopicMonitorWidget = {
+      id: nextWidgetId(),
+      kind: "topic-monitor",
+      label: "Topic Monitor",
+      topic: "/ui/topic_monitor",
+      topics: [
+        {
+          label: "Detections",
+          topic: "/tag_detections",
+          messageType: "extender_msgs/msg/SharedControlGoalArray",
+        },
+      ],
+      showRaw: false,
+      rect: { x, y, w: 460, h: 250 },
     };
     return widget;
   }

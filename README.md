@@ -108,6 +108,15 @@ The rule going forward is:
 
 The UI can display streams and capture frames from stream widgets. Captured frames can now be sent to backend as `camera_frame`, so camera data can become ROS topics and later be reused by perception or visual-servoing nodes.
 
+## Visual Servoing Monitor
+
+The sandbox visual-servoing flow is split across two screens:
+
+- `visual_servoing`: camera/RViz preview plus the visual-servoing toggle and save-tag action.
+- `visual_servoing_monitor`: a dedicated ROS topic monitor for AprilTag detections, velocity command, and servo error snapshots.
+
+The monitor uses the generic backend `topic_subscribe` / `topic_snapshot` websocket flow. It is meant for small diagnostic ROS messages, not for video frames; webcam preview stays on the stream widget path.
+
 ## Development
 
 ```bash

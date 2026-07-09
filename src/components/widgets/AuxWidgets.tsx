@@ -20,7 +20,10 @@ import {
 } from "recharts";
 import { InlineEditableText } from "./InlineEditableText";
 import { selectModeLabel, useTeleopStore } from "../../store/teleopStore";
+import { topicSnapshotKey, useUiStore } from "../../store/uiStore";
+import { wsClient } from "../../services/wsClient";
 import type { CSSProperties } from "react";
+import type { WsTopicSnapshotMessage } from "../../types/ws";
 import type {
   ButtonWidget as ButtonWidgetModel,
   CurvesWidget as CurvesWidgetModel,
@@ -37,6 +40,7 @@ import type {
   ThrowDrawWidget as ThrowDrawWidgetModel,
   TextareaWidget as TextareaWidgetModel,
   TextWidget as TextWidgetModel,
+  TopicMonitorWidget as TopicMonitorWidgetModel,
   WidgetIcon,
 } from "./widgetTypes";
 
@@ -185,6 +189,11 @@ declare global {
 
 type LogsWidgetProps = BaseWidgetProps & {
   widget: LogsWidgetModel;
+  onLabelChange: (nextLabel: string) => void;
+};
+
+type TopicMonitorWidgetProps = BaseWidgetProps & {
+  widget: TopicMonitorWidgetModel;
   onLabelChange: (nextLabel: string) => void;
 };
 
@@ -2234,6 +2243,139 @@ type LogEntry = {
   level: "info" | "warn" | "error";
   message: string;
 };
+
+const formatTopicAge = (updatedAtMs: number | null) => {
+  if (updatedAtMs == null) return "waiting";
+  const ageMs = Math.max(0, Date.now() - updatedAtMs);
+  if (ageMs < 1000) return `${ageMs} ms`;
+  return `${(ageMs / 1000).toFixed(1)} s`;
+};
+
+const formatVector = (value: unknown) => {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  const x = typeof record.x === "number" ? record.x : null;
+  const y = typeof record.y === "number" ? record.y : null;
+  const z = typeof record.z === "number" ? record.z : null;
+  if (x == null || y == null || z == null) return null;
+  return `x=${x.toFixed(3)} y=${y.toFixed(3)} z=${z.toFixed(3)}`;
+};
+
+const getArraySummary = (value: unknown): string | null => {
+  if (Array.isArray(value)) return `${value.length} item${value.length === 1 ? "" : "s"}`;
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  for (const key of ["detections", "goals", "markers", "tags", "data"]) {
+    const candidate = record[key];
+    if (Array.isArray(candidate)) {
+      return `${candidate.length} ${key}`;
+    }
+  }
+  return null;
+};
+
+const summarizeTopicData = (snapshot: WsTopicSnapshotMessage | undefined) => {
+  if (!snapshot) return "No snapshot yet";
+  if (snapshot.error) return snapshot.error;
+  const data = snapshot.data;
+  if (!data || typeof data !== "object") return JSON.stringify(data);
+
+  const record = data as Record<string, unknown>;
+  const twist = record.twist as Record<string, unknown> | undefined;
+  const linear = formatVector(twist?.linear ?? record.linear);
+  const angular = formatVector(twist?.angular ?? record.angular);
+  if (linear || angular) {
+    return [linear ? `lin ${linear}` : null, angular ? `ang ${angular}` : null]
+      .filter(Boolean)
+      .join(" | ");
+  }
+
+  const arraySummary = getArraySummary(data);
+  if (arraySummary) return arraySummary;
+
+  const keys = Object.keys(record).slice(0, 4);
+  return keys.length ? keys.join(", ") : "empty message";
+};
+
+export function TopicMonitorWidget({
+  widget,
+  selected,
+  onSelect,
+  onRectChange,
+  onLabelChange,
+}: TopicMonitorWidgetProps) {
+  const topicSnapshots = useUiStore((s) => s.topicSnapshots);
+  const subscriptionSignature = useMemo(
+    () => widget.topics.map((topic) => `${topic.topic}|${topic.messageType}`).join("\n"),
+    [widget.topics]
+  );
+
+  useEffect(() => {
+    const topics = widget.topics
+      .map((topic) => ({
+        topic: topic.topic.trim(),
+        message_type: topic.messageType.trim(),
+      }))
+      .filter((topic) => topic.topic && topic.message_type);
+    if (!topics.length) return;
+    wsClient.send({
+      type: "topic_subscribe",
+      topics,
+    });
+  }, [subscriptionSignature, widget.topics]);
+
+  return (
+    <CanvasItem
+      x={widget.rect.x}
+      y={widget.rect.y}
+      w={widget.rect.w}
+      h={widget.rect.h}
+      onChange={onRectChange}
+      onSelect={onSelect}
+      selected={selected}
+      minSize={{ w: 300, h: 170 }}
+      className="controls-topic-monitor-item"
+    >
+      <div className="controls-topic-monitor-widget">
+        <div className="controls-topic-monitor-header">
+          <div className="controls-topic-monitor-title">
+            <InlineEditableText value={widget.label} onCommit={onLabelChange} className="controls-inline-label" />
+          </div>
+          <div className="controls-topic-monitor-meta">{widget.topics.length} topics</div>
+        </div>
+        <div className="controls-topic-monitor-list">
+          {widget.topics.map((topic) => {
+            const snapshot =
+              topicSnapshots[topicSnapshotKey(topic.topic, topic.messageType)];
+            const hasData = Boolean(snapshot && snapshot.revision > 0 && !snapshot.error);
+            return (
+              <div
+                key={`${topic.topic}|${topic.messageType}`}
+                className={`controls-topic-monitor-row ${snapshot?.error ? "is-error" : hasData ? "is-live" : "is-waiting"}`.trim()}
+              >
+                <div className="controls-topic-monitor-row-head">
+                  <span className="controls-topic-monitor-name">{topic.label || topic.topic}</span>
+                  <span className="controls-topic-monitor-age">
+                    {formatTopicAge(snapshot?.updated_at_ms ?? null)}
+                  </span>
+                </div>
+                <div className="controls-topic-monitor-topic">{topic.topic}</div>
+                <div className="controls-topic-monitor-summary">
+                  {summarizeTopicData(snapshot)}
+                </div>
+                {widget.showRaw && snapshot?.data != null ? (
+                  <pre className="controls-topic-monitor-raw">
+                    {JSON.stringify(snapshot.data, null, 2)}
+                  </pre>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </CanvasItem>
+  );
+}
 
 export function LogsWidget({
   widget,
