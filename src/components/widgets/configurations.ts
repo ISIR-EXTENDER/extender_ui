@@ -361,43 +361,50 @@ export const DEFAULT_DEMO_CONFIGURATIONS: WidgetConfiguration[] = [
       fontSize: 26,
       rect: { w: 320, h: 56 },
     }),
-    createDemoWidget("servo-stream", "stream-display", 20, 90, {
-      label: "Servo Camera",
-      source: "camera",
+    createDemoWidget("servo-rviz", "stream-display", 20, 90, {
+      label: "AprilTag RViz",
+      topic: "/tag_detections",
+      source: "rviz",
+      fitMode: "contain",
+      showStatus: true,
+      showUrl: false,
+      overlayText: "RViz: camera and tag frames",
+      rect: { w: 760, h: 510 },
+    }),
+    createDemoWidget("servo-camera", "stream-display", 800, 90, {
+      label: "Camera Preview",
+      topic: "/image_raw",
+      source: "webcam",
+      streamUrl: "webcam://default",
       fitMode: "cover",
       showStatus: true,
       showUrl: false,
-      overlayText: "target lock",
-      rect: { w: 760, h: 500 },
+      showWebcamPicker: true,
+      overlayText: "webcam preview",
+      rect: { w: 460, h: 300 },
     }),
-    createDemoWidget("servo-joy", "joystick", 800, 90, {
-      label: "Alignment",
-      binding: "rot",
-      topic: "/cmd/servo_alignment",
-      color: "#22c55e",
-      rect: { w: 300, h: 300 },
+    createDemoWidget("servo-enable", "ros-message-toggle", 800, 410, {
+      label: "Visual Servoing",
+      topic: "/ui/visual_servoing/on",
+      messageType: "std_msgs/msg/Bool",
+      onPayload: "{data: true}",
+      offPayload: "{data: false}",
+      rect: { w: 220, h: 120 },
     }),
-    createDemoWidget("servo-gain", "slider", 800, 410, {
-      label: "Servo Gain",
-      binding: "rz",
-      topic: "/cmd/servo_gain",
-      direction: "horizontal",
-      showLabel: true,
-      showTopicInfo: true,
-      labelAlign: "left",
-      rect: { w: 460, h: 84 },
-    }),
-    createDemoWidget("servo-start", "button", 800, 520, {
-      label: "Start Servo",
-      topic: "/cmd/servo_state",
-      payload: "start",
+    createDemoWidget("servo-save", "button", 1040, 410, {
+      label: "Save Tag",
+      topic: "/ui/visual_servoing/save",
+      payload: "save",
+      tone: "success",
       rect: { w: 220, h: 58 },
     }),
-    createDemoWidget("servo-stop", "button", 1040, 520, {
-      label: "Stop Servo",
-      topic: "/cmd/servo_state",
-      payload: "stop",
-      rect: { w: 220, h: 58 },
+    createDemoWidget("servo-topic-notes", "textarea", 800, 550, {
+      label: "AprilTag Topics",
+      topic: "/ui/text/visual_servoing/topics",
+      text:
+        "Camera: /image_raw\nDetections: /tag_detections\nControl: /ui/visual_servoing/on\nSave target: /ui/visual_servoing/save\nCommand: /visual_servoing/velocity_command\nError: /visual_servoing/error_TAGtoTAGd",
+      fontSize: 14,
+      rect: { w: 460, h: 150 },
     }),
   ]),
 
@@ -1877,6 +1884,51 @@ const ensureSandboxRosMessageToggle = (
   });
 };
 
+const migrateVisualServoingLayout = (
+  configurations: WidgetConfiguration[]
+): WidgetConfiguration[] => {
+  const latestVisualServoing = DEFAULT_DEMO_CONFIGURATIONS.find(
+    (configuration) => configuration.name === "visual_servoing"
+  );
+  if (!latestVisualServoing) return configurations;
+
+  const requiredWidgetIds = new Set([
+    "servo-rviz",
+    "servo-camera",
+    "servo-enable",
+    "servo-save",
+    "servo-topic-notes",
+  ]);
+  const legacyLabelPattern = /^(alignment|servo gain|start servo|stop servo)$/i;
+
+  return configurations.map((configuration) => {
+    if (configuration.name !== "visual_servoing") return configuration;
+
+    const hasRequiredWidgets = [...requiredWidgetIds].every((requiredId) =>
+      configuration.widgets.some((widget) => widget.id === requiredId)
+    );
+    const hasLegacyWidget = configuration.widgets.some((widget) =>
+      legacyLabelPattern.test(widget.label.trim())
+    );
+    const hasOutdatedWidget = configuration.widgets.some(
+      (widget) =>
+        (widget.id === "servo-camera" &&
+          widget.kind === "stream-display" &&
+          widget.streamUrl === "webcam:///dev/video2") ||
+        (widget.id === "servo-rviz" &&
+          widget.kind === "stream-display" &&
+          widget.topic !== "/tag_detections")
+    );
+
+    if (hasRequiredWidgets && !hasLegacyWidget && !hasOutdatedWidget) return configuration;
+
+    return {
+      ...cloneConfiguration(latestVisualServoing),
+      poses: clonePoses(configuration.poses),
+    };
+  });
+};
+
 const migrateRosMessageToggleWidgets = (
   configurations: WidgetConfiguration[]
 ): WidgetConfiguration[] => {
@@ -2361,15 +2413,17 @@ const applyConfigurationMigrations = (
         normalizePetanqueSliderDisplayOptions(
           normalizePetanqueSliderRanges(
             migrateRosMessageToggleWidgets(
-              ensureSandboxRosMessageToggle(
-                ensurePetanqueGripperControl(
-                  ensurePetanqueElectromagnetControl(
-                    removePetanqueLegacyNavigationButtons(
-                      migratePetanqueTeleopConfigLayout(
-                        disablePetanqueViewerWidget(
-                          migrateLegacyPetanque(
-                            migrateLegacyDefaultControl(
-                              mergeMissingDemoConfigurations(configurations)
+              migrateVisualServoingLayout(
+                ensureSandboxRosMessageToggle(
+                  ensurePetanqueGripperControl(
+                    ensurePetanqueElectromagnetControl(
+                      removePetanqueLegacyNavigationButtons(
+                        migratePetanqueTeleopConfigLayout(
+                          disablePetanqueViewerWidget(
+                            migrateLegacyPetanque(
+                              migrateLegacyDefaultControl(
+                                mergeMissingDemoConfigurations(configurations)
+                              )
                             )
                           )
                         )

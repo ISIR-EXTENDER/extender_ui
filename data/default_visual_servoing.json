@@ -4,117 +4,103 @@
     {
       "id": "servo-title",
       "kind": "text",
-      "label": "Title",
-      "topic": "/ui/text/servo/title",
+      "label": "Text",
+      "topic": "/ui/text",
       "text": "Visual Servoing",
-      "fontSize": 30,
+      "fontSize": 26,
       "align": "left",
       "rect": {
-        "x": 40,
-        "y": 32,
-        "w": 420,
-        "h": 64
+        "x": 20,
+        "y": 20,
+        "w": 320,
+        "h": 56
+      }
+    },
+    {
+      "id": "servo-rviz",
+      "kind": "stream-display",
+      "label": "AprilTag RViz",
+      "topic": "/tag_detections",
+      "source": "rviz",
+      "streamUrl": "webrtc://localhost:8001/stream",
+      "fitMode": "contain",
+      "showStatus": true,
+      "showUrl": false,
+      "overlayText": "RViz: camera and tag frames",
+      "rect": {
+        "x": 20,
+        "y": 90,
+        "w": 760,
+        "h": 510
       }
     },
     {
       "id": "servo-camera",
       "kind": "stream-display",
-      "label": "Camera Stream",
-      "topic": "/ui/stream/camera",
-      "source": "camera",
-      "streamUrl": "webrtc://localhost:8001/stream",
+      "label": "Camera Preview",
+      "topic": "/image_raw",
+      "source": "webcam",
+      "streamUrl": "webcam://default",
+      "fitMode": "cover",
+      "showStatus": true,
+      "showUrl": false,
+      "showWebcamPicker": true,
+      "overlayText": "webcam preview",
       "rect": {
-        "x": 40,
-        "y": 112,
-        "w": 760,
-        "h": 430
+        "x": 800,
+        "y": 90,
+        "w": 460,
+        "h": 300
       }
     },
     {
       "id": "servo-enable",
-      "kind": "button",
-      "label": "Enable Servo",
-      "topic": "/cmd/visual_servoing/enable",
-      "payload": "on",
+      "kind": "ros-message-toggle",
+      "label": "Visual Servoing",
+      "topic": "/ui/visual_servoing/on",
+      "messageType": "std_msgs/msg/Bool",
+      "onPayload": "{data: true}",
+      "offPayload": "{data: false}",
       "rect": {
-        "x": 830,
-        "y": 112,
-        "w": 190,
-        "h": 52
+        "x": 800,
+        "y": 410,
+        "w": 220,
+        "h": 120
       }
     },
     {
-      "id": "servo-disable",
+      "id": "servo-save",
       "kind": "button",
-      "label": "Disable Servo",
-      "topic": "/cmd/visual_servoing/enable",
-      "payload": "off",
+      "label": "Save Tag",
+      "topic": "/ui/visual_servoing/save",
+      "payload": "save",
+      "tone": "success",
       "rect": {
-        "x": 1030,
-        "y": 112,
-        "w": 190,
-        "h": 52
+        "x": 1040,
+        "y": 410,
+        "w": 220,
+        "h": 58
       }
     },
     {
-      "id": "servo-target-a",
-      "kind": "button",
-      "label": "Target A",
-      "topic": "/cmd/visual_servoing/target",
-      "payload": "A",
-      "rect": {
-        "x": 830,
-        "y": 182,
-        "w": 190,
-        "h": 52
-      }
-    },
-    {
-      "id": "servo-target-b",
-      "kind": "button",
-      "label": "Target B",
-      "topic": "/cmd/visual_servoing/target",
-      "payload": "B",
-      "rect": {
-        "x": 1030,
-        "y": 182,
-        "w": 190,
-        "h": 52
-      }
-    },
-    {
-      "id": "servo-pid-note",
+      "id": "servo-topic-notes",
       "kind": "textarea",
-      "label": "PID Notes",
-      "topic": "/ui/text/servo/pid",
-      "text": "PID / gain settings placeholder. Replace with dedicated widgets when available.",
-      "fontSize": 16,
+      "label": "AprilTag Topics",
+      "topic": "/ui/text/visual_servoing/topics",
+      "text": "Camera: /image_raw\nDetections: /tag_detections\nControl: /ui/visual_servoing/on\nSave target: /ui/visual_servoing/save\nCommand: /visual_servoing/velocity_command\nError: /visual_servoing/error_TAGtoTAGd",
+      "fontSize": 14,
       "rect": {
-        "x": 830,
-        "y": 260,
-        "w": 390,
-        "h": 198
-      }
-    },
-    {
-      "id": "servo-back-home",
-      "kind": "navigation-button",
-      "label": "Home",
-      "topic": "/ui/navigation",
-      "targetScreenId": "default_home",
-      "icon": "home",
-      "rect": {
-        "x": 1030,
-        "y": 488,
-        "w": 190,
-        "h": 52
+        "x": 800,
+        "y": 550,
+        "w": 460,
+        "h": 150
       }
     }
   ],
   "poses": [],
   "canvas": {
     "presetId": "hd",
-    "runtimeMode": "left"
+    "runtimeMode": "fit"
   },
-  "updatedAt": "2026-03-10T23:15:29.149Z"
+  "updatedAt": "2026-07-09T00:00:00.000Z"
 }

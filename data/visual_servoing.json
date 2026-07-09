@@ -17,92 +17,83 @@
       }
     },
     {
-      "id": "servo-stream",
+      "id": "servo-rviz",
       "kind": "stream-display",
-      "label": "Servo Camera",
-      "topic": "/ui/stream",
-      "source": "camera",
+      "label": "AprilTag RViz",
+      "topic": "/tag_detections",
+      "source": "rviz",
       "streamUrl": "webrtc://localhost:8001/stream",
-      "fitMode": "cover",
+      "fitMode": "contain",
       "showStatus": true,
       "showUrl": false,
-      "overlayText": "target lock",
+      "overlayText": "RViz: camera and tag frames",
       "rect": {
         "x": 20,
         "y": 90,
         "w": 760,
-        "h": 500
+        "h": 510
       }
     },
     {
-      "id": "servo-joy",
-      "kind": "joystick",
-      "binding": "rot",
-      "label": "Alignment",
-      "topic": "/cmd/servo_alignment",
-      "showTopicInfo": true,
-      "color": "#22c55e",
-      "deadzone": 0.1,
-      "diskSize": 80,
-      "labels": {
-        "top": "Y+",
-        "right": "X+",
-        "bottom": "Y-",
-        "left": "X-"
-      },
+      "id": "servo-camera",
+      "kind": "stream-display",
+      "label": "Camera Preview",
+      "topic": "/image_raw",
+      "source": "webcam",
+      "streamUrl": "webcam://default",
+      "fitMode": "cover",
+      "showStatus": true,
+      "showUrl": false,
+      "showWebcamPicker": true,
+      "overlayText": "webcam preview",
       "rect": {
         "x": 800,
         "y": 90,
-        "w": 300,
+        "w": 460,
         "h": 300
       }
     },
     {
-      "id": "servo-gain",
-      "kind": "slider",
-      "binding": "rz",
-      "label": "Servo Gain",
-      "topic": "/cmd/servo_gain",
-      "direction": "horizontal",
-      "showLabel": true,
-      "showTopicInfo": true,
-      "labelAlign": "left",
-      "min": -1,
-      "max": 1,
-      "step": 0.01,
+      "id": "servo-enable",
+      "kind": "ros-message-toggle",
+      "label": "Visual Servoing",
+      "topic": "/ui/visual_servoing/on",
+      "messageType": "std_msgs/msg/Bool",
+      "onPayload": "{data: true}",
+      "offPayload": "{data: false}",
       "rect": {
         "x": 800,
         "y": 410,
-        "w": 460,
-        "h": 84
-      }
-    },
-    {
-      "id": "servo-start",
-      "kind": "button",
-      "label": "Start Servo",
-      "topic": "/cmd/servo_state",
-      "payload": "start",
-      "tone": "default",
-      "rect": {
-        "x": 800,
-        "y": 520,
         "w": 220,
-        "h": 58
+        "h": 120
       }
     },
     {
-      "id": "servo-stop",
+      "id": "servo-save",
       "kind": "button",
-      "label": "Stop Servo",
-      "topic": "/cmd/servo_state",
-      "payload": "stop",
-      "tone": "default",
+      "label": "Save Tag",
+      "topic": "/ui/visual_servoing/save",
+      "payload": "save",
+      "tone": "success",
       "rect": {
         "x": 1040,
-        "y": 520,
+        "y": 410,
         "w": 220,
         "h": 58
+      }
+    },
+    {
+      "id": "servo-topic-notes",
+      "kind": "textarea",
+      "label": "AprilTag Topics",
+      "topic": "/ui/text/visual_servoing/topics",
+      "text": "Camera: /image_raw\nDetections: /tag_detections\nControl: /ui/visual_servoing/on\nSave target: /ui/visual_servoing/save\nCommand: /visual_servoing/velocity_command\nError: /visual_servoing/error_TAGtoTAGd",
+      "fontSize": 14,
+      "rect": {
+        "x": 800,
+        "y": 550,
+        "w": 460,
+        "h": 150
       }
     }
   ],
@@ -111,5 +102,5 @@
     "presetId": "hd",
     "runtimeMode": "fit"
   },
-  "updatedAt": "2026-02-24T00:00:00.000Z"
+  "updatedAt": "2026-07-09T00:00:00.000Z"
 }
