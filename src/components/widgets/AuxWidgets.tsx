@@ -1,7 +1,13 @@
-import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import { CanvasItem } from "../layout/CanvasItem";
 import type { CanvasRect } from "../layout/CanvasItem";
-import * as Slider from "@radix-ui/react-slider";
 import {
   CartesianGrid,
   Legend,
@@ -598,8 +604,27 @@ export function MaxVelocityWidget({
   const normalizedValue = Math.max(0, Math.min(1, (value - widget.min) / sliderSpan));
   const thumbRatio = reverseDirection ? 1 - normalizedValue : normalizedValue;
   const thumbPercent = `${thumbRatio * 100}%`;
+  const sliderRef = useRef<HTMLDivElement | null>(null);
+  const activePointerIdRef = useRef<number | null>(null);
   const leftEndpointValue = reverseDirection ? widget.max : widget.min;
   const rightEndpointValue = reverseDirection ? widget.min : widget.max;
+  const clampToRange = (raw: number) => Math.max(widget.min, Math.min(widget.max, raw));
+  const snapToStep = (raw: number) => {
+    const step = widget.step > 0 ? widget.step : 0.01;
+    const stepped = widget.min + Math.round((raw - widget.min) / step) * step;
+    const decimals = Math.max(0, Math.min(6, (step.toString().split(".")[1] ?? "").length));
+    return Number(clampToRange(stepped).toFixed(decimals));
+  };
+  const valueFromClientX = (clientX: number) => {
+    const rect = sliderRef.current?.getBoundingClientRect();
+    if (!rect || rect.width <= 0) return value;
+    const visualRatio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    const valueRatio = reverseDirection ? 1 - visualRatio : visualRatio;
+    return snapToStep(widget.min + valueRatio * sliderSpan);
+  };
+  const updateFromPointer = (event: ReactPointerEvent<HTMLDivElement>) => {
+    onValueChange(valueFromClientX(event.clientX));
+  };
   const formatCompactValue = (raw: number) => {
     const rounded = Math.round(raw * 100) / 100;
     if (Number.isInteger(rounded)) return `${rounded}`;
@@ -643,20 +668,67 @@ export function MaxVelocityWidget({
           <div className="controls-max-velocity-bubble" style={{ left: thumbPercent }}>
             {bubbleValueFormatter ? bubbleValueFormatter(value) : formatCompactValue(value)}
           </div>
-          <Slider.Root
+          <div
+            ref={sliderRef}
             className={`slider controls-max-velocity-slider ${hasUnsafeSegment ? "slider-with-unsafe-zone" : ""}`.trim()}
-            min={widget.min}
-            max={widget.max}
-            step={widget.step}
-            dir={reverseDirection ? "rtl" : "ltr"}
-            value={[value]}
-            onValueChange={(next) => onValueChange(next[0] ?? value)}
+            data-canvas-interactive="true"
+            role="slider"
+            tabIndex={0}
+            aria-valuemin={widget.min}
+            aria-valuemax={widget.max}
+            aria-valuenow={clampToRange(value)}
+            aria-valuetext={bubbleValueFormatter ? bubbleValueFormatter(value) : formatCompactValue(value)}
+            onPointerDown={(event) => {
+              if (event.button !== 0) return;
+              event.preventDefault();
+              event.currentTarget.setPointerCapture(event.pointerId);
+              activePointerIdRef.current = event.pointerId;
+              updateFromPointer(event);
+            }}
+            onPointerMove={(event) => {
+              if (activePointerIdRef.current !== event.pointerId) return;
+              updateFromPointer(event);
+            }}
+            onPointerUp={(event) => {
+              if (activePointerIdRef.current !== event.pointerId) return;
+              activePointerIdRef.current = null;
+              event.currentTarget.releasePointerCapture(event.pointerId);
+            }}
+            onPointerCancel={(event) => {
+              if (activePointerIdRef.current !== event.pointerId) return;
+              activePointerIdRef.current = null;
+              if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+                event.currentTarget.releasePointerCapture(event.pointerId);
+              }
+            }}
+            onKeyDown={(event: ReactKeyboardEvent<HTMLDivElement>) => {
+              const step = widget.step > 0 ? widget.step : 0.01;
+              if (event.key === "Home") {
+                event.preventDefault();
+                onValueChange(reverseDirection ? widget.max : widget.min);
+                return;
+              }
+              if (event.key === "End") {
+                event.preventDefault();
+                onValueChange(reverseDirection ? widget.min : widget.max);
+                return;
+              }
+              const direction =
+                event.key === "ArrowRight" || event.key === "ArrowUp"
+                  ? 1
+                  : event.key === "ArrowLeft" || event.key === "ArrowDown"
+                    ? -1
+                    : 0;
+              if (!direction) return;
+              event.preventDefault();
+              onValueChange(snapToStep(value + direction * step * (reverseDirection ? -1 : 1)));
+            }}
           >
-            <Slider.Track className="slider-track controls-max-velocity-track" style={trackStyle}>
-              <Slider.Range className="slider-range controls-max-velocity-range" />
-            </Slider.Track>
-            <Slider.Thumb className="slider-thumb controls-max-velocity-thumb" />
-          </Slider.Root>
+            <div className="slider-track controls-max-velocity-track" style={trackStyle}>
+              <div className="slider-range controls-max-velocity-range" style={{ width: thumbPercent }} />
+            </div>
+            <div className="slider-thumb controls-max-velocity-thumb" style={{ left: thumbPercent }} />
+          </div>
           <div className="controls-max-velocity-endpoints">
             <span>{endpointLabels?.left || formatCompactValue(leftEndpointValue)}</span>
             <span>{endpointLabels?.right || formatCompactValue(rightEndpointValue)}</span>

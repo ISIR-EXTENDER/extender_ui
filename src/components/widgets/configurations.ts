@@ -1400,6 +1400,33 @@ const cloneConfiguration = (configuration: WidgetConfiguration): WidgetConfigura
   updatedAt: configuration.updatedAt,
 });
 
+const stableJsonValue = (value: unknown): unknown => {
+  if (Array.isArray(value)) return value.map(stableJsonValue);
+  if (isRecord(value)) {
+    return Object.fromEntries(
+      Object.keys(value)
+        .sort()
+        .map((key) => [key, stableJsonValue(value[key])])
+    );
+  }
+  return value;
+};
+
+const serializeConfigurationContent = (configuration: WidgetConfiguration): string =>
+  JSON.stringify(
+    stableJsonValue({
+      name: configuration.name,
+      widgets: configuration.widgets,
+      poses: configuration.poses,
+      canvas: configuration.canvas,
+    })
+  );
+
+const hasSameConfigurationContent = (
+  left: WidgetConfiguration,
+  right: WidgetConfiguration
+): boolean => serializeConfigurationContent(left) === serializeConfigurationContent(right);
+
 const LEGACY_DEMO_UPDATED_AT = "2026-02-17T00:00:00.000Z";
 
 const migrateLegacyDefaultControl = (
@@ -1749,36 +1776,6 @@ const migratePlayPetanqueLancerDrawThrowWidget = (
       nextWidgets.push(drawWidget);
     }
 
-    return {
-      ...configuration,
-      widgets: nextWidgets,
-      updatedAt: new Date().toISOString(),
-    };
-  });
-};
-
-const normalizeTeleopVelocitySliderRange = (
-  configurations: WidgetConfiguration[]
-): WidgetConfiguration[] => {
-  return configurations.map((configuration) => {
-    let changed = false;
-    const nextWidgets = configuration.widgets.map((widget) => {
-      if (widget.kind !== "max-velocity" || widget.topic !== "/cmd/max_velocity") {
-        return widget;
-      }
-      if (widget.min === 0 && widget.max === 3 && widget.step === 0.01) {
-        return widget;
-      }
-      changed = true;
-      return {
-        ...widget,
-        min: 0,
-        max: 3,
-        step: 0.01,
-      };
-    });
-
-    if (!changed) return configuration;
     return {
       ...configuration,
       widgets: nextWidgets,
@@ -2359,22 +2356,20 @@ const applyConfigurationMigrations = (
   configurations: WidgetConfiguration[]
 ): WidgetConfiguration[] =>
   normalizePetanqueTeleopButtonLayout(
-    normalizeTeleopVelocitySliderRange(
-      migratePlayPetanqueLancerDrawThrowWidget(
-        ensurePlayPetanqueLancerActionButtons(
-          normalizePetanqueSliderDisplayOptions(
-            normalizePetanqueSliderRanges(
-              migrateRosMessageToggleWidgets(
-                ensureSandboxRosMessageToggle(
-                  ensurePetanqueGripperControl(
-                    ensurePetanqueElectromagnetControl(
-                      removePetanqueLegacyNavigationButtons(
-                        migratePetanqueTeleopConfigLayout(
-                          disablePetanqueViewerWidget(
-                            migrateLegacyPetanque(
-                              migrateLegacyDefaultControl(
-                                mergeMissingDemoConfigurations(configurations)
-                              )
+    migratePlayPetanqueLancerDrawThrowWidget(
+      ensurePlayPetanqueLancerActionButtons(
+        normalizePetanqueSliderDisplayOptions(
+          normalizePetanqueSliderRanges(
+            migrateRosMessageToggleWidgets(
+              ensureSandboxRosMessageToggle(
+                ensurePetanqueGripperControl(
+                  ensurePetanqueElectromagnetControl(
+                    removePetanqueLegacyNavigationButtons(
+                      migratePetanqueTeleopConfigLayout(
+                        disablePetanqueViewerWidget(
+                          migrateLegacyPetanque(
+                            migrateLegacyDefaultControl(
+                              mergeMissingDemoConfigurations(configurations)
                             )
                           )
                         )
@@ -2418,7 +2413,8 @@ export function upsertConfiguration(
   name: string,
   widgets: CanvasWidget[],
   poses?: PoseSnapshot[],
-  canvas?: CanvasSettings
+  canvas?: CanvasSettings,
+  updatedAt?: string
 ): WidgetConfiguration[] {
   const existing = configurations.find((config) => config.name === name);
   const nextConfig: WidgetConfiguration = {
@@ -2426,12 +2422,16 @@ export function upsertConfiguration(
     widgets: cloneWidgets(widgets),
     poses: clonePoses(poses ?? existing?.poses ?? []),
     canvas: cloneCanvasSettings(canvas ?? existing?.canvas ?? DEFAULT_CANVAS_SETTINGS),
-    updatedAt: new Date().toISOString(),
+    updatedAt: updatedAt ?? new Date().toISOString(),
   };
 
   const existingIndex = configurations.findIndex((config) => config.name === name);
   if (existingIndex === -1) {
     return [...configurations, nextConfig].sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  if (existing && hasSameConfigurationContent(existing, nextConfig)) {
+    return configurations;
   }
 
   return configurations.map((config, index) => (index === existingIndex ? nextConfig : config));
@@ -2476,11 +2476,28 @@ export async function syncConfigurationsToFolder(configurations: WidgetConfigura
   const directoryHandle = await pickerWindow.showDirectoryPicker();
 
   for (const configuration of configurations) {
-    const fileHandle = await directoryHandle.getFileHandle(sanitizeFileName(configuration.name), {
-      create: true,
-    });
+    const fileName = sanitizeFileName(configuration.name);
+    let configurationToWrite = configuration;
+    let fileHandle: FileSystemFileHandle;
+
+    try {
+      fileHandle = await directoryHandle.getFileHandle(fileName);
+      const existingConfiguration = await parseConfigurationFile(fileHandle);
+      if (
+        existingConfiguration &&
+        hasSameConfigurationContent(existingConfiguration, configuration)
+      ) {
+        configurationToWrite = {
+          ...configuration,
+          updatedAt: existingConfiguration.updatedAt,
+        };
+      }
+    } catch {
+      fileHandle = await directoryHandle.getFileHandle(fileName, { create: true });
+    }
+
     const writable = await fileHandle.createWritable();
-    await writable.write(JSON.stringify(configuration, null, 2));
+    await writable.write(JSON.stringify(configurationToWrite, null, 2));
     await writable.close();
   }
 
@@ -2512,7 +2529,8 @@ export async function syncConfigurationsFromFolder(
       configuration.name,
       configuration.widgets,
       configuration.poses,
-      configuration.canvas
+      configuration.canvas,
+      configuration.updatedAt
     );
   }
 
