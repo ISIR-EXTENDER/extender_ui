@@ -5,6 +5,7 @@ import type {
   DrinkWidget,
   GripperControlWidget,
   MagnetControlWidget,
+  MomentaryRosMessageWidget,
   JoystickWidget,
   LogsWidget,
   LoadPoseButtonWidget,
@@ -27,6 +28,11 @@ import {
   DEFAULT_ROS_MESSAGE_TOGGLE_MESSAGE_TYPE,
   getDefaultRosMessageTogglePayloads,
 } from "./rosMessageToggle/model";
+import {
+  DEFAULT_MOMENTARY_ROS_MESSAGE_PRESSED_PAYLOAD,
+  DEFAULT_MOMENTARY_ROS_MESSAGE_RELEASED_PAYLOAD,
+  DEFAULT_MOMENTARY_ROS_MESSAGE_TYPE,
+} from "./momentaryRosMessage/model";
 
 export type WidgetCatalogType =
   | "joystick"
@@ -45,6 +51,7 @@ export type WidgetCatalogType =
   | "magnet-control"
   | "toggle-publisher"
   | "ros-message-toggle"
+  | "momentary-ros-message"
   | "stream-display"
   | "throw-draw"
   | "drink"
@@ -80,6 +87,7 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
   { type: "magnet-control", label: "Magnet Control", enabled: true, defaultSize: { w: 240, h: 120 } },
   { type: "toggle-publisher", label: "Toggle Publisher", enabled: true, defaultSize: { w: 240, h: 120 } },
   { type: "ros-message-toggle", label: "ROS Message Toggle", enabled: true, defaultSize: { w: 240, h: 120 } },
+  { type: "momentary-ros-message", label: "Momentary ROS Message", enabled: true, defaultSize: { w: 260, h: 120 } },
   { type: "stream-display", label: "Stream Display", enabled: true, defaultSize: { w: 360, h: 260 } },
   { type: "throw-draw", label: "Throw Draw", enabled: true, defaultSize: { w: 640, h: 360 } },
   { type: "drink", label: "Drink Button", enabled: true, defaultSize: { w: 180, h: 58 } },
@@ -311,6 +319,20 @@ export function createWidgetFromCatalogType(
       onPayload: payloads.onPayload,
       offPayload: payloads.offPayload,
       rect: { x, y, w: 240, h: 120 },
+    };
+    return widget;
+  }
+
+  if (type === "momentary-ros-message") {
+    const widget: MomentaryRosMessageWidget = {
+      id: nextWidgetId(),
+      kind: "momentary-ros-message",
+      label: "Hold",
+      topic: "/snake_control/enable",
+      messageType: DEFAULT_MOMENTARY_ROS_MESSAGE_TYPE,
+      pressedPayload: DEFAULT_MOMENTARY_ROS_MESSAGE_PRESSED_PAYLOAD,
+      releasedPayload: DEFAULT_MOMENTARY_ROS_MESSAGE_RELEASED_PAYLOAD,
+      rect: { x, y, w: 260, h: 120 },
     };
     return widget;
   }

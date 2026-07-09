@@ -29,6 +29,7 @@ export type WidgetKind =
   | "magnet-control"
   | "toggle-publisher"
   | "ros-message-toggle"
+  | "momentary-ros-message"
   | "stream-display"
   | "throw-draw"
   | "drink"
@@ -161,6 +162,13 @@ export type RosMessageToggleWidget = WidgetBase & {
   offPayload: string;
 };
 
+export type MomentaryRosMessageWidget = WidgetBase & {
+  kind: "momentary-ros-message";
+  messageType: string;
+  pressedPayload: string;
+  releasedPayload: string;
+};
+
 export type StreamDisplayWidget = WidgetBase & {
   kind: "stream-display";
   source: StreamSource;
@@ -228,6 +236,7 @@ export type CanvasWidget =
   | MagnetControlWidget
   | TogglePublisherWidget
   | RosMessageToggleWidget
+  | MomentaryRosMessageWidget
   | StreamDisplayWidget
   | ThrowDrawWidget
   | DrinkWidget
