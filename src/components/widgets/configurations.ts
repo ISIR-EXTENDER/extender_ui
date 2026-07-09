@@ -442,6 +442,7 @@ export const DEFAULT_DEMO_CONFIGURATIONS: WidgetConfiguration[] = [
       ],
       showSummary: true,
       showRaw: false,
+      staleAfterMs: 2000,
       rect: { w: 1240, h: 600 },
     }),
   ]),

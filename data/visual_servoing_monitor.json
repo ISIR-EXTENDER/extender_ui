@@ -54,6 +54,7 @@
       ],
       "showSummary": true,
       "showRaw": false,
+      "staleAfterMs": 2000,
       "rect": {
         "x": 20,
         "y": 100,

@@ -26,4 +26,20 @@ describe("uiStore topic snapshots", () => {
       data: { detections: [{ id: 4 }] },
     });
   });
+
+  it("stores the latest topic monitor subscription event", () => {
+    useUiStore.setState({ topicMonitorEvent: null });
+
+    useUiStore.getState().setTopicMonitorEvent({
+      type: "event",
+      severity: "warning",
+      code: "TOPIC_SUBSCRIBE_PARTIAL",
+      message: "/camera/image_raw: image topic blocked",
+    });
+
+    expect(useUiStore.getState().topicMonitorEvent).toMatchObject({
+      severity: "warning",
+      code: "TOPIC_SUBSCRIBE_PARTIAL",
+    });
+  });
 });

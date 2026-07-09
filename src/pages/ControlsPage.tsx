@@ -3515,9 +3515,47 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
                           <option value="visible">visible</option>
                         </select>
                       </label>
+                      <label className="controls-field">
+                        <span>Stale Threshold (ms)</span>
+                        <input
+                          type="number"
+                          min={250}
+                          max={60000}
+                          step={250}
+                          className="editor-input"
+                          value={selectedWidget.staleAfterMs ?? 2000}
+                          onChange={(event) =>
+                            updateSelectedTopicMonitor((widget) => ({
+                              ...widget,
+                              staleAfterMs: Math.max(
+                                250,
+                                Math.min(
+                                  60000,
+                                  Math.round(readNumber(event.target.value, widget.staleAfterMs ?? 2000))
+                                )
+                              ),
+                            }))
+                          }
+                        />
+                      </label>
                       {selectedWidget.topics.map((topic, index) => (
                         <div className="controls-field-group" key={`${topic.topic}-${index}`}>
-                          <div className="controls-property-subtitle">Topic {index + 1}</div>
+                          <div className="controls-field-group-header">
+                            <div className="controls-property-subtitle">Topic {index + 1}</div>
+                            <button
+                              type="button"
+                              className="controls-inline-button"
+                              disabled={selectedWidget.topics.length <= 1}
+                              onClick={() =>
+                                updateSelectedTopicMonitor((widget) => ({
+                                  ...widget,
+                                  topics: widget.topics.filter((_, itemIndex) => itemIndex !== index),
+                                }))
+                              }
+                            >
+                              Remove
+                            </button>
+                          </div>
                           <label className="controls-field">
                             <span>Label</span>
                             <input
@@ -3571,6 +3609,25 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
                           </label>
                         </div>
                       ))}
+                      <button
+                        type="button"
+                        className="controls-inline-button"
+                        onClick={() =>
+                          updateSelectedTopicMonitor((widget) => ({
+                            ...widget,
+                            topics: [
+                              ...widget.topics,
+                              {
+                                label: `Topic ${widget.topics.length + 1}`,
+                                topic: "/debug/topic",
+                                messageType: "std_msgs/msg/String",
+                              },
+                            ],
+                          }))
+                        }
+                      >
+                        Add Topic
+                      </button>
                     </>
                   ) : selectedWidget.kind === "mode-button" ? (
                     <>

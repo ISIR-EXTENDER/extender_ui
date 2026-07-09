@@ -231,6 +231,7 @@ export type TopicMonitorWidget = WidgetBase & {
   topics: TopicMonitorTopic[];
   showSummary?: boolean;
   showRaw: boolean;
+  staleAfterMs?: number;
 };
 
 export type CanvasWidget =

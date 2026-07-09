@@ -117,6 +117,13 @@ The sandbox visual-servoing flow is split across two screens:
 
 The monitor uses the generic backend `topic_subscribe` / `topic_snapshot` websocket flow. It is meant for small diagnostic ROS messages, not for video frames; webcam preview stays on the stream widget path.
 
+Topic monitor widgets support:
+
+- a configurable stale threshold, so topics move from live to stale when snapshots stop updating.
+- visible backend subscription events, including partial failures.
+- local warnings for `sensor_msgs/msg/Image` and `sensor_msgs/msg/CompressedImage`; use stream widgets for those.
+- adding, editing, and removing monitored topics from the editor inspector.
+
 ## Development
 
 ```bash

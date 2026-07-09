@@ -2244,11 +2244,32 @@ type LogEntry = {
   message: string;
 };
 
+type TopicMonitorStatus = "waiting" | "live" | "stale" | "error" | "blocked";
+
+const DEFAULT_TOPIC_MONITOR_STALE_MS = 2000;
+const BLOCKED_TOPIC_MONITOR_MESSAGE_TYPES = new Set([
+  "sensor_msgs/msg/Image",
+  "sensor_msgs/msg/CompressedImage",
+]);
+
+const isBlockedTopicMonitorMessageType = (messageType: string) =>
+  BLOCKED_TOPIC_MONITOR_MESSAGE_TYPES.has(messageType.trim());
+
 const formatTopicAge = (updatedAtMs: number | null) => {
   if (updatedAtMs == null) return "waiting";
   const ageMs = Math.max(0, Date.now() - updatedAtMs);
   if (ageMs < 1000) return `${ageMs} ms`;
   return `${(ageMs / 1000).toFixed(1)} s`;
+};
+
+const resolveTopicMonitorStatus = (
+  snapshot: WsTopicSnapshotMessage | undefined,
+  staleAfterMs: number
+): TopicMonitorStatus => {
+  if (!snapshot) return "waiting";
+  if (snapshot.error) return "error";
+  if (snapshot.updated_at_ms == null || snapshot.revision <= 0) return "waiting";
+  return Date.now() - snapshot.updated_at_ms > staleAfterMs ? "stale" : "live";
 };
 
 const formatVector = (value: unknown) => {
@@ -2335,7 +2356,8 @@ const summarizeTopicData = (snapshot: WsTopicSnapshotMessage | undefined) => {
 
 const resolveMonitorSummary = (
   topics: TopicMonitorWidgetModel["topics"],
-  topicSnapshots: Record<string, WsTopicSnapshotMessage>
+  topicSnapshots: Record<string, WsTopicSnapshotMessage>,
+  staleAfterMs: number
 ) => {
   const findSnapshot = (matcher: (topic: TopicMonitorWidgetModel["topics"][number]) => boolean) => {
     const topic = topics.find(matcher);
@@ -2368,22 +2390,27 @@ const resolveMonitorSummary = (
     {
       label: "Tags",
       value: `${getArrayCount(detectionsSnapshot?.data) ?? 0}`,
-      status: detectionsSnapshot?.error ? "error" : detectionsSnapshot ? "live" : "waiting",
+      status: resolveTopicMonitorStatus(detectionsSnapshot, staleAfterMs),
     },
     {
       label: "Cmd |v|",
       value: formatMagnitude(commandMagnitudes.linear),
-      status: commandSnapshot?.error ? "error" : commandSnapshot ? "live" : "waiting",
+      status: resolveTopicMonitorStatus(commandSnapshot, staleAfterMs),
     },
     {
       label: "Err |v|",
       value: formatMagnitude(errorMagnitudes.linear),
-      status: errorSnapshot?.error ? "error" : errorSnapshot ? "live" : "waiting",
+      status: resolveTopicMonitorStatus(errorSnapshot, staleAfterMs),
     },
     {
       label: "Age",
       value: formatTopicAge(freshestUpdatedAt),
-      status: freshestUpdatedAt == null ? "waiting" : "live",
+      status:
+        freshestUpdatedAt == null
+          ? "waiting"
+          : Date.now() - freshestUpdatedAt > staleAfterMs
+            ? "stale"
+            : "live",
     },
   ];
 };
@@ -2396,14 +2423,28 @@ export function TopicMonitorWidget({
   onLabelChange,
 }: TopicMonitorWidgetProps) {
   const topicSnapshots = useUiStore((s) => s.topicSnapshots);
+  const topicMonitorEvent = useUiStore((s) => s.topicMonitorEvent);
+  const [, setFreshnessTick] = useState(0);
+  const staleAfterMs = Math.max(
+    250,
+    Math.round(widget.staleAfterMs ?? DEFAULT_TOPIC_MONITOR_STALE_MS)
+  );
+  const blockedTopics = widget.topics.filter((topic) =>
+    isBlockedTopicMonitorMessageType(topic.messageType)
+  );
   const subscriptionSignature = useMemo(
     () => widget.topics.map((topic) => `${topic.topic}|${topic.messageType}`).join("\n"),
     [widget.topics]
   );
-  const summaryItems = useMemo(
-    () => resolveMonitorSummary(widget.topics, topicSnapshots),
-    [topicSnapshots, widget.topics]
-  );
+  const summaryItems = resolveMonitorSummary(widget.topics, topicSnapshots, staleAfterMs);
+
+  useEffect(() => {
+    const intervalMs = Math.max(250, Math.min(1000, Math.round(staleAfterMs / 2)));
+    const timer = window.setInterval(() => {
+      setFreshnessTick((value) => value + 1);
+    }, intervalMs);
+    return () => window.clearInterval(timer);
+  }, [staleAfterMs]);
 
   useEffect(() => {
     const topics = widget.topics
@@ -2411,7 +2452,12 @@ export function TopicMonitorWidget({
         topic: topic.topic.trim(),
         message_type: topic.messageType.trim(),
       }))
-      .filter((topic) => topic.topic && topic.message_type);
+      .filter(
+        (topic) =>
+          topic.topic &&
+          topic.message_type &&
+          !isBlockedTopicMonitorMessageType(topic.message_type)
+      );
     if (!topics.length) return;
     wsClient.send({
       type: "topic_subscribe",
@@ -2438,6 +2484,17 @@ export function TopicMonitorWidget({
           </div>
           <div className="controls-topic-monitor-meta">{widget.topics.length} topics</div>
         </div>
+        {topicMonitorEvent ? (
+          <div className={`controls-topic-monitor-event is-${topicMonitorEvent.severity}`}>
+            {topicMonitorEvent.message}
+          </div>
+        ) : null}
+        {blockedTopics.length ? (
+          <div className="controls-topic-monitor-event is-warning">
+            Image/video message types are not monitored here. Use stream widgets for{" "}
+            {blockedTopics.map((topic) => topic.topic || topic.label).join(", ")}.
+          </div>
+        ) : null}
         {widget.showSummary ?? true ? (
           <div className="controls-topic-monitor-summary-grid">
             {summaryItems.map((item) => (
@@ -2453,23 +2510,28 @@ export function TopicMonitorWidget({
         ) : null}
         <div className="controls-topic-monitor-list">
           {widget.topics.map((topic) => {
+            const blocked = isBlockedTopicMonitorMessageType(topic.messageType);
             const snapshot =
               topicSnapshots[topicSnapshotKey(topic.topic, topic.messageType)];
-            const hasData = Boolean(snapshot && snapshot.revision > 0 && !snapshot.error);
+            const status = blocked
+              ? "blocked"
+              : resolveTopicMonitorStatus(snapshot, staleAfterMs);
             return (
               <div
                 key={`${topic.topic}|${topic.messageType}`}
-                className={`controls-topic-monitor-row ${snapshot?.error ? "is-error" : hasData ? "is-live" : "is-waiting"}`.trim()}
+                className={`controls-topic-monitor-row is-${status}`}
               >
                 <div className="controls-topic-monitor-row-head">
                   <span className="controls-topic-monitor-name">{topic.label || topic.topic}</span>
                   <span className="controls-topic-monitor-age">
-                    {formatTopicAge(snapshot?.updated_at_ms ?? null)}
+                    {blocked ? "blocked" : formatTopicAge(snapshot?.updated_at_ms ?? null)}
                   </span>
                 </div>
                 <div className="controls-topic-monitor-topic">{topic.topic}</div>
                 <div className="controls-topic-monitor-summary">
-                  {summarizeTopicData(snapshot)}
+                  {blocked
+                    ? "image/video topic blocked; use a stream widget instead"
+                    : summarizeTopicData(snapshot)}
                 </div>
                 {widget.showRaw && snapshot?.data != null ? (
                   <pre className="controls-topic-monitor-raw">

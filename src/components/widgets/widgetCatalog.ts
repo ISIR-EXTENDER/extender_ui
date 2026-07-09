@@ -372,6 +372,7 @@ export function createWidgetFromCatalogType(
       ],
       showSummary: true,
       showRaw: false,
+      staleAfterMs: 2000,
       rect: { x, y, w: 460, h: 250 },
     };
     return widget;
