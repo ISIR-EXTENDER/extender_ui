@@ -92,6 +92,8 @@ The max velocity widget uses the same pointer-position rule. Its value source de
 - known teleop configuration topics, such as `/cmd/max_velocity`, read and write the shared teleop store.
 - custom topics keep an independent per-widget value in the controls page, so several max velocity widgets no longer force each other to the same value.
 
+Generic teleoperation treats `/cmd/max_velocity` as a normalized gain from `0` to `1`. Pétanque-specific throw controls keep their own ranges on dedicated topics such as `/petanque_throw/total_duration`.
+
 When a screen is saved or synchronized to a folder, `updatedAt` is preserved if the screen content is unchanged. This avoids timestamp-only JSON diffs when no widget, pose, or canvas setting actually changed.
 
 ## Apps

@@ -133,9 +133,9 @@ export const DEFAULT_DEMO_CONFIGURATIONS: WidgetConfiguration[] = [
     createDemoWidget("sandbox-max-velocity", "max-velocity", 279, 95, {
       label: "Max Velocity",
       topic: "/cmd/max_velocity",
-      min: 0.1,
-      max: 3.0,
-      step: 0.1,
+      min: 0,
+      max: 1,
+      step: 0.01,
       rect: { w: 382, h: 159 },
     }),
     createDemoWidget("sandbox-rotation", "joystick", 802, 268, {
@@ -266,12 +266,12 @@ export const DEFAULT_DEMO_CONFIGURATIONS: WidgetConfiguration[] = [
     createDemoWidget("control-panel-max-velocity", "max-velocity", 610, 20, {
       label: "Max Velocity",
       topic: "/cmd/max_velocity",
-      min: 0.1,
-      max: 3.0,
-      step: 0.1,
-      rect: { w: 640, h: 92 },
+      min: 0,
+      max: 1,
+      step: 0.01,
+      rect: { w: 640, h: 145 },
     }),
-    createDemoWidget("control-panel-z", "slider", 610, 140, {
+    createDemoWidget("control-panel-z", "slider", 589, 174, {
       binding: "z",
       label: "Z",
       topic: "/cmd/joystick_z",
@@ -282,9 +282,9 @@ export const DEFAULT_DEMO_CONFIGURATIONS: WidgetConfiguration[] = [
       min: -1,
       max: 1,
       step: 0.01,
-      rect: { w: 120, h: 405 },
+      rect: { w: 162, h: 413 },
     }),
-    createDemoWidget("control-panel-translation", "joystick", 760, 140, {
+    createDemoWidget("control-panel-translation", "joystick", 765, 185, {
       binding: "joy",
       label: "X Y",
       topic: "/cmd/joystick",
@@ -300,7 +300,7 @@ export const DEFAULT_DEMO_CONFIGURATIONS: WidgetConfiguration[] = [
       },
       rect: { w: 240, h: 240 },
     }),
-    createDemoWidget("control-panel-rotation", "joystick", 1015, 140, {
+    createDemoWidget("control-panel-rotation", "joystick", 1015, 185, {
       binding: "rot",
       label: "RX RY",
       topic: "/cmd/joystick_rxry",
@@ -316,7 +316,7 @@ export const DEFAULT_DEMO_CONFIGURATIONS: WidgetConfiguration[] = [
       },
       rect: { w: 240, h: 240 },
     }),
-    createDemoWidget("control-panel-rz", "slider", 760, 418, {
+    createDemoWidget("control-panel-rz", "slider", 765, 439, {
       binding: "rz",
       label: "RZ",
       topic: "/cmd/joystick_rz",
@@ -327,9 +327,9 @@ export const DEFAULT_DEMO_CONFIGURATIONS: WidgetConfiguration[] = [
       min: -1,
       max: 1,
       step: 0.01,
-      rect: { w: 495, h: 92 },
+      rect: { w: 490, h: 157 },
     }),
-    createDemoWidget("control-panel-mode", "mode-button", 610, 575, {
+    createDemoWidget("control-panel-mode", "mode-button", 610, 616, {
       label: "Mode",
       topic: "/cmd/mode",
       rect: { w: 120, h: 84 },

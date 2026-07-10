@@ -25,6 +25,11 @@ type TeleopConfigProfile = {
 
 const TELEOP_PROFILE_STORAGE_KEY = "extender_ui.teleop_profiles.v1";
 const DEFAULT_TELEOP_PROFILE_ROBOT = "explorer";
+const TELEOP_MAX_VELOCITY_MIN = 0;
+const TELEOP_MAX_VELOCITY_MAX = 1;
+
+export const clampTeleopMaxVelocity = (value: number) =>
+  Math.max(TELEOP_MAX_VELOCITY_MIN, Math.min(TELEOP_MAX_VELOCITY_MAX, value));
 
 const normalizeProfileRobot = (robot: string) => {
   const normalized = robot.trim().toLowerCase();
@@ -56,7 +61,6 @@ const getDefaultTeleopConfigProfile = (
   if (normalizeProfileRobot(robot) === "explorer") {
     return {
       ...baseDefaults,
-      maxVelocity: 3,
       swapXY: true,
       invertLinearX: true,
     };
@@ -83,7 +87,10 @@ const loadTeleopConfigProfile = (robot: string): TeleopConfigProfile => {
   if (!stored || typeof stored !== "object") return defaults;
 
   return {
-    maxVelocity: typeof stored.maxVelocity === "number" ? stored.maxVelocity : defaults.maxVelocity,
+    maxVelocity:
+      typeof stored.maxVelocity === "number"
+        ? clampTeleopMaxVelocity(stored.maxVelocity)
+        : defaults.maxVelocity,
     scaleX: typeof stored.scaleX === "number" ? stored.scaleX : defaults.scaleX,
     scaleY: typeof stored.scaleY === "number" ? stored.scaleY : defaults.scaleY,
     scaleZ: typeof stored.scaleZ === "number" ? stored.scaleZ : defaults.scaleZ,
@@ -236,7 +243,7 @@ export const useTeleopStore = create<TeleopState>((set, get) => ({
   cycleMode: () => set((state) => ({ mode: selectNextTabletMode(state.mode) })),
   setWsStatus: (status) => set({ wsStatus: status }),
   setWsState: (state) => set({ wsState: state }),
-  setMaxVelocity: (value) => set({ maxVelocity: value }),
+  setMaxVelocity: (value) => set({ maxVelocity: clampTeleopMaxVelocity(value) }),
   setScaleX: (v) => set({ scaleX: v }),
   setScaleY: (v) => set({ scaleY: v }),
   setScaleZ: (v) => set({ scaleZ: v }),
@@ -260,7 +267,7 @@ export const useTeleopStore = create<TeleopState>((set, get) => ({
     const state = get();
     const targetRobot = normalizeProfileRobot(robot ?? state.profileRobot);
     const profile: TeleopConfigProfile = {
-      maxVelocity: state.maxVelocity,
+      maxVelocity: clampTeleopMaxVelocity(state.maxVelocity),
       scaleX: state.scaleX,
       scaleY: state.scaleY,
       scaleZ: state.scaleZ,
@@ -287,7 +294,7 @@ export const useTeleopStore = create<TeleopState>((set, get) => ({
     const profile = loadTeleopConfigProfile(targetRobot);
     set({
       profileRobot: targetRobot,
-      maxVelocity: profile.maxVelocity,
+      maxVelocity: clampTeleopMaxVelocity(profile.maxVelocity),
       scaleX: profile.scaleX,
       scaleY: profile.scaleY,
       scaleZ: profile.scaleZ,
@@ -376,8 +383,9 @@ export const useTeleopStore = create<TeleopState>((set, get) => ({
     const angularSignY = (invertY ? -1 : 1) * (invertAngularY ? -1 : 1);
     const angularSignZ = (invertZ ? -1 : 1) * (invertAngularZ ? -1 : 1);
 
-    const linearGain = translationGain * maxVelocity;
-    const angularGain = rotationGain * maxVelocity;
+    const safeMaxVelocity = clampTeleopMaxVelocity(maxVelocity);
+    const linearGain = translationGain * safeMaxVelocity;
+    const angularGain = rotationGain * safeMaxVelocity;
 
     const linearX = translationActive ? linearSignX * linearSourceX * scaleX * linearGain : 0;
     const linearY = translationActive ? linearSignY * linearSourceY * scaleY * linearGain : 0;

@@ -27,13 +27,13 @@
       "showStatus": true,
       "showUrl": false,
       "overlayText": "webcam feed",
-      "showWebcamPicker": true,
       "rect": {
         "x": 20,
         "y": 90,
         "w": 560,
         "h": 400
-      }
+      },
+      "showWebcamPicker": true
     },
     {
       "id": "control-panel-gripper",
@@ -96,22 +96,22 @@
       "kind": "max-velocity",
       "label": "Max Velocity",
       "topic": "/cmd/max_velocity",
-      "min": 0.1,
-      "max": 3,
-      "step": 0.1,
+      "min": 0,
+      "max": 1,
+      "step": 0.01,
       "rect": {
         "x": 610,
         "y": 20,
         "w": 640,
-        "h": 92
+        "h": 145
       }
     },
     {
       "id": "control-panel-z",
       "kind": "slider",
+      "binding": "z",
       "label": "Z",
       "topic": "/cmd/joystick_z",
-      "binding": "z",
       "direction": "vertical",
       "showLabel": true,
       "showTopicInfo": false,
@@ -120,18 +120,18 @@
       "max": 1,
       "step": 0.01,
       "rect": {
-        "x": 610,
-        "y": 140,
-        "w": 120,
-        "h": 405
+        "x": 589,
+        "y": 174,
+        "w": 162,
+        "h": 413
       }
     },
     {
       "id": "control-panel-translation",
       "kind": "joystick",
+      "binding": "joy",
       "label": "X Y",
       "topic": "/cmd/joystick",
-      "binding": "joy",
       "showTopicInfo": false,
       "color": "#4a9eff",
       "deadzone": 0.1,
@@ -143,8 +143,8 @@
         "left": "X-"
       },
       "rect": {
-        "x": 760,
-        "y": 140,
+        "x": 765,
+        "y": 185,
         "w": 240,
         "h": 240
       }
@@ -152,9 +152,9 @@
     {
       "id": "control-panel-rotation",
       "kind": "joystick",
+      "binding": "rot",
       "label": "RX RY",
       "topic": "/cmd/joystick_rxry",
-      "binding": "rot",
       "showTopicInfo": false,
       "color": "#ff4d67",
       "deadzone": 0.1,
@@ -167,7 +167,7 @@
       },
       "rect": {
         "x": 1015,
-        "y": 140,
+        "y": 185,
         "w": 240,
         "h": 240
       }
@@ -175,9 +175,9 @@
     {
       "id": "control-panel-rz",
       "kind": "slider",
+      "binding": "rz",
       "label": "RZ",
       "topic": "/cmd/joystick_rz",
-      "binding": "rz",
       "direction": "horizontal",
       "showLabel": true,
       "showTopicInfo": false,
@@ -186,10 +186,10 @@
       "max": 1,
       "step": 0.01,
       "rect": {
-        "x": 760,
-        "y": 418,
-        "w": 495,
-        "h": 92
+        "x": 765,
+        "y": 439,
+        "w": 490,
+        "h": 157
       }
     },
     {
@@ -199,7 +199,7 @@
       "topic": "/cmd/mode",
       "rect": {
         "x": 610,
-        "y": 575,
+        "y": 616,
         "w": 120,
         "h": 84
       }
