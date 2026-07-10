@@ -1,0 +1,214 @@
+{
+  "name": "control_panel",
+  "widgets": [
+    {
+      "id": "control-panel-title",
+      "kind": "text",
+      "label": "Text",
+      "topic": "/ui/text",
+      "text": "Control Panel",
+      "fontSize": 26,
+      "align": "left",
+      "rect": {
+        "x": 20,
+        "y": 20,
+        "w": 300,
+        "h": 56
+      }
+    },
+    {
+      "id": "control-panel-camera",
+      "kind": "stream-display",
+      "label": "Camera",
+      "topic": "/camera/play_petanque",
+      "source": "webcam",
+      "streamUrl": "webcam:///dev/video2",
+      "fitMode": "cover",
+      "showStatus": true,
+      "showUrl": false,
+      "overlayText": "webcam feed",
+      "showWebcamPicker": true,
+      "rect": {
+        "x": 20,
+        "y": 90,
+        "w": 560,
+        "h": 400
+      }
+    },
+    {
+      "id": "control-panel-gripper",
+      "kind": "gripper-control",
+      "label": "Gripper",
+      "topic": "/cmd/gripper",
+      "showAdvancedControls": true,
+      "rect": {
+        "x": 20,
+        "y": 510,
+        "w": 260,
+        "h": 86
+      }
+    },
+    {
+      "id": "control-panel-servo-enable",
+      "kind": "ros-message-toggle",
+      "label": "Visual Servoing",
+      "topic": "/ui/visual_servoing/on",
+      "messageType": "std_msgs/msg/Bool",
+      "onPayload": "{data: true}",
+      "offPayload": "{data: false}",
+      "rect": {
+        "x": 300,
+        "y": 510,
+        "w": 280,
+        "h": 86
+      }
+    },
+    {
+      "id": "control-panel-servo-save",
+      "kind": "button",
+      "label": "Save Tag",
+      "topic": "/ui/visual_servoing/save",
+      "payload": "save",
+      "tone": "success",
+      "rect": {
+        "x": 20,
+        "y": 616,
+        "w": 260,
+        "h": 58
+      }
+    },
+    {
+      "id": "control-panel-open-monitor",
+      "kind": "navigation-button",
+      "label": "Monitor",
+      "topic": "/ui/navigation/visual_servoing_monitor",
+      "targetScreenId": "visual_servoing_monitor",
+      "icon": "arrow-right",
+      "rect": {
+        "x": 300,
+        "y": 616,
+        "w": 280,
+        "h": 58
+      }
+    },
+    {
+      "id": "control-panel-max-velocity",
+      "kind": "max-velocity",
+      "label": "Max Velocity",
+      "topic": "/cmd/max_velocity",
+      "min": 0.1,
+      "max": 3,
+      "step": 0.1,
+      "rect": {
+        "x": 610,
+        "y": 20,
+        "w": 640,
+        "h": 92
+      }
+    },
+    {
+      "id": "control-panel-z",
+      "kind": "slider",
+      "label": "Z",
+      "topic": "/cmd/joystick_z",
+      "binding": "z",
+      "direction": "vertical",
+      "showLabel": true,
+      "showTopicInfo": false,
+      "labelAlign": "center",
+      "min": -1,
+      "max": 1,
+      "step": 0.01,
+      "rect": {
+        "x": 610,
+        "y": 140,
+        "w": 120,
+        "h": 405
+      }
+    },
+    {
+      "id": "control-panel-translation",
+      "kind": "joystick",
+      "label": "X Y",
+      "topic": "/cmd/joystick",
+      "binding": "joy",
+      "showTopicInfo": false,
+      "color": "#4a9eff",
+      "deadzone": 0.1,
+      "diskSize": 80,
+      "labels": {
+        "top": "Y+",
+        "right": "X+",
+        "bottom": "Y-",
+        "left": "X-"
+      },
+      "rect": {
+        "x": 760,
+        "y": 140,
+        "w": 240,
+        "h": 240
+      }
+    },
+    {
+      "id": "control-panel-rotation",
+      "kind": "joystick",
+      "label": "RX RY",
+      "topic": "/cmd/joystick_rxry",
+      "binding": "rot",
+      "showTopicInfo": false,
+      "color": "#ff4d67",
+      "deadzone": 0.1,
+      "diskSize": 80,
+      "labels": {
+        "top": "RY+",
+        "right": "RX+",
+        "bottom": "RY-",
+        "left": "RX-"
+      },
+      "rect": {
+        "x": 1015,
+        "y": 140,
+        "w": 240,
+        "h": 240
+      }
+    },
+    {
+      "id": "control-panel-rz",
+      "kind": "slider",
+      "label": "RZ",
+      "topic": "/cmd/joystick_rz",
+      "binding": "rz",
+      "direction": "horizontal",
+      "showLabel": true,
+      "showTopicInfo": false,
+      "labelAlign": "center",
+      "min": -1,
+      "max": 1,
+      "step": 0.01,
+      "rect": {
+        "x": 760,
+        "y": 418,
+        "w": 495,
+        "h": 92
+      }
+    },
+    {
+      "id": "control-panel-mode",
+      "kind": "mode-button",
+      "label": "Mode",
+      "topic": "/cmd/mode",
+      "rect": {
+        "x": 610,
+        "y": 575,
+        "w": 120,
+        "h": 84
+      }
+    }
+  ],
+  "poses": [],
+  "canvas": {
+    "presetId": "hd",
+    "runtimeMode": "fit"
+  },
+  "updatedAt": "2026-02-24T00:00:00.000Z"
+}

@@ -4,6 +4,7 @@
   "screenIds": [
     "sandbox_control",
     "sandbox_teleop_config",
+    "control_panel",
     "snake_control",
     "visual_servoing",
     "visual_servoing_monitor"

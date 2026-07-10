@@ -112,8 +112,11 @@ The UI can display streams and capture frames from stream widgets. Captured fram
 
 The sandbox visual-servoing flow is split across two screens:
 
+- `control_panel`: a compact daily-operation screen for Sandbox with webcam preview, Cartesian velocity controls, max velocity, gripper, and visual-servoing save/on/off controls.
 - `visual_servoing`: camera/RViz preview plus the visual-servoing toggle and save-tag action.
 - `visual_servoing_monitor`: a dedicated ROS topic monitor for AprilTag detections, velocity command, and servo error snapshots.
+
+`control_panel` is based on Robin's `default_control_with_camera` workflow. It keeps only the useful daily controls: `/cmd/joystick`, `/cmd/joystick_rxry`, `/cmd/joystick_z`, `/cmd/joystick_rz`, `/cmd/max_velocity`, `/cmd/gripper`, `/ui/visual_servoing/on`, and `/ui/visual_servoing/save`. The unused snake slider and generic ROS test toggle are intentionally left out.
 
 The monitor uses the generic backend `topic_subscribe` / `topic_snapshot` websocket flow. It is meant for small diagnostic ROS messages, not for video frames; webcam preview stays on the stream widget path.
 
