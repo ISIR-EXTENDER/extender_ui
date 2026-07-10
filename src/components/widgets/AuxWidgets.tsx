@@ -2432,6 +2432,7 @@ export function TopicMonitorWidget({
   const blockedTopics = widget.topics.filter((topic) =>
     isBlockedTopicMonitorMessageType(topic.messageType)
   );
+  const showDetails = widget.showDetails ?? true;
   const subscriptionSignature = useMemo(
     () => widget.topics.map((topic) => `${topic.topic}|${topic.messageType}`).join("\n"),
     [widget.topics]
@@ -2474,10 +2475,10 @@ export function TopicMonitorWidget({
       onChange={onRectChange}
       onSelect={onSelect}
       selected={selected}
-      minSize={{ w: 300, h: 170 }}
+      minSize={{ w: 300, h: showDetails ? 170 : 84 }}
       className="controls-topic-monitor-item"
     >
-      <div className="controls-topic-monitor-widget">
+      <div className={`controls-topic-monitor-widget ${showDetails ? "" : "is-compact"}`.trim()}>
         <div className="controls-topic-monitor-header">
           <div className="controls-topic-monitor-title">
             <InlineEditableText value={widget.label} onCommit={onLabelChange} className="controls-inline-label" />
@@ -2508,40 +2509,42 @@ export function TopicMonitorWidget({
             ))}
           </div>
         ) : null}
-        <div className="controls-topic-monitor-list">
-          {widget.topics.map((topic) => {
-            const blocked = isBlockedTopicMonitorMessageType(topic.messageType);
-            const snapshot =
-              topicSnapshots[topicSnapshotKey(topic.topic, topic.messageType)];
-            const status = blocked
-              ? "blocked"
-              : resolveTopicMonitorStatus(snapshot, staleAfterMs);
-            return (
-              <div
-                key={`${topic.topic}|${topic.messageType}`}
-                className={`controls-topic-monitor-row is-${status}`}
-              >
-                <div className="controls-topic-monitor-row-head">
-                  <span className="controls-topic-monitor-name">{topic.label || topic.topic}</span>
-                  <span className="controls-topic-monitor-age">
-                    {blocked ? "blocked" : formatTopicAge(snapshot?.updated_at_ms ?? null)}
-                  </span>
+        {showDetails ? (
+          <div className="controls-topic-monitor-list">
+            {widget.topics.map((topic) => {
+              const blocked = isBlockedTopicMonitorMessageType(topic.messageType);
+              const snapshot =
+                topicSnapshots[topicSnapshotKey(topic.topic, topic.messageType)];
+              const status = blocked
+                ? "blocked"
+                : resolveTopicMonitorStatus(snapshot, staleAfterMs);
+              return (
+                <div
+                  key={`${topic.topic}|${topic.messageType}`}
+                  className={`controls-topic-monitor-row is-${status}`}
+                >
+                  <div className="controls-topic-monitor-row-head">
+                    <span className="controls-topic-monitor-name">{topic.label || topic.topic}</span>
+                    <span className="controls-topic-monitor-age">
+                      {blocked ? "blocked" : formatTopicAge(snapshot?.updated_at_ms ?? null)}
+                    </span>
+                  </div>
+                  <div className="controls-topic-monitor-topic">{topic.topic}</div>
+                  <div className="controls-topic-monitor-summary">
+                    {blocked
+                      ? "image/video topic blocked; use a stream widget instead"
+                      : summarizeTopicData(snapshot)}
+                  </div>
+                  {widget.showRaw && snapshot?.data != null ? (
+                    <pre className="controls-topic-monitor-raw">
+                      {JSON.stringify(snapshot.data, null, 2)}
+                    </pre>
+                  ) : null}
                 </div>
-                <div className="controls-topic-monitor-topic">{topic.topic}</div>
-                <div className="controls-topic-monitor-summary">
-                  {blocked
-                    ? "image/video topic blocked; use a stream widget instead"
-                    : summarizeTopicData(snapshot)}
-                </div>
-                {widget.showRaw && snapshot?.data != null ? (
-                  <pre className="controls-topic-monitor-raw">
-                    {JSON.stringify(snapshot.data, null, 2)}
-                  </pre>
-                ) : null}
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        ) : null}
       </div>
     </CanvasItem>
   );

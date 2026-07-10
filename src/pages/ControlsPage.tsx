@@ -3500,6 +3500,22 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
                         </select>
                       </label>
                       <label className="controls-field">
+                        <span>Details</span>
+                        <select
+                          className="editor-input"
+                          value={(selectedWidget.showDetails ?? true) ? "visible" : "hidden"}
+                          onChange={(event) =>
+                            updateSelectedTopicMonitor((widget) => ({
+                              ...widget,
+                              showDetails: event.target.value === "visible",
+                            }))
+                          }
+                        >
+                          <option value="visible">visible</option>
+                          <option value="hidden">hidden</option>
+                        </select>
+                      </label>
+                      <label className="controls-field">
                         <span>Raw JSON</span>
                         <select
                           className="editor-input"

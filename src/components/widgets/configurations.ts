@@ -249,14 +249,14 @@ export const DEFAULT_DEMO_CONFIGURATIONS: WidgetConfiguration[] = [
       offPayload: "{data: false}",
       rect: { w: 280, h: 86 },
     }),
-    createDemoWidget("control-panel-servo-save", "button", 20, 616, {
+    createDemoWidget("control-panel-servo-save", "button", 20, 629, {
       label: "Save Tag",
       topic: "/ui/visual_servoing/save",
       payload: "save",
       tone: "success",
       rect: { w: 260, h: 58 },
     }),
-    createDemoWidget("control-panel-open-monitor", "navigation-button", 300, 616, {
+    createDemoWidget("control-panel-open-monitor", "navigation-button", 300, 629, {
       label: "Monitor",
       topic: "/ui/navigation/visual_servoing_monitor",
       targetScreenId: "visual_servoing_monitor",
@@ -264,7 +264,7 @@ export const DEFAULT_DEMO_CONFIGURATIONS: WidgetConfiguration[] = [
       rect: { w: 280, h: 58 },
     }),
     createDemoWidget("control-panel-max-velocity", "max-velocity", 610, 20, {
-      label: "Max Velocity",
+      label: "Teleop Gain",
       topic: "/cmd/max_velocity",
       min: 0,
       max: 1,
@@ -316,7 +316,7 @@ export const DEFAULT_DEMO_CONFIGURATIONS: WidgetConfiguration[] = [
       },
       rect: { w: 240, h: 240 },
     }),
-    createDemoWidget("control-panel-rz", "slider", 765, 439, {
+    createDemoWidget("control-panel-rz", "slider", 765, 432, {
       binding: "rz",
       label: "RZ",
       topic: "/cmd/joystick_rz",
@@ -329,10 +329,36 @@ export const DEFAULT_DEMO_CONFIGURATIONS: WidgetConfiguration[] = [
       step: 0.01,
       rect: { w: 490, h: 157 },
     }),
-    createDemoWidget("control-panel-mode", "mode-button", 610, 616, {
+    createDemoWidget("control-panel-mode", "mode-button", 600, 616, {
       label: "Mode",
       topic: "/cmd/mode",
-      rect: { w: 120, h: 84 },
+      rect: { w: 141, h: 71 },
+    }),
+    createDemoWidget("control-panel-servo-telemetry", "topic-monitor", 763, 606, {
+      label: "Servo Telemetry",
+      topic: "/ui/visual_servoing/control_panel_topics",
+      topics: [
+        {
+          label: "Tags",
+          topic: "/tag_detections",
+          messageType: "extender_msgs/msg/SharedControlGoalArray",
+        },
+        {
+          label: "Cmd",
+          topic: "/visual_servoing/velocity_command",
+          messageType: "geometry_msgs/msg/TwistStamped",
+        },
+        {
+          label: "Err",
+          topic: "/visual_servoing/error_TAGtoTAGd",
+          messageType: "geometry_msgs/msg/TwistStamped",
+        },
+      ],
+      showSummary: true,
+      showDetails: false,
+      showRaw: false,
+      staleAfterMs: 2000,
+      rect: { w: 492, h: 104 },
     }),
   ]),
 
@@ -2519,6 +2545,52 @@ const normalizeGenericTeleopMaxVelocityRanges = (
     };
   });
 
+const migrateControlPanelVisualServoTelemetry = (
+  configurations: WidgetConfiguration[]
+): WidgetConfiguration[] => {
+  const latestControlPanel = DEFAULT_DEMO_CONFIGURATIONS.find(
+    (configuration) => configuration.name === "control_panel"
+  );
+  if (!latestControlPanel) return configurations;
+
+  const telemetryTemplate = latestControlPanel.widgets.find(
+    (widget) => widget.id === "control-panel-servo-telemetry"
+  );
+  if (!telemetryTemplate) return configurations;
+
+  return configurations.map((configuration) => {
+    if (configuration.name !== "control_panel") return configuration;
+
+    let changed = false;
+    const nextWidgets = configuration.widgets.map((widget) => {
+      if (
+        widget.id === "control-panel-max-velocity" &&
+        widget.kind === "max-velocity" &&
+        widget.label !== "Teleop Gain"
+      ) {
+        changed = true;
+        return {
+          ...widget,
+          label: "Teleop Gain",
+        };
+      }
+      return widget;
+    });
+
+    if (!nextWidgets.some((widget) => widget.id === telemetryTemplate.id)) {
+      nextWidgets.push(cloneWidgets([telemetryTemplate])[0]);
+      changed = true;
+    }
+
+    if (!changed) return configuration;
+    return {
+      ...configuration,
+      widgets: nextWidgets,
+      updatedAt: new Date().toISOString(),
+    };
+  });
+};
+
 const cloneDefaultConfigurations = () => DEFAULT_DEMO_CONFIGURATIONS.map(cloneConfiguration);
 
 const mergeMissingDemoConfigurations = (
@@ -2615,7 +2687,8 @@ const applyConfigurationMigrations = (
   nextConfigurations = ensurePlayPetanqueLancerActionButtons(nextConfigurations);
   nextConfigurations = migratePlayPetanqueLancerDrawThrowWidget(nextConfigurations);
   nextConfigurations = normalizePetanqueTeleopButtonLayout(nextConfigurations);
-  return normalizeGenericTeleopMaxVelocityRanges(nextConfigurations);
+  nextConfigurations = normalizeGenericTeleopMaxVelocityRanges(nextConfigurations);
+  return migrateControlPanelVisualServoTelemetry(nextConfigurations);
 };
 
 export function loadConfigurationsFromLocalStorage(): WidgetConfiguration[] {

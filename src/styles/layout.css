@@ -2578,6 +2578,28 @@ body,
   gap: 0.45rem;
 }
 
+.controls-topic-monitor-widget.is-compact {
+  grid-template-rows: auto 1fr;
+  gap: 0.35rem;
+}
+
+.controls-topic-monitor-widget.is-compact .controls-topic-monitor-meta {
+  display: none;
+}
+
+.controls-topic-monitor-widget.is-compact .controls-topic-monitor-summary-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.35rem;
+}
+
+.controls-topic-monitor-widget.is-compact .controls-topic-monitor-summary-card {
+  padding: 0.3rem 0.42rem;
+}
+
+.controls-topic-monitor-widget.is-compact .controls-topic-monitor-summary-card strong {
+  font-size: 0.86rem;
+}
+
 .controls-topic-monitor-header,
 .controls-topic-monitor-row-head {
   display: flex;

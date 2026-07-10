@@ -120,6 +120,16 @@ The sandbox visual-servoing flow is split across two screens:
 
 `control_panel` is based on Robin's `default_control_with_camera` workflow. It keeps only the useful daily controls: `/cmd/joystick`, `/cmd/joystick_rxry`, `/cmd/joystick_z`, `/cmd/joystick_rz`, `/cmd/max_velocity`, `/cmd/gripper`, `/ui/visual_servoing/on`, and `/ui/visual_servoing/save`. The unused snake slider and generic ROS test toggle are intentionally left out.
 
+Robin's current visual-servoing node contract is:
+
+| Topic | Message | UI role |
+| --- | --- | --- |
+| `/ui/visual_servoing/on` | `std_msgs/msg/Bool` | `ROS Message Toggle`; `true` starts visual servoing and `false` stops it. |
+| `/ui/visual_servoing/save` | `std_msgs/msg/String` | `Save Tag` button; current payload is `save`. |
+| `/tag_detections` | `extender_msgs/msg/SharedControlGoalArray` | AprilTag detections monitored by the UI and consumed by Robin's node. |
+| `/visual_servoing/velocity_command` | `geometry_msgs/msg/TwistStamped` | Servo command telemetry. |
+| `/visual_servoing/error_TAGtoTAGd` | `geometry_msgs/msg/TwistStamped` | Servo alignment/error telemetry. |
+
 The monitor uses the generic backend `topic_subscribe` / `topic_snapshot` websocket flow. It is meant for small diagnostic ROS messages, not for video frames; webcam preview stays on the stream widget path.
 
 Topic monitor widgets support:

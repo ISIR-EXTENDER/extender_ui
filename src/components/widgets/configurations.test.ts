@@ -101,13 +101,74 @@ describe("widget configuration migrations", () => {
     const maxVelocityWidget = controlPanel?.widgets.find(
       (widget) => widget.id === "control-panel-max-velocity"
     );
+    const telemetryWidget = controlPanel?.widgets.find(
+      (widget) => widget.id === "control-panel-servo-telemetry"
+    );
 
     expect(maxVelocityWidget).toMatchObject({
       kind: "max-velocity",
+      label: "Teleop Gain",
       topic: "/cmd/max_velocity",
       min: 0,
       max: 1,
       step: 0.01,
+    });
+    expect(telemetryWidget).toMatchObject({
+      kind: "topic-monitor",
+      rect: { x: 763, y: 606, w: 492, h: 104 },
+      showDetails: false,
+      topics: [
+        {
+          topic: "/tag_detections",
+          messageType: "extender_msgs/msg/SharedControlGoalArray",
+        },
+        {
+          topic: "/visual_servoing/velocity_command",
+          messageType: "geometry_msgs/msg/TwistStamped",
+        },
+        {
+          topic: "/visual_servoing/error_TAGtoTAGd",
+          messageType: "geometry_msgs/msg/TwistStamped",
+        },
+      ],
+    });
+  });
+
+  it("keeps existing control panel telemetry layout during migrations", () => {
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify([
+        {
+          name: "control_panel",
+          widgets: [
+            {
+              id: "control-panel-servo-telemetry",
+              kind: "topic-monitor",
+              label: "Servo Telemetry",
+              topic: "/ui/visual_servoing/control_panel_topics",
+              topics: [],
+              showSummary: true,
+              showDetails: false,
+              showRaw: false,
+              rect: { x: 700, y: 610, w: 520, h: 120 },
+            },
+          ],
+          poses: [],
+          canvas: { presetId: "hd", runtimeMode: "fit" },
+          updatedAt: "2026-02-24T00:00:00.000Z",
+        },
+      ])
+    );
+
+    const controlPanel = loadConfigurationsFromLocalStorage().find(
+      (configuration) => configuration.name === "control_panel"
+    );
+    const telemetryWidget = controlPanel?.widgets.find(
+      (widget) => widget.id === "control-panel-servo-telemetry"
+    );
+
+    expect(telemetryWidget).toMatchObject({
+      rect: { x: 700, y: 610, w: 520, h: 120 },
     });
   });
 });
