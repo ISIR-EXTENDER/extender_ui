@@ -58,8 +58,8 @@ EXTENDER_UI_URL=http://127.0.0.1:5173 npm run capture:readme
 
 Sandbox V0.0 is the recommended app for new Extender UI and controller
 development. It is designed to work with
-[`sandbox_controller`](https://github.com/ISIR-EXTENDER/controllers) and the
-`tablet_interface` backend.
+[`sandbox_controller`](https://github.com/ISIR-EXTENDER/sandbox_controller) and
+the `tablet_interface` backend.
 
 Current Sandbox V0.0 screens:
 
@@ -191,7 +191,8 @@ Important repositories:
 | --- | --- |
 | [`extender_ui`](https://github.com/ISIR-EXTENDER/extender_ui) | React tablet frontend, screen builder, runtime app renderer. |
 | [`input_interfaces`](https://github.com/ISIR-EXTENDER/input_interfaces) | ROS 2 input/backend packages, including `tablet_interface`. |
-| [`controllers`](https://github.com/ISIR-EXTENDER/controllers) | Robot and sandbox controllers, including `sandbox_controller`. |
+| [`controllers`](https://github.com/ISIR-EXTENDER/controllers) | Shared robot controllers such as Cartesian velocity, joint interpolation, and shared-control controllers. |
+| [`sandbox_controller`](https://github.com/ISIR-EXTENDER/sandbox_controller) | Reference sandbox controller for new controller prototypes and UI/backend smoke tests. |
 | [`robot_interfaces`](https://github.com/ISIR-EXTENDER/robot_interfaces) | Shared ROS messages such as `extender_msgs/msg/TeleopCommand`. |
 | [`tools`](https://github.com/ISIR-EXTENDER/tools) | Tools such as `apriltag_detector`. |
 | [`visual_servoing`](https://github.com/ISIR-EXTENDER/visual_servoing) | Visual-servoing control loop used by Robin's workflow. |
@@ -308,10 +309,11 @@ Extender UI README and Sandbox V0.0 integration notes.
 
 | Component | Repository | Branch checked | Commit checked | Notes |
 | --- | --- | --- | --- | --- |
-| Frontend | [`extender_ui`](https://github.com/ISIR-EXTENDER/extender_ui) | `docs/update-project-readme` | Current PR branch | This README update. |
-| Workspace wrapper | [`extender_workspace`](https://github.com/ISIR-EXTENDER/extender_workspace) | `feat/workspace-uv-petanque-deps` | `22f4206 build: add tablet interface deps to workspace uv` | Used for local ROS workspace dependency checks. |
-| Controllers | [`controllers`](https://github.com/ISIR-EXTENDER/controllers) | `main` | `c6bbebc feat: add snake mode to cartesian_velocity controller (#7)` | Use `sandbox_controller` for new development. |
-| Backend/input interfaces | [`input_interfaces`](https://github.com/ISIR-EXTENDER/input_interfaces) | `main` | `51b400a docs: document visual servoing ui contract (#19)` | Provides `tablet_interface`. |
+| Frontend | [`extender_ui`](https://github.com/ISIR-EXTENDER/extender_ui) | Current branch | This README update | Documents the current Sandbox V0.0 UI contract. |
+| Workspace wrapper | [`extender_workspace`](https://github.com/ISIR-EXTENDER/extender_workspace) | `main` | `da55bc9 fix: import sandbox controller repository (#4)` | Imports `sandbox_controller` as a standalone repository. |
+| Controllers | [`controllers`](https://github.com/ISIR-EXTENDER/controllers) | `main` | `c6bbebc feat: add snake mode to cartesian_velocity controller (#7)` | Shared robot controllers. |
+| Sandbox controller | [`sandbox_controller`](https://github.com/ISIR-EXTENDER/sandbox_controller) | `main` | `0411619 fix: use synced joint positions for feedback (#4)` | Reference controller for new UI/backend/controller smoke tests. |
+| Backend/input interfaces | [`input_interfaces`](https://github.com/ISIR-EXTENDER/input_interfaces) | `main` | `c72c02a docs: update tablet interface readme (#20)` | Provides `tablet_interface`. |
 | Robot messages | [`robot_interfaces`](https://github.com/ISIR-EXTENDER/robot_interfaces) | `main` | `1543180 Merge pull request #5 from ssrpo/fix/remove-stale-joint-pose-helper` | Provides shared ROS messages. |
 | Tools | [`tools`](https://github.com/ISIR-EXTENDER/tools) | `main` | `800bed7 Merge pull request #4 from MegMll/topic/add_snake` | Provides `apriltag_detector` for visual-servoing tag telemetry. |
 | Input devices | [`explorer_stack`](https://github.com/ISIR-EXTENDER/explorer_stack) | `feat/petanque` | `bee7467 feat - petanque parameter` | Current input-device package is `explorer_input_devices`; no top-level `input_devices` repo exists in this workspace. |
@@ -344,7 +346,7 @@ to exist in the ROS 2 workspace:
 | --- | --- | --- |
 | `input_interfaces/tablet_interface` | Required runtime backend | Websocket server used by the UI. Bridges UI messages to ROS and sends state/events back. |
 | `robot_interfaces/extender_msgs` | Required by backend/controller contracts | Provides `extender_msgs/msg/TeleopCommand` and shared-control messages used by the stack. |
-| `controllers/sandbox_controller` | Sandbox teleop and feedback | Consumes `/teleop_cmd` and publishes sandbox feedback used by the UI. |
+| `sandbox_controller` | Sandbox teleop and feedback | Consumes `/teleop_cmd` and publishes sandbox feedback used by the UI. |
 | `tools/apriltag_detector` | Visual-servoing tag telemetry | Publishes `/tag_detections` for visual servoing and monitoring. |
 | `visual_servoing` | Visual-servoing control loop | Consumes `/tag_detections`, `/ui/visual_servoing/on`, and `/ui/visual_servoing/save`; publishes command/error telemetry. |
 
