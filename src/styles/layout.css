@@ -872,6 +872,28 @@ body,
   letter-spacing: 0.02em;
 }
 
+.controls-property-subtitle {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.controls-field-group {
+  display: grid;
+  gap: 0.55rem;
+  border-top: 1px solid var(--border);
+  padding-top: 0.65rem;
+}
+
+.controls-field-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
 .controls-menu-state {
   min-width: 42px;
   text-align: center;
@@ -1722,7 +1744,8 @@ body,
 .controls-magnet-item,
 .controls-stream-item,
 .controls-curves-item,
-.controls-logs-item {
+.controls-logs-item,
+.controls-topic-monitor-item {
   border-radius: 10px;
 }
 
@@ -1732,7 +1755,8 @@ body,
 .controls-magnet-widget,
 .controls-stream-widget,
 .controls-curves-widget,
-.controls-logs-widget {
+.controls-logs-widget,
+.controls-topic-monitor-widget {
   width: 100%;
   height: 100%;
   border-radius: 10px;
@@ -2547,6 +2571,199 @@ body,
   text-transform: lowercase;
 }
 
+.controls-topic-monitor-widget {
+  padding: 0.5rem 0.65rem;
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  gap: 0.45rem;
+}
+
+.controls-topic-monitor-header,
+.controls-topic-monitor-row-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.controls-topic-monitor-title {
+  font-weight: 800;
+  font-size: 0.92rem;
+}
+
+.controls-topic-monitor-meta,
+.controls-topic-monitor-age {
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.controls-topic-monitor-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.45rem;
+}
+
+.controls-topic-monitor-summary-card {
+  min-width: 0;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--border) 84%, transparent);
+  background: color-mix(in srgb, var(--panel-2) 90%, transparent);
+  padding: 0.42rem 0.5rem;
+  display: grid;
+  gap: 0.12rem;
+}
+
+.controls-topic-monitor-summary-card.is-live {
+  border-color: color-mix(in srgb, #22c55e 42%, var(--border));
+}
+
+.controls-topic-monitor-summary-card.is-stale {
+  border-color: color-mix(in srgb, #f59e0b 48%, var(--border));
+}
+
+.controls-topic-monitor-summary-card.is-error {
+  border-color: color-mix(in srgb, #ef4444 55%, var(--border));
+}
+
+.controls-topic-monitor-summary-card.is-blocked {
+  border-color: color-mix(in srgb, #94a3b8 42%, var(--border));
+}
+
+.controls-topic-monitor-summary-card span {
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.controls-topic-monitor-summary-card strong {
+  min-width: 0;
+  color: var(--text);
+  font-family: "JetBrains Mono", "Fira Code", "SFMono-Regular", Consolas, monospace;
+  font-size: 1rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.controls-topic-monitor-list {
+  min-height: 80px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--panel) 90%, var(--accent) 10%);
+  padding: 0.35rem;
+  overflow: auto;
+  display: grid;
+  gap: 0.35rem;
+  align-content: start;
+}
+
+.controls-topic-monitor-event {
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--border) 86%, transparent);
+  background: color-mix(in srgb, var(--panel-2) 92%, transparent);
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.35;
+  padding: 0.4rem 0.5rem;
+  overflow-wrap: anywhere;
+}
+
+.controls-topic-monitor-event.is-info {
+  border-color: color-mix(in srgb, #60a5fa 42%, var(--border));
+}
+
+.controls-topic-monitor-event.is-warning {
+  border-color: color-mix(in srgb, #f59e0b 50%, var(--border));
+  color: #fbbf24;
+}
+
+.controls-topic-monitor-event.is-error {
+  border-color: color-mix(in srgb, #ef4444 55%, var(--border));
+  color: #fca5a5;
+}
+
+.controls-topic-monitor-row {
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--border) 86%, transparent);
+  background: color-mix(in srgb, var(--panel-2) 90%, transparent);
+  padding: 0.38rem 0.45rem;
+  display: grid;
+  gap: 0.2rem;
+}
+
+.controls-topic-monitor-row.is-live {
+  border-color: color-mix(in srgb, #22c55e 42%, var(--border));
+}
+
+.controls-topic-monitor-row.is-stale {
+  border-color: color-mix(in srgb, #f59e0b 48%, var(--border));
+}
+
+.controls-topic-monitor-row.is-error {
+  border-color: color-mix(in srgb, #ef4444 55%, var(--border));
+}
+
+.controls-topic-monitor-row.is-blocked {
+  border-color: color-mix(in srgb, #94a3b8 42%, var(--border));
+}
+
+.controls-topic-monitor-name {
+  min-width: 0;
+  font-weight: 800;
+  font-size: 0.78rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.controls-topic-monitor-topic,
+.controls-topic-monitor-summary,
+.controls-topic-monitor-raw {
+  font-family: "JetBrains Mono", "Fira Code", "SFMono-Regular", Consolas, monospace;
+}
+
+.controls-topic-monitor-topic {
+  color: var(--muted);
+  font-size: 0.68rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.controls-topic-monitor-summary {
+  color: var(--text);
+  font-size: 0.72rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.controls-topic-monitor-row.is-waiting .controls-topic-monitor-summary {
+  color: var(--muted);
+}
+
+.controls-topic-monitor-row.is-stale .controls-topic-monitor-summary {
+  color: #fbbf24;
+}
+
+.controls-topic-monitor-row.is-error .controls-topic-monitor-summary {
+  color: #fca5a5;
+}
+
+.controls-topic-monitor-row.is-blocked .controls-topic-monitor-summary {
+  color: var(--muted);
+}
+
+.controls-topic-monitor-raw {
+  max-height: 120px;
+  overflow: auto;
+  margin: 0.2rem 0 0;
+  color: var(--muted);
+  font-size: 0.66rem;
+  line-height: 1.3;
+}
+
 .builder-home-layout {
   grid-template-columns: minmax(260px, 0.9fr) minmax(260px, 1fr) minmax(280px, 1.1fr);
   align-items: start;
@@ -2684,9 +2901,14 @@ body,
 
 .application-runtime-page .controls-curves-meta,
 .application-runtime-page .controls-logs-meta,
+.application-runtime-page .controls-topic-monitor-meta,
+.application-runtime-page .controls-topic-monitor-age,
+.application-runtime-page .controls-topic-monitor-summary-card span,
 .application-runtime-page .controls-log-entry,
 .application-runtime-page .controls-log-empty,
-.application-runtime-page .controls-logs-footer {
+.application-runtime-page .controls-logs-footer,
+.application-runtime-page .controls-topic-monitor-topic,
+.application-runtime-page .controls-topic-monitor-summary {
   font-size: 0.78rem;
 }
 

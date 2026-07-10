@@ -133,9 +133,9 @@ export const DEFAULT_DEMO_CONFIGURATIONS: WidgetConfiguration[] = [
     createDemoWidget("sandbox-max-velocity", "max-velocity", 279, 95, {
       label: "Max Velocity",
       topic: "/cmd/max_velocity",
-      min: 0.1,
-      max: 3.0,
-      step: 0.1,
+      min: 0,
+      max: 1,
+      step: 0.01,
       rect: { w: 382, h: 159 },
     }),
     createDemoWidget("sandbox-rotation", "joystick", 802, 268, {
@@ -214,6 +214,125 @@ export const DEFAULT_DEMO_CONFIGURATIONS: WidgetConfiguration[] = [
       onPayload: "{data: 1.0}",
       offPayload: "{data: 0.0}",
       rect: { w: 188, h: 92 },
+    }),
+  ]),
+
+  createDemoConfiguration("control_panel", [
+    createDemoWidget("control-panel-title", "text", 20, 20, {
+      text: "Control Panel",
+      fontSize: 26,
+      rect: { w: 300, h: 56 },
+    }),
+    createDemoWidget("control-panel-camera", "stream-display", 20, 90, {
+      label: "Camera",
+      topic: "/camera/play_petanque",
+      source: "webcam",
+      streamUrl: "webcam:///dev/video2",
+      fitMode: "cover",
+      showStatus: true,
+      showUrl: false,
+      showWebcamPicker: true,
+      overlayText: "webcam feed",
+      rect: { w: 560, h: 400 },
+    }),
+    createDemoWidget("control-panel-gripper", "gripper-control", 20, 510, {
+      label: "Gripper",
+      topic: "/cmd/gripper",
+      showAdvancedControls: true,
+      rect: { w: 260, h: 86 },
+    }),
+    createDemoWidget("control-panel-servo-enable", "ros-message-toggle", 300, 510, {
+      label: "Visual Servoing",
+      topic: "/ui/visual_servoing/on",
+      messageType: "std_msgs/msg/Bool",
+      onPayload: "{data: true}",
+      offPayload: "{data: false}",
+      rect: { w: 280, h: 86 },
+    }),
+    createDemoWidget("control-panel-servo-save", "button", 20, 616, {
+      label: "Save Tag",
+      topic: "/ui/visual_servoing/save",
+      payload: "save",
+      tone: "success",
+      rect: { w: 260, h: 58 },
+    }),
+    createDemoWidget("control-panel-open-monitor", "navigation-button", 300, 616, {
+      label: "Monitor",
+      topic: "/ui/navigation/visual_servoing_monitor",
+      targetScreenId: "visual_servoing_monitor",
+      icon: "arrow-right",
+      rect: { w: 280, h: 58 },
+    }),
+    createDemoWidget("control-panel-max-velocity", "max-velocity", 610, 20, {
+      label: "Max Velocity",
+      topic: "/cmd/max_velocity",
+      min: 0,
+      max: 1,
+      step: 0.01,
+      rect: { w: 640, h: 145 },
+    }),
+    createDemoWidget("control-panel-z", "slider", 589, 174, {
+      binding: "z",
+      label: "Z",
+      topic: "/cmd/joystick_z",
+      direction: "vertical",
+      showLabel: true,
+      showTopicInfo: false,
+      labelAlign: "center",
+      min: -1,
+      max: 1,
+      step: 0.01,
+      rect: { w: 162, h: 413 },
+    }),
+    createDemoWidget("control-panel-translation", "joystick", 765, 185, {
+      binding: "joy",
+      label: "X Y",
+      topic: "/cmd/joystick",
+      showTopicInfo: false,
+      color: "#4a9eff",
+      deadzone: 0.1,
+      diskSize: 80,
+      labels: {
+        top: "Y+",
+        right: "X+",
+        bottom: "Y-",
+        left: "X-",
+      },
+      rect: { w: 240, h: 240 },
+    }),
+    createDemoWidget("control-panel-rotation", "joystick", 1015, 185, {
+      binding: "rot",
+      label: "RX RY",
+      topic: "/cmd/joystick_rxry",
+      showTopicInfo: false,
+      color: "#ff4d67",
+      deadzone: 0.1,
+      diskSize: 80,
+      labels: {
+        top: "RY+",
+        right: "RX+",
+        bottom: "RY-",
+        left: "RX-",
+      },
+      rect: { w: 240, h: 240 },
+    }),
+    createDemoWidget("control-panel-rz", "slider", 765, 439, {
+      binding: "rz",
+      label: "RZ",
+      topic: "/cmd/joystick_rz",
+      direction: "horizontal",
+      showLabel: true,
+      showTopicInfo: false,
+      labelAlign: "center",
+      min: -1,
+      max: 1,
+      step: 0.01,
+      rect: { w: 490, h: 157 },
+    }),
+    createDemoWidget("control-panel-mode", "mode-button", 610, 616, {
+      label: "Mode",
+      topic: "/cmd/mode",
+      rect: { w: 120, h: 84 },
     }),
   ]),
 
@@ -381,30 +500,69 @@ export const DEFAULT_DEMO_CONFIGURATIONS: WidgetConfiguration[] = [
       showUrl: false,
       showWebcamPicker: true,
       overlayText: "webcam preview",
-      rect: { w: 460, h: 300 },
+      rect: { w: 460, h: 260 },
     }),
-    createDemoWidget("servo-enable", "ros-message-toggle", 800, 410, {
+    createDemoWidget("servo-enable", "ros-message-toggle", 800, 370, {
       label: "Visual Servoing",
       topic: "/ui/visual_servoing/on",
       messageType: "std_msgs/msg/Bool",
       onPayload: "{data: true}",
       offPayload: "{data: false}",
-      rect: { w: 220, h: 120 },
+      rect: { w: 220, h: 110 },
     }),
-    createDemoWidget("servo-save", "button", 1040, 410, {
+    createDemoWidget("servo-save", "button", 1040, 370, {
       label: "Save Tag",
       topic: "/ui/visual_servoing/save",
       payload: "save",
       tone: "success",
       rect: { w: 220, h: 58 },
     }),
-    createDemoWidget("servo-topic-notes", "textarea", 800, 550, {
-      label: "AprilTag Topics",
-      topic: "/ui/text/visual_servoing/topics",
-      text:
-        "Camera: /image_raw\nDetections: /tag_detections\nControl: /ui/visual_servoing/on\nSave target: /ui/visual_servoing/save\nCommand: /visual_servoing/velocity_command\nError: /visual_servoing/error_TAGtoTAGd",
-      fontSize: 14,
-      rect: { w: 460, h: 150 },
+    createDemoWidget("servo-open-monitor", "navigation-button", 1040, 445, {
+      label: "Monitor",
+      topic: "/ui/navigation/visual_servoing_monitor",
+      targetScreenId: "visual_servoing_monitor",
+      icon: "arrow-right",
+      rect: { w: 220, h: 58 },
+    }),
+  ]),
+
+  createDemoConfiguration("visual_servoing_monitor", [
+    createDemoWidget("servo-monitor-title", "text", 20, 20, {
+      text: "Visual Servoing Monitor",
+      fontSize: 26,
+      rect: { w: 420, h: 56 },
+    }),
+    createDemoWidget("servo-monitor-back", "navigation-button", 1080, 20, {
+      label: "Control",
+      topic: "/ui/navigation/visual_servoing",
+      targetScreenId: "visual_servoing",
+      icon: "home",
+      rect: { w: 180, h: 58 },
+    }),
+    createDemoWidget("servo-topic-monitor", "topic-monitor", 20, 100, {
+      label: "ROS Topic Monitor",
+      topic: "/ui/visual_servoing/topics",
+      topics: [
+        {
+          label: "AprilTag detections",
+          topic: "/tag_detections",
+          messageType: "extender_msgs/msg/SharedControlGoalArray",
+        },
+        {
+          label: "Velocity command",
+          topic: "/visual_servoing/velocity_command",
+          messageType: "geometry_msgs/msg/TwistStamped",
+        },
+        {
+          label: "Servo error",
+          topic: "/visual_servoing/error_TAGtoTAGd",
+          messageType: "geometry_msgs/msg/TwistStamped",
+        },
+      ],
+      showSummary: true,
+      showRaw: false,
+      staleAfterMs: 2000,
+      rect: { w: 1240, h: 600 },
     }),
   ]),
 
@@ -1897,7 +2055,7 @@ const migrateVisualServoingLayout = (
     "servo-camera",
     "servo-enable",
     "servo-save",
-    "servo-topic-notes",
+    "servo-open-monitor",
   ]);
   const legacyLabelPattern = /^(alignment|servo gain|start servo|stop servo)$/i;
 
@@ -2327,6 +2485,40 @@ const normalizePetanqueTeleopButtonLayout = (
   });
 };
 
+const normalizeGenericTeleopMaxVelocityRanges = (
+  configurations: WidgetConfiguration[]
+): WidgetConfiguration[] =>
+  configurations.map((configuration) => {
+    let changed = false;
+    const nextWidgets = configuration.widgets.map((widget) => {
+      if (widget.kind !== "max-velocity" || widget.topic !== "/cmd/max_velocity") {
+        return widget;
+      }
+
+      const nextWidget = {
+        ...widget,
+        min: 0,
+        max: 1,
+        step: 0.01,
+      };
+      if (
+        widget.min !== nextWidget.min ||
+        widget.max !== nextWidget.max ||
+        widget.step !== nextWidget.step
+      ) {
+        changed = true;
+      }
+      return nextWidget;
+    });
+
+    if (!changed) return configuration;
+    return {
+      ...configuration,
+      widgets: nextWidgets,
+      updatedAt: new Date().toISOString(),
+    };
+  });
+
 const cloneDefaultConfigurations = () => DEFAULT_DEMO_CONFIGURATIONS.map(cloneConfiguration);
 
 const mergeMissingDemoConfigurations = (
@@ -2406,38 +2598,25 @@ const parsePoses = (value: unknown): PoseSnapshot[] => {
 
 const applyConfigurationMigrations = (
   configurations: WidgetConfiguration[]
-): WidgetConfiguration[] =>
-  normalizePetanqueTeleopButtonLayout(
-    migratePlayPetanqueLancerDrawThrowWidget(
-      ensurePlayPetanqueLancerActionButtons(
-        normalizePetanqueSliderDisplayOptions(
-          normalizePetanqueSliderRanges(
-            migrateRosMessageToggleWidgets(
-              migrateVisualServoingLayout(
-                ensureSandboxRosMessageToggle(
-                  ensurePetanqueGripperControl(
-                    ensurePetanqueElectromagnetControl(
-                      removePetanqueLegacyNavigationButtons(
-                        migratePetanqueTeleopConfigLayout(
-                          disablePetanqueViewerWidget(
-                            migrateLegacyPetanque(
-                              migrateLegacyDefaultControl(
-                                mergeMissingDemoConfigurations(configurations)
-                              )
-                            )
-                          )
-                        )
-                      )
-                    )
-                  )
-                )
-              )
-            )
-          )
-        )
-      )
-    )
-  );
+): WidgetConfiguration[] => {
+  let nextConfigurations = mergeMissingDemoConfigurations(configurations);
+  nextConfigurations = migrateLegacyDefaultControl(nextConfigurations);
+  nextConfigurations = migrateLegacyPetanque(nextConfigurations);
+  nextConfigurations = disablePetanqueViewerWidget(nextConfigurations);
+  nextConfigurations = migratePetanqueTeleopConfigLayout(nextConfigurations);
+  nextConfigurations = removePetanqueLegacyNavigationButtons(nextConfigurations);
+  nextConfigurations = ensurePetanqueElectromagnetControl(nextConfigurations);
+  nextConfigurations = ensurePetanqueGripperControl(nextConfigurations);
+  nextConfigurations = ensureSandboxRosMessageToggle(nextConfigurations);
+  nextConfigurations = migrateVisualServoingLayout(nextConfigurations);
+  nextConfigurations = migrateRosMessageToggleWidgets(nextConfigurations);
+  nextConfigurations = normalizePetanqueSliderRanges(nextConfigurations);
+  nextConfigurations = normalizePetanqueSliderDisplayOptions(nextConfigurations);
+  nextConfigurations = ensurePlayPetanqueLancerActionButtons(nextConfigurations);
+  nextConfigurations = migratePlayPetanqueLancerDrawThrowWidget(nextConfigurations);
+  nextConfigurations = normalizePetanqueTeleopButtonLayout(nextConfigurations);
+  return normalizeGenericTeleopMaxVelocityRanges(nextConfigurations);
+};
 
 export function loadConfigurationsFromLocalStorage(): WidgetConfiguration[] {
   return readJsonStorage(STORAGE_KEY, cloneDefaultConfigurations(), (parsed) => {

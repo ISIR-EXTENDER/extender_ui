@@ -30,6 +30,7 @@ import {
   SavePoseButtonWidget,
   SliderWidget,
   StreamDisplayWidget,
+  TopicMonitorWidget,
   ThrowDrawWidget,
   TogglePublisherFields,
   TextareaWidget,
@@ -70,6 +71,7 @@ import {
   type TextAlign,
   type TextareaWidgetModel,
   type TextWidgetModel,
+  type TopicMonitorWidgetModel,
   type WidgetIcon,
   type WidgetCatalogType,
   type WidgetConfiguration,
@@ -850,6 +852,11 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
   };
   const updateSelectedLogs = (updater: (widget: LogsWidgetModel) => LogsWidgetModel) => {
     updateSelectedWidget((widget) => (widget.kind === "logs" ? updater(widget) : widget));
+  };
+  const updateSelectedTopicMonitor = (
+    updater: (widget: TopicMonitorWidgetModel) => TopicMonitorWidgetModel
+  ) => {
+    updateSelectedWidget((widget) => (widget.kind === "topic-monitor" ? updater(widget) : widget));
   };
 
   const markWidgetPulse = (widgetId: string) => {
@@ -1779,6 +1786,23 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
           onLabelChange={(nextLabel) =>
             updateWidget(widget.id, (current) =>
               current.kind === "logs" ? { ...current, label: nextLabel } : current
+            )
+          }
+        />
+      );
+    }
+
+    if (widget.kind === "topic-monitor") {
+      return (
+        <TopicMonitorWidget
+          key={widget.id}
+          widget={widget}
+          selected={selected}
+          onSelect={() => setSelectedWidgetId(widget.id)}
+          onRectChange={(next) => handleWidgetRectChange(widget.id, next)}
+          onLabelChange={(nextLabel) =>
+            updateWidget(widget.id, (current) =>
+              current.kind === "topic-monitor" ? { ...current, label: nextLabel } : current
             )
           }
         />
@@ -3455,6 +3479,155 @@ export function ControlsPage({ focusOnly = false, onDirtyChange }: ControlsPageP
                           </select>
                         </label>
                       </div>
+                    </>
+                  ) : selectedWidget.kind === "topic-monitor" ? (
+                    <>
+                      <div className="controls-property-title">Topic Monitor</div>
+                      <label className="controls-field">
+                        <span>Summary</span>
+                        <select
+                          className="editor-input"
+                          value={(selectedWidget.showSummary ?? true) ? "visible" : "hidden"}
+                          onChange={(event) =>
+                            updateSelectedTopicMonitor((widget) => ({
+                              ...widget,
+                              showSummary: event.target.value === "visible",
+                            }))
+                          }
+                        >
+                          <option value="visible">visible</option>
+                          <option value="hidden">hidden</option>
+                        </select>
+                      </label>
+                      <label className="controls-field">
+                        <span>Raw JSON</span>
+                        <select
+                          className="editor-input"
+                          value={selectedWidget.showRaw ? "visible" : "hidden"}
+                          onChange={(event) =>
+                            updateSelectedTopicMonitor((widget) => ({
+                              ...widget,
+                              showRaw: event.target.value === "visible",
+                            }))
+                          }
+                        >
+                          <option value="hidden">hidden</option>
+                          <option value="visible">visible</option>
+                        </select>
+                      </label>
+                      <label className="controls-field">
+                        <span>Stale Threshold (ms)</span>
+                        <input
+                          type="number"
+                          min={250}
+                          max={60000}
+                          step={250}
+                          className="editor-input"
+                          value={selectedWidget.staleAfterMs ?? 2000}
+                          onChange={(event) =>
+                            updateSelectedTopicMonitor((widget) => ({
+                              ...widget,
+                              staleAfterMs: Math.max(
+                                250,
+                                Math.min(
+                                  60000,
+                                  Math.round(readNumber(event.target.value, widget.staleAfterMs ?? 2000))
+                                )
+                              ),
+                            }))
+                          }
+                        />
+                      </label>
+                      {selectedWidget.topics.map((topic, index) => (
+                        <div className="controls-field-group" key={`${topic.topic}-${index}`}>
+                          <div className="controls-field-group-header">
+                            <div className="controls-property-subtitle">Topic {index + 1}</div>
+                            <button
+                              type="button"
+                              className="controls-inline-button"
+                              disabled={selectedWidget.topics.length <= 1}
+                              onClick={() =>
+                                updateSelectedTopicMonitor((widget) => ({
+                                  ...widget,
+                                  topics: widget.topics.filter((_, itemIndex) => itemIndex !== index),
+                                }))
+                              }
+                            >
+                              Remove
+                            </button>
+                          </div>
+                          <label className="controls-field">
+                            <span>Label</span>
+                            <input
+                              className="editor-input"
+                              value={topic.label}
+                              onChange={(event) =>
+                                updateSelectedTopicMonitor((widget) => ({
+                                  ...widget,
+                                  topics: widget.topics.map((item, itemIndex) =>
+                                    itemIndex === index
+                                      ? { ...item, label: event.target.value }
+                                      : item
+                                  ),
+                                }))
+                              }
+                            />
+                          </label>
+                          <label className="controls-field">
+                            <span>Topic</span>
+                            <input
+                              className="editor-input"
+                              value={topic.topic}
+                              onChange={(event) =>
+                                updateSelectedTopicMonitor((widget) => ({
+                                  ...widget,
+                                  topics: widget.topics.map((item, itemIndex) =>
+                                    itemIndex === index
+                                      ? { ...item, topic: event.target.value }
+                                      : item
+                                  ),
+                                }))
+                              }
+                            />
+                          </label>
+                          <label className="controls-field">
+                            <span>Message Type</span>
+                            <input
+                              className="editor-input"
+                              value={topic.messageType}
+                              onChange={(event) =>
+                                updateSelectedTopicMonitor((widget) => ({
+                                  ...widget,
+                                  topics: widget.topics.map((item, itemIndex) =>
+                                    itemIndex === index
+                                      ? { ...item, messageType: event.target.value }
+                                      : item
+                                  ),
+                                }))
+                              }
+                            />
+                          </label>
+                        </div>
+                      ))}
+                      <button
+                        type="button"
+                        className="controls-inline-button"
+                        onClick={() =>
+                          updateSelectedTopicMonitor((widget) => ({
+                            ...widget,
+                            topics: [
+                              ...widget.topics,
+                              {
+                                label: `Topic ${widget.topics.length + 1}`,
+                                topic: "/debug/topic",
+                                messageType: "std_msgs/msg/String",
+                              },
+                            ],
+                          }))
+                        }
+                      >
+                        Add Topic
+                      </button>
                     </>
                   ) : selectedWidget.kind === "mode-button" ? (
                     <>

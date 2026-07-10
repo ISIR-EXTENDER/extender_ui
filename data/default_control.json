@@ -118,7 +118,7 @@
       "label": "velocity",
       "topic": "/cmd/max_velocity",
       "min": 0,
-      "max": 3,
+      "max": 1,
       "step": 0.01,
       "rect": {
         "x": 334,

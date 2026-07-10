@@ -92,6 +92,8 @@ The max velocity widget uses the same pointer-position rule. Its value source de
 - known teleop configuration topics, such as `/cmd/max_velocity`, read and write the shared teleop store.
 - custom topics keep an independent per-widget value in the controls page, so several max velocity widgets no longer force each other to the same value.
 
+Generic teleoperation treats `/cmd/max_velocity` as a normalized gain from `0` to `1`. Pétanque-specific throw controls keep their own ranges on dedicated topics such as `/petanque_throw/total_duration`.
+
 When a screen is saved or synchronized to a folder, `updatedAt` is preserved if the screen content is unchanged. This avoids timestamp-only JSON diffs when no widget, pose, or canvas setting actually changed.
 
 ## Apps
@@ -107,6 +109,25 @@ The rule going forward is:
 ## Camera direction
 
 The UI can display streams and capture frames from stream widgets. Captured frames can now be sent to backend as `camera_frame`, so camera data can become ROS topics and later be reused by perception or visual-servoing nodes.
+
+## Visual Servoing Monitor
+
+The sandbox visual-servoing flow is split across two screens:
+
+- `control_panel`: a compact daily-operation screen for Sandbox with webcam preview, Cartesian velocity controls, max velocity, gripper, and visual-servoing save/on/off controls.
+- `visual_servoing`: camera/RViz preview plus the visual-servoing toggle and save-tag action.
+- `visual_servoing_monitor`: a dedicated ROS topic monitor for AprilTag detections, velocity command, and servo error snapshots.
+
+`control_panel` is based on Robin's `default_control_with_camera` workflow. It keeps only the useful daily controls: `/cmd/joystick`, `/cmd/joystick_rxry`, `/cmd/joystick_z`, `/cmd/joystick_rz`, `/cmd/max_velocity`, `/cmd/gripper`, `/ui/visual_servoing/on`, and `/ui/visual_servoing/save`. The unused snake slider and generic ROS test toggle are intentionally left out.
+
+The monitor uses the generic backend `topic_subscribe` / `topic_snapshot` websocket flow. It is meant for small diagnostic ROS messages, not for video frames; webcam preview stays on the stream widget path.
+
+Topic monitor widgets support:
+
+- a configurable stale threshold, so topics move from live to stale when snapshots stop updating.
+- visible backend subscription events, including partial failures.
+- local warnings for `sensor_msgs/msg/Image` and `sensor_msgs/msg/CompressedImage`; use stream widgets for those.
+- adding, editing, and removing monitored topics from the editor inspector.
 
 ## Development
 

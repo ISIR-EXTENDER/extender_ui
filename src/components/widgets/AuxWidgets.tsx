@@ -20,7 +20,10 @@ import {
 } from "recharts";
 import { InlineEditableText } from "./InlineEditableText";
 import { selectModeLabel, useTeleopStore } from "../../store/teleopStore";
+import { topicSnapshotKey, useUiStore } from "../../store/uiStore";
+import { wsClient } from "../../services/wsClient";
 import type { CSSProperties } from "react";
+import type { WsTopicSnapshotMessage } from "../../types/ws";
 import type {
   ButtonWidget as ButtonWidgetModel,
   CurvesWidget as CurvesWidgetModel,
@@ -37,6 +40,7 @@ import type {
   ThrowDrawWidget as ThrowDrawWidgetModel,
   TextareaWidget as TextareaWidgetModel,
   TextWidget as TextWidgetModel,
+  TopicMonitorWidget as TopicMonitorWidgetModel,
   WidgetIcon,
 } from "./widgetTypes";
 
@@ -185,6 +189,11 @@ declare global {
 
 type LogsWidgetProps = BaseWidgetProps & {
   widget: LogsWidgetModel;
+  onLabelChange: (nextLabel: string) => void;
+};
+
+type TopicMonitorWidgetProps = BaseWidgetProps & {
+  widget: TopicMonitorWidgetModel;
   onLabelChange: (nextLabel: string) => void;
 };
 
@@ -2234,6 +2243,309 @@ type LogEntry = {
   level: "info" | "warn" | "error";
   message: string;
 };
+
+type TopicMonitorStatus = "waiting" | "live" | "stale" | "error" | "blocked";
+
+const DEFAULT_TOPIC_MONITOR_STALE_MS = 2000;
+const BLOCKED_TOPIC_MONITOR_MESSAGE_TYPES = new Set([
+  "sensor_msgs/msg/Image",
+  "sensor_msgs/msg/CompressedImage",
+]);
+
+const isBlockedTopicMonitorMessageType = (messageType: string) =>
+  BLOCKED_TOPIC_MONITOR_MESSAGE_TYPES.has(messageType.trim());
+
+const formatTopicAge = (updatedAtMs: number | null) => {
+  if (updatedAtMs == null) return "waiting";
+  const ageMs = Math.max(0, Date.now() - updatedAtMs);
+  if (ageMs < 1000) return `${ageMs} ms`;
+  return `${(ageMs / 1000).toFixed(1)} s`;
+};
+
+const resolveTopicMonitorStatus = (
+  snapshot: WsTopicSnapshotMessage | undefined,
+  staleAfterMs: number
+): TopicMonitorStatus => {
+  if (!snapshot) return "waiting";
+  if (snapshot.error) return "error";
+  if (snapshot.updated_at_ms == null || snapshot.revision <= 0) return "waiting";
+  return Date.now() - snapshot.updated_at_ms > staleAfterMs ? "stale" : "live";
+};
+
+const formatVector = (value: unknown) => {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  const x = typeof record.x === "number" ? record.x : null;
+  const y = typeof record.y === "number" ? record.y : null;
+  const z = typeof record.z === "number" ? record.z : null;
+  if (x == null || y == null || z == null) return null;
+  return `x=${x.toFixed(3)} y=${y.toFixed(3)} z=${z.toFixed(3)}`;
+};
+
+const getVectorComponents = (value: unknown) => {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  const x = typeof record.x === "number" ? record.x : null;
+  const y = typeof record.y === "number" ? record.y : null;
+  const z = typeof record.z === "number" ? record.z : null;
+  if (x == null || y == null || z == null) return null;
+  return { x, y, z };
+};
+
+const formatMagnitude = (value: number | null) =>
+  value == null ? "-" : value.toFixed(3);
+
+const getArraySummary = (value: unknown): string | null => {
+  if (Array.isArray(value)) return `${value.length} item${value.length === 1 ? "" : "s"}`;
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  for (const key of ["detections", "goals", "markers", "tags", "data"]) {
+    const candidate = record[key];
+    if (Array.isArray(candidate)) {
+      return `${candidate.length} ${key}`;
+    }
+  }
+  return null;
+};
+
+const getArrayCount = (value: unknown): number | null => {
+  if (Array.isArray(value)) return value.length;
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  for (const key of ["detections", "goals", "markers", "tags", "data"]) {
+    const candidate = record[key];
+    if (Array.isArray(candidate)) return candidate.length;
+  }
+  return null;
+};
+
+const getTwistMagnitudes = (value: unknown) => {
+  if (!value || typeof value !== "object") return { linear: null, angular: null };
+  const record = value as Record<string, unknown>;
+  const twist = record.twist as Record<string, unknown> | undefined;
+  const linear = getVectorComponents(twist?.linear ?? record.linear);
+  const angular = getVectorComponents(twist?.angular ?? record.angular);
+  return {
+    linear: linear ? Math.hypot(linear.x, linear.y, linear.z) : null,
+    angular: angular ? Math.hypot(angular.x, angular.y, angular.z) : null,
+  };
+};
+
+const summarizeTopicData = (snapshot: WsTopicSnapshotMessage | undefined) => {
+  if (!snapshot) return "No snapshot yet";
+  if (snapshot.error) return snapshot.error;
+  const data = snapshot.data;
+  if (!data || typeof data !== "object") return JSON.stringify(data);
+
+  const record = data as Record<string, unknown>;
+  const twist = record.twist as Record<string, unknown> | undefined;
+  const linear = formatVector(twist?.linear ?? record.linear);
+  const angular = formatVector(twist?.angular ?? record.angular);
+  if (linear || angular) {
+    return [linear ? `lin ${linear}` : null, angular ? `ang ${angular}` : null]
+      .filter(Boolean)
+      .join(" | ");
+  }
+
+  const arraySummary = getArraySummary(data);
+  if (arraySummary) return arraySummary;
+
+  const keys = Object.keys(record).slice(0, 4);
+  return keys.length ? keys.join(", ") : "empty message";
+};
+
+const resolveMonitorSummary = (
+  topics: TopicMonitorWidgetModel["topics"],
+  topicSnapshots: Record<string, WsTopicSnapshotMessage>,
+  staleAfterMs: number
+) => {
+  const findSnapshot = (matcher: (topic: TopicMonitorWidgetModel["topics"][number]) => boolean) => {
+    const topic = topics.find(matcher);
+    if (!topic) return undefined;
+    return topicSnapshots[topicSnapshotKey(topic.topic, topic.messageType)];
+  };
+
+  const detectionsSnapshot = findSnapshot((topic) =>
+    `${topic.label} ${topic.topic}`.toLowerCase().includes("detection") ||
+    topic.topic.toLowerCase().includes("tag")
+  );
+  const commandSnapshot = findSnapshot((topic) =>
+    `${topic.label} ${topic.topic}`.toLowerCase().includes("command")
+  );
+  const errorSnapshot = findSnapshot((topic) =>
+    `${topic.label} ${topic.topic}`.toLowerCase().includes("error")
+  );
+  const commandMagnitudes = getTwistMagnitudes(commandSnapshot?.data);
+  const errorMagnitudes = getTwistMagnitudes(errorSnapshot?.data);
+  const activeSnapshots = [detectionsSnapshot, commandSnapshot, errorSnapshot].filter(
+    (snapshot): snapshot is WsTopicSnapshotMessage => Boolean(snapshot)
+  );
+  const freshestUpdatedAt = activeSnapshots.reduce<number | null>((freshest, snapshot) => {
+    if (snapshot.updated_at_ms == null) return freshest;
+    if (freshest == null) return snapshot.updated_at_ms;
+    return Math.max(freshest, snapshot.updated_at_ms);
+  }, null);
+
+  return [
+    {
+      label: "Tags",
+      value: `${getArrayCount(detectionsSnapshot?.data) ?? 0}`,
+      status: resolveTopicMonitorStatus(detectionsSnapshot, staleAfterMs),
+    },
+    {
+      label: "Cmd |v|",
+      value: formatMagnitude(commandMagnitudes.linear),
+      status: resolveTopicMonitorStatus(commandSnapshot, staleAfterMs),
+    },
+    {
+      label: "Err |v|",
+      value: formatMagnitude(errorMagnitudes.linear),
+      status: resolveTopicMonitorStatus(errorSnapshot, staleAfterMs),
+    },
+    {
+      label: "Age",
+      value: formatTopicAge(freshestUpdatedAt),
+      status:
+        freshestUpdatedAt == null
+          ? "waiting"
+          : Date.now() - freshestUpdatedAt > staleAfterMs
+            ? "stale"
+            : "live",
+    },
+  ];
+};
+
+export function TopicMonitorWidget({
+  widget,
+  selected,
+  onSelect,
+  onRectChange,
+  onLabelChange,
+}: TopicMonitorWidgetProps) {
+  const topicSnapshots = useUiStore((s) => s.topicSnapshots);
+  const topicMonitorEvent = useUiStore((s) => s.topicMonitorEvent);
+  const [, setFreshnessTick] = useState(0);
+  const staleAfterMs = Math.max(
+    250,
+    Math.round(widget.staleAfterMs ?? DEFAULT_TOPIC_MONITOR_STALE_MS)
+  );
+  const blockedTopics = widget.topics.filter((topic) =>
+    isBlockedTopicMonitorMessageType(topic.messageType)
+  );
+  const subscriptionSignature = useMemo(
+    () => widget.topics.map((topic) => `${topic.topic}|${topic.messageType}`).join("\n"),
+    [widget.topics]
+  );
+  const summaryItems = resolveMonitorSummary(widget.topics, topicSnapshots, staleAfterMs);
+
+  useEffect(() => {
+    const intervalMs = Math.max(250, Math.min(1000, Math.round(staleAfterMs / 2)));
+    const timer = window.setInterval(() => {
+      setFreshnessTick((value) => value + 1);
+    }, intervalMs);
+    return () => window.clearInterval(timer);
+  }, [staleAfterMs]);
+
+  useEffect(() => {
+    const topics = widget.topics
+      .map((topic) => ({
+        topic: topic.topic.trim(),
+        message_type: topic.messageType.trim(),
+      }))
+      .filter(
+        (topic) =>
+          topic.topic &&
+          topic.message_type &&
+          !isBlockedTopicMonitorMessageType(topic.message_type)
+      );
+    if (!topics.length) return;
+    wsClient.send({
+      type: "topic_subscribe",
+      topics,
+    });
+  }, [subscriptionSignature, widget.topics]);
+
+  return (
+    <CanvasItem
+      x={widget.rect.x}
+      y={widget.rect.y}
+      w={widget.rect.w}
+      h={widget.rect.h}
+      onChange={onRectChange}
+      onSelect={onSelect}
+      selected={selected}
+      minSize={{ w: 300, h: 170 }}
+      className="controls-topic-monitor-item"
+    >
+      <div className="controls-topic-monitor-widget">
+        <div className="controls-topic-monitor-header">
+          <div className="controls-topic-monitor-title">
+            <InlineEditableText value={widget.label} onCommit={onLabelChange} className="controls-inline-label" />
+          </div>
+          <div className="controls-topic-monitor-meta">{widget.topics.length} topics</div>
+        </div>
+        {topicMonitorEvent ? (
+          <div className={`controls-topic-monitor-event is-${topicMonitorEvent.severity}`}>
+            {topicMonitorEvent.message}
+          </div>
+        ) : null}
+        {blockedTopics.length ? (
+          <div className="controls-topic-monitor-event is-warning">
+            Image/video message types are not monitored here. Use stream widgets for{" "}
+            {blockedTopics.map((topic) => topic.topic || topic.label).join(", ")}.
+          </div>
+        ) : null}
+        {widget.showSummary ?? true ? (
+          <div className="controls-topic-monitor-summary-grid">
+            {summaryItems.map((item) => (
+              <div
+                key={item.label}
+                className={`controls-topic-monitor-summary-card is-${item.status}`}
+              >
+                <span>{item.label}</span>
+                <strong>{item.value}</strong>
+              </div>
+            ))}
+          </div>
+        ) : null}
+        <div className="controls-topic-monitor-list">
+          {widget.topics.map((topic) => {
+            const blocked = isBlockedTopicMonitorMessageType(topic.messageType);
+            const snapshot =
+              topicSnapshots[topicSnapshotKey(topic.topic, topic.messageType)];
+            const status = blocked
+              ? "blocked"
+              : resolveTopicMonitorStatus(snapshot, staleAfterMs);
+            return (
+              <div
+                key={`${topic.topic}|${topic.messageType}`}
+                className={`controls-topic-monitor-row is-${status}`}
+              >
+                <div className="controls-topic-monitor-row-head">
+                  <span className="controls-topic-monitor-name">{topic.label || topic.topic}</span>
+                  <span className="controls-topic-monitor-age">
+                    {blocked ? "blocked" : formatTopicAge(snapshot?.updated_at_ms ?? null)}
+                  </span>
+                </div>
+                <div className="controls-topic-monitor-topic">{topic.topic}</div>
+                <div className="controls-topic-monitor-summary">
+                  {blocked
+                    ? "image/video topic blocked; use a stream widget instead"
+                    : summarizeTopicData(snapshot)}
+                </div>
+                {widget.showRaw && snapshot?.data != null ? (
+                  <pre className="controls-topic-monitor-raw">
+                    {JSON.stringify(snapshot.data, null, 2)}
+                  </pre>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </CanvasItem>
+  );
+}
 
 export function LogsWidget({
   widget,
