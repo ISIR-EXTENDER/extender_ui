@@ -1,156 +1,460 @@
 # Extender UI
 
-`extender_ui` is the tablet frontend for Extender robots. It is used for teleoperation, app-specific workflows such as pétanque, and sandbox experiments that researchers can change without rewriting the whole UI.
+`extender_ui` is the current React tablet interface for the ISIR Extender robot
+stack. It provides configurable operator screens for teleoperation, sandbox
+experiments, webcam preview, visual-servoing supervision, snake control, and
+legacy app workflows.
+
+The current production-style app for new work is **Sandbox V0.0**. Petanque is
+kept as a legacy/example app family and should not be used as the default
+template for new development.
+
+<p align="center">
+  <img alt="React" src="https://img.shields.io/badge/React-19-61dafb?style=for-the-badge&logo=react&logoColor=20232a" />
+  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5.9-3178c6?style=for-the-badge&logo=typescript&logoColor=white" />
+  <img alt="ROS 2" src="https://img.shields.io/badge/ROS%202-Humble-22314e?style=for-the-badge" />
+  <img alt="Vite" src="https://img.shields.io/badge/Vite-7-646cff?style=for-the-badge&logo=vite&logoColor=white" />
+</p>
+
+<p align="center">
+  <a href="#preview">Preview</a> ·
+  <a href="#current-state">Current State</a> ·
+  <a href="#sandbox-v00">Sandbox V0.0</a> ·
+  <a href="#user-guide">User Guide</a> ·
+  <a href="#architecture">Architecture</a> ·
+  <a href="#compatibility">Compatibility</a> ·
+  <a href="#development">Development</a> ·
+  <a href="#bloom-migration">Bloom Migration</a>
+</p>
+
+## Preview
+
+| Screen builder | Sandbox control panel | Visual-servoing monitor |
+| --- | --- | --- |
+| ![Extender UI screen builder](docs/assets/screenshots/builder.png) | ![Sandbox V0.0 control panel](docs/assets/screenshots/control-panel.png) | ![Visual-servoing monitor](docs/assets/screenshots/visual-servoing-monitor.png) |
+
+Refresh these screenshots from a running frontend:
+
+```bash
+npm run dev
+EXTENDER_UI_URL=http://127.0.0.1:5173 npm run capture:readme
+```
+
+## Current State
+
+- Canvas-based screen editor with reusable widgets.
+- Runtime application mode for tablet operation.
+- Sandbox V0.0 app with teleoperation, snake control, visual servoing, and
+  topic monitoring screens.
+- Browser webcam preview through stream widgets.
+- Generic ROS typed-message widgets for booleans, strings, and custom payloads.
+- Topic monitor widgets for small diagnostic ROS messages.
+- Legacy Petanque screens kept for compatibility and as migration examples.
+- Backend integration through the
+  [`tablet_interface`](https://github.com/ISIR-EXTENDER/input_interfaces/tree/main/tablet_interface)
+  ROS 2 package.
+
+## Sandbox V0.0
+
+Sandbox V0.0 is the recommended app for new Extender UI and controller
+development. It is designed to work with
+[`sandbox_controller`](https://github.com/ISIR-EXTENDER/controllers) and the
+`tablet_interface` backend.
+
+Current Sandbox V0.0 screens:
+
+| Screen | Purpose |
+| --- | --- |
+| `sandbox_control` | General sandbox teleoperation and UI smoke checks. |
+| `sandbox_teleop_config` | Teleoperation configuration and reusable widget examples. |
+| `control_panel` | Daily operation screen with webcam preview, Cartesian velocity controls, gain, gripper, visual-servoing controls, and compact telemetry. |
+| `snake_control` | Two-mode joystick control with B1/B2 mode toggle and hold-to-enable snake command. |
+| `visual_servoing` | Camera/RViz preview plus visual-servoing ON/OFF and save-tag controls. |
+| `visual_servoing_monitor` | Dedicated topic monitor for AprilTag detections, velocity commands, and servo error snapshots. |
+
+Petanque screens are still useful as examples of app-specific runtime behavior,
+but they are a legacy project. New features should start from Sandbox V0.0
+unless the work explicitly targets Petanque maintenance.
+
+## User Guide
+
+### Open The App
+
+1. Start the frontend with `npm run dev`.
+2. Open the Vite URL, usually `http://127.0.0.1:5173`.
+3. Use the home page to open either the screen builder or a runtime app.
+4. For new testing, choose **Sandbox V0.0**.
+
+### Use Runtime Screens
+
+Runtime URLs follow this shape:
+
+```text
+/application/:appId/:screenId
+```
+
+Useful Sandbox V0.0 examples:
+
+```text
+/application/application-95a8/control_panel
+/application/application-95a8/snake_control
+/application/application-95a8/visual_servoing
+/application/application-95a8/visual_servoing_monitor
+```
+
+The runtime header lets the operator switch between screens included in the
+current app. Runtime mode is intentionally operator-focused: widgets can be
+used, but they cannot be moved or resized.
+
+### Edit A Screen
+
+1. Open `/canvas-design`.
+2. Select an existing configuration or load a TypeScript preset.
+3. Add widgets from the catalog.
+4. Drag and resize widgets on the canvas.
+5. Select a widget to edit its label, topic, message type, colors, and
+   type-specific options.
+6. Save the configuration.
+
+### Create Or Edit An App
+
+An app is a named set of screens with one home screen.
+
+1. Open the application management controls from the builder.
+2. Create a new app or edit an existing one.
+3. Add the screens that should be visible in runtime.
+4. Pick the `homeScreenId`.
+5. Save the app, then open `/application/:appId`.
+
+Use Sandbox V0.0 as the reference app layout when adding new robot workflows.
+
+### Save, Sync To Folder, And Sync From Folder
+
+Screen and app edits are first stored in browser `localStorage`.
+
+- **Save** stores the current screen/app in the browser.
+- **Sync To Folder** exports the saved screens/apps as JSON files.
+- **Sync From Folder** imports JSON files from disk and merges them into the
+  local browser state.
+
+Recommended workflow for shared screens:
+
+1. Edit and save in the builder.
+2. Use **Sync To Folder** to export JSON.
+3. Review JSON diffs in Git.
+4. Remove timestamp-only `updatedAt` noise before committing.
+5. Use **Sync From Folder** after pulling team changes to refresh local browser
+   state.
+
+### Use Webcam And Video Widgets
+
+Stream widgets can display browser webcam streams. The browser may ask for
+camera permission. If webcam access fails, close other browser tabs or ROS
+nodes that may already be using the same `/dev/video*` device.
+
+For ROS camera pipelines, use video/stream widgets for image data. Do not use
+topic monitor widgets for `sensor_msgs/msg/Image` or
+`sensor_msgs/msg/CompressedImage`; topic monitors are for small diagnostic
+messages.
+
+### Use Topic Monitor Widgets
+
+Topic monitor widgets subscribe through the backend and display compact topic
+snapshots. They support:
+
+- stale thresholds;
+- backend subscription failure events;
+- compact summary mode;
+- optional raw JSON display;
+- adding, editing, and removing monitored topics from the editor.
 
 ## Architecture
 
-The UI now follows a simple split:
-
-- generic core: screens, widgets, storage, websocket client, runtime orchestration
-- app modules: behavior that is specific to one app family
-- backend contract: generic websocket messages handled by `tablet_interface`
-
-Current app modules:
-
-- `src/apps/petanque`
-- `src/apps/sandbox`
-
-Important runtime folders:
-
-- `src/app/runtime`: generic runtime/plugin system
-- `src/pages`: page orchestration
-- `src/components/widgets`: reusable widget rendering
-
-## Data flow
-
-1. the user interacts with widgets
-2. the UI sends websocket messages such as `teleop_cmd`, `ui_button`, `ui_scalar`, `ui_typed`, or `camera_frame`
-3. `tablet_interface` republishes those messages into ROS 2
-4. websocket state and events come back to the UI for live feedback
-
-## Teleop and Topic Workflow
-
-There are two different notions of "topic" in the tablet UI:
-
-- widget `topic` fields such as `/cmd/joystick` or `/cmd/mode` are mostly UI metadata for the canvas, presets, and readouts.
-- ROS topics such as `/teleop_cmd` are published by the backend after it receives websocket commands from the UI.
-
-The normal joystick and mode path is:
-
-1. joystick, slider, and mode widgets update the frontend teleop store in `src/store/teleopStore.ts`
-2. the store builds a websocket message with `type: "teleop_cmd"`, the current `mode`, and the scaled `linear` / `angular` axes
-3. `tablet_interface` receives that websocket message and republishes it as a ROS 2 `extender_msgs/msg/TeleopCommand`
-4. controllers such as `sandbox_controller` consume the ROS topic `/teleop_cmd`
-
-So for joystick based teleop, changing a widget field from `/cmd/joystick` to another value does not change the ROS topic. The ROS output remains the backend `teleop_cmd` bridge unless the backend contract changes.
-
-The snake screen follows this split:
-
-- the 2D joystick uses the existing `teleop_cmd` websocket flow, ending on ROS `/teleop_cmd`
-- the green mode button cycles the frontend mode between `B1` and `B2`
-- the orange hold button is independent from teleop and sends a typed websocket message through `ui_typed`
-
-`B1` and `B2` do not change the joystick velocity computed by the frontend. The same joystick velocity is sent in both modes; only the `mode` field changes (`B1` -> `mode: 0`, `B2` -> `mode: 3`). The snake control algorithm can then interpret those modes on the backend side.
-
-For typed ROS widgets, the widget topic is the real ROS target. The momentary snake button sends:
+Extender UI is intentionally split between a generic web interface and ROS 2
+backend packages.
 
 ```text
-press   -> ui_typed -> /snake_control/enable std_msgs/msg/Bool {data: true}
-release -> ui_typed -> /snake_control/enable std_msgs/msg/Bool {data: false}
+operator action
+  -> React widget/store
+  -> websocket message
+  -> tablet_interface backend
+  -> ROS 2 topic/service
+  -> controller or perception node
+  -> ROS feedback/topic snapshot
+  -> tablet_interface backend
+  -> UI state, event, or monitor widget
 ```
 
-Use this path when a screen needs to publish a small standalone ROS message that should not be part of the continuous `teleop_cmd` stream.
+Important repositories:
 
-## ROS Message Widgets
+| Repository | Role |
+| --- | --- |
+| [`extender_ui`](https://github.com/ISIR-EXTENDER/extender_ui) | React tablet frontend, screen builder, runtime app renderer. |
+| [`input_interfaces`](https://github.com/ISIR-EXTENDER/input_interfaces) | ROS 2 input/backend packages, including `tablet_interface`. |
+| [`controllers`](https://github.com/ISIR-EXTENDER/controllers) | Robot and sandbox controllers, including `sandbox_controller`. |
+| [`robot_interfaces`](https://github.com/ISIR-EXTENDER/robot_interfaces) | Shared ROS messages such as `extender_msgs/msg/TeleopCommand`. |
+| [`tools`](https://github.com/ISIR-EXTENDER/tools) | Tools such as `apriltag_detector`. |
+| [`visual_servoing`](https://github.com/ISIR-EXTENDER/visual_servoing) | Visual-servoing control loop used by Robin's workflow. |
+| [`bloom`](https://github.com/ISIR-EXTENDER/bloom) | WIP next-generation monorepo that will replace `extender_ui` and its backend flow. |
 
-The canvas includes generic ROS publishing widgets for simple hardware and controller integrations:
+### Backend Contract
 
-- `ROS Message Toggle`: publishes one typed ROS payload for ON and another for OFF.
-- `Momentary ROS Message`: publishes a typed ROS payload when pressed and another when released.
-
-The momentary widget is used by the default `snake_control` screen for the snake hold button. Its default contract is:
+The frontend connects to:
 
 ```text
-topic: /snake_control/enable
-message_type: std_msgs/msg/Bool
-pressed payload: {data: true}
-released payload: {data: false}
+ws://localhost:8765/ws/control
 ```
 
-At runtime it sends `ui_typed` websocket messages, so the existing `tablet_interface` typed-message bridge republishes the configured ROS message without needing a custom websocket message type.
+`tablet_interface` receives websocket messages such as:
 
-The same `snake_control` screen keeps the 2D joystick on the existing `teleop_cmd` websocket flow and uses the regular mode button as a two-state `B1` / `B2` toggle.
+- `teleop_cmd`
+- `ui_button`
+- `ui_scalar`
+- `ui_typed`
+- `topic_subscribe`
+- `camera_frame`
 
-## Widget Interaction Notes
+The backend publishes ROS messages, manages topic subscriptions, and sends
+state/events back to the UI.
 
-Interactive widgets should compute pointer positions from the rendered DOM rectangle with `getBoundingClientRect()`. This keeps controls aligned when the canvas is zoomed, resized, or rendered in fit mode.
+### Teleoperation Contract
 
-The joystick is implemented with pointer events directly in `src/components/teleop/NippleJoystick.tsx`. It clamps motion to the circular base, applies the configured deadzone before publishing, and visually moves the knob to the edge at saturation. The faint horizontal and vertical guide lines become brighter when the stick is aligned with one main axis, which helps users drive only `x/-x` or only `y/-y`.
+Joystick, slider, and mode widgets do not publish directly to their widget
+`topic` fields during normal teleoperation. They update the teleop store, and
+the frontend sends:
 
-The max velocity widget uses the same pointer-position rule. Its value source depends on the configured topic:
+```text
+type: teleop_cmd
+mode: number
+linear: {x, y, z}
+angular: {x, y, z}
+```
 
-- known teleop configuration topics, such as `/cmd/max_velocity`, read and write the shared teleop store.
-- custom topics keep an independent per-widget value in the controls page, so several max velocity widgets no longer force each other to the same value.
+`tablet_interface` republishes this command as:
 
-Generic teleoperation treats `/cmd/max_velocity` as a normalized gain from `0` to `1`. Pétanque-specific throw controls keep their own ranges on dedicated topics such as `/petanque_throw/total_duration`.
+| ROS topic | Message |
+| --- | --- |
+| `/teleop_cmd` | `extender_msgs/msg/TeleopCommand` |
 
-When a screen is saved or synchronized to a folder, `updatedAt` is preserved if the screen content is unchanged. This avoids timestamp-only JSON diffs when no widget, pose, or canvas setting actually changed.
+Widget `topic` values such as `/cmd/joystick`, `/cmd/joystick_z`, or
+`/cmd/mode` are UI configuration metadata for the screen editor and readouts.
+Changing them does not change the backend ROS teleop topic.
 
-## Apps
+Generic teleoperation treats `/cmd/max_velocity` as a normalized gain from `0`
+to `1`. Legacy Petanque throw controls keep their own app-specific ranges on
+dedicated topics.
 
-- `SandboxV0.0`: generic teleop/sandbox app used for experiments
-- pétanque screens: preserved as a compatibility app family during the refactor
+### Typed ROS Message Widgets
 
-The rule going forward is:
+Some widgets publish directly to configured ROS topics through the generic
+typed-message bridge:
 
-- keep the core generic
-- put app-specific behavior in `src/apps/<app_name>`
+- `ROS Message Toggle`: publishes one typed payload for ON and one for OFF.
+- `Momentary ROS Message`: publishes one typed payload while pressed and
+  another when released.
 
-## Camera direction
+At runtime these widgets send `ui_typed` websocket messages.
+`tablet_interface` republishes the configured ROS message type and payload.
 
-The UI can display streams and capture frames from stream widgets. Captured frames can now be sent to backend as `camera_frame`, so camera data can become ROS topics and later be reused by perception or visual-servoing nodes.
+### Snake Control Contract
 
-## Visual Servoing Monitor
+The `snake_control` screen uses two independent flows:
 
-The sandbox visual-servoing flow is split across two screens:
-
-- `control_panel`: a compact daily-operation screen for Sandbox with webcam preview, Cartesian velocity controls, max velocity, gripper, and visual-servoing save/on/off controls.
-- `visual_servoing`: camera/RViz preview plus the visual-servoing toggle and save-tag action.
-- `visual_servoing_monitor`: a dedicated ROS topic monitor for AprilTag detections, velocity command, and servo error snapshots.
-
-`control_panel` is based on Robin's `default_control_with_camera` workflow. It keeps only the useful daily controls: `/cmd/joystick`, `/cmd/joystick_rxry`, `/cmd/joystick_z`, `/cmd/joystick_rz`, `/cmd/max_velocity`, `/cmd/gripper`, `/ui/visual_servoing/on`, and `/ui/visual_servoing/save`. The unused snake slider and generic ROS test toggle are intentionally left out.
-
-Robin's current visual-servoing node contract is:
-
-| Topic | Message | UI role |
+| UI control | Backend path | ROS effect |
 | --- | --- | --- |
-| `/ui/visual_servoing/on` | `std_msgs/msg/Bool` | `ROS Message Toggle`; `true` starts visual servoing and `false` stops it. |
-| `/ui/visual_servoing/save` | `std_msgs/msg/String` | `Save Tag` button; current payload is `save`. |
-| `/tag_detections` | `extender_msgs/msg/SharedControlGoalArray` | AprilTag detections monitored by the UI and consumed by Robin's node. |
-| `/visual_servoing/velocity_command` | `geometry_msgs/msg/TwistStamped` | Servo command telemetry. |
-| `/visual_servoing/error_TAGtoTAGd` | `geometry_msgs/msg/TwistStamped` | Servo alignment/error telemetry. |
+| 2D joystick | `teleop_cmd` websocket message | Publishes `/teleop_cmd` |
+| Green mode button | teleop mode store | `B1 -> mode: 0`, `B2 -> mode: 3` |
+| Orange hold button | `ui_typed` websocket message | Publishes `/snake_control/enable` as `std_msgs/msg/Bool` |
 
-The monitor uses the generic backend `topic_subscribe` / `topic_snapshot` websocket flow. It is meant for small diagnostic ROS messages, not for video frames; webcam preview stays on the stream widget path.
+The frontend sends the same joystick velocity in `B1` and `B2`. Only the mode
+field changes; the controller interprets the mode backend-side.
 
-Topic monitor widgets support:
+Momentary snake button contract:
 
-- a configurable stale threshold, so topics move from live to stale when snapshots stop updating.
-- visible backend subscription events, including partial failures.
-- local warnings for `sensor_msgs/msg/Image` and `sensor_msgs/msg/CompressedImage`; use stream widgets for those.
-- adding, editing, and removing monitored topics from the editor inspector.
+```text
+press   -> /snake_control/enable std_msgs/msg/Bool {data: true}
+release -> /snake_control/enable std_msgs/msg/Bool {data: false}
+```
+
+### Visual Servoing Contract
+
+Current visual-servoing topics:
+
+| Topic | Message | Direction |
+| --- | --- | --- |
+| `/ui/visual_servoing/on` | `std_msgs/msg/Bool` | UI -> ROS |
+| `/ui/visual_servoing/save` | `std_msgs/msg/String` | UI -> ROS |
+| `/tag_detections` | `extender_msgs/msg/SharedControlGoalArray` | AprilTag detector -> UI / visual servoing |
+| `/visual_servoing/velocity_command` | `geometry_msgs/msg/TwistStamped` | visual servoing -> UI |
+| `/visual_servoing/error_TAGtoTAGd` | `geometry_msgs/msg/TwistStamped` | visual servoing -> UI |
+
+For the ROS AprilTag pipeline, camera images usually come from:
+
+```text
+/image_raw
+/camera_info
+```
+
+The AprilTag detector then publishes:
+
+```text
+/tag_detections
+```
+
+## Compatibility
+
+This table documents the local commits used while validating the current
+Extender UI README and Sandbox V0.0 integration notes.
+
+| Component | Repository | Branch checked | Commit checked | Notes |
+| --- | --- | --- | --- | --- |
+| Frontend | [`extender_ui`](https://github.com/ISIR-EXTENDER/extender_ui) | `docs/update-project-readme` | Current PR branch | This README update. |
+| Workspace wrapper | [`extender_workspace`](https://github.com/ISIR-EXTENDER/extender_workspace) | `feat/workspace-uv-petanque-deps` | `22f4206 build: add tablet interface deps to workspace uv` | Used for local ROS workspace dependency checks. |
+| Controllers | [`controllers`](https://github.com/ISIR-EXTENDER/controllers) | `main` | `c6bbebc feat: add snake mode to cartesian_velocity controller (#7)` | Use `sandbox_controller` for new development. |
+| Backend/input interfaces | [`input_interfaces`](https://github.com/ISIR-EXTENDER/input_interfaces) | `main` | `51b400a docs: document visual servoing ui contract (#19)` | Provides `tablet_interface`. |
+| Robot messages | [`robot_interfaces`](https://github.com/ISIR-EXTENDER/robot_interfaces) | `main` | `1543180 Merge pull request #5 from ssrpo/fix/remove-stale-joint-pose-helper` | Provides shared ROS messages. |
+| Tools | [`tools`](https://github.com/ISIR-EXTENDER/tools) | `main` | `800bed7 Merge pull request #4 from MegMll/topic/add_snake` | Provides `apriltag_detector` for visual-servoing tag telemetry. |
+| Input devices | [`explorer_stack`](https://github.com/ISIR-EXTENDER/explorer_stack) | `feat/petanque` | `bee7467 feat - petanque parameter` | Current input-device package is `explorer_input_devices`; no top-level `input_devices` repo exists in this workspace. |
+| Visual servoing | [`visual_servoing`](https://github.com/ISIR-EXTENDER/visual_servoing) | `main` | `bc6a33a first commit` | Robin's visual-servoing package cloned locally for integration checks. |
+| Next platform | [`bloom`](https://github.com/ISIR-EXTENDER/bloom) | WIP | `5db90c9 fix(ros): add topic status preflight diagnostics (#95)` | Future replacement platform; see [Bloom Migration](#bloom-migration). |
+
+## Repository Layout
+
+```text
+src/app/                  application registry, routing, runtime orchestration
+src/app/runtime/          generic runtime/plugin system
+src/apps/                 app-specific behavior
+src/components/widgets/   widget models, renderers, catalog, and migrations
+src/components/teleop/    joystick UI and teleoperation controls
+src/pages/                editor/runtime pages
+src/services/             websocket client
+src/store/                UI and teleop state stores
+data/                     default screen/application JSON files
+docs/                     architecture, contribution notes, README screenshots
+```
+
+## Required Extender Packages
+
+For frontend-only development, only Node.js and npm are required.
+
+For a working robot/sandbox setup, `extender_ui` expects these Extender packages
+to exist in the ROS 2 workspace:
+
+| Package / repo | Required for | Notes |
+| --- | --- | --- |
+| `input_interfaces/tablet_interface` | Required runtime backend | Websocket server used by the UI. Bridges UI messages to ROS and sends state/events back. |
+| `robot_interfaces/extender_msgs` | Required by backend/controller contracts | Provides `extender_msgs/msg/TeleopCommand` and shared-control messages used by the stack. |
+| `controllers/sandbox_controller` | Sandbox teleop and feedback | Consumes `/teleop_cmd` and publishes sandbox feedback used by the UI. |
+| `tools/apriltag_detector` | Visual-servoing tag telemetry | Publishes `/tag_detections` for visual servoing and monitoring. |
+| `visual_servoing` | Visual-servoing control loop | Consumes `/tag_detections`, `/ui/visual_servoing/on`, and `/ui/visual_servoing/save`; publishes command/error telemetry. |
+
+Optional or legacy packages:
+
+- Petanque controllers/state-machine packages for legacy Petanque screens.
+- `usb_cam` (`ros-humble-usb-cam`) when running the AprilTag camera pipeline
+  through ROS image topics.
 
 ## Development
 
+### Prerequisites
+
+- Node.js 20 or newer.
+- npm.
+- ROS 2 Humble for backend integration.
+- A built Extender ROS workspace when using the UI with live ROS topics.
+
+### Install
+
 ```bash
+cd extender_frontend/extender_ui
 npm install
-npm run build
-npm run test:coverage
-npm run test:e2e
 ```
+
+### Run The Frontend
+
+```bash
+npm run dev
+```
+
+Vite prints the local URL, usually:
+
+```text
+http://localhost:5173
+```
+
+The frontend can be opened without the backend, but live robot state and ROS
+publication require `tablet_interface`.
+
+### Run With The Backend
+
+From the ROS workspace:
+
+```bash
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+ros2 run tablet_interface tablet_interface_node
+```
+
+### Useful Commands
+
+```bash
+npm run dev          # start Vite
+npm run build        # typecheck and build
+npm run lint         # eslint
+npm test -- --run    # unit tests
+npm run test:e2e     # Playwright tests
+npm run capture:readme
+```
+
+The current lint configuration may report existing React hook/compiler warnings.
+Treat new errors as blocking.
+
+## Working With Screen Data
+
+Default screens are stored in `data/*.json` and mirrored by configuration
+factories/migrations in `src/components/widgets/configurations.ts`.
+
+When changing a default screen:
+
+1. Keep JSON diffs intentional.
+2. Avoid timestamp-only `updatedAt` changes.
+3. Update migrations when an existing localStorage screen should receive the
+   new widget or setting.
+4. Do not write migrations that permanently override future manual edits from
+   the screen editor.
+
+## Bloom Migration
+
+[`Bloom`](https://github.com/ISIR-EXTENDER/bloom) is the WIP next-generation
+robot UI platform. It is being developed as a monorepo that combines the
+frontend, backend API, reusable widget contracts, runtime safety rules, storage,
+and ROS adapters.
+
+The goal is for Bloom to replace both `extender_ui` and the current dedicated
+backend flow once the team has validated equivalent robot workflows. Until then,
+`extender_ui` and `tablet_interface` remain the stable path for integration
+week and current Sandbox V0.0 work.
+
+Migration rule of thumb:
+
+1. Keep shipping stable Extender work in `extender_ui` + `tablet_interface`.
+2. Use Sandbox V0.0 as the reference for new Extender workflows.
+3. Port accepted workflows into Bloom incrementally.
+4. Replace legacy repos only after the matching Bloom workflow is tested with
+   the robot stack and accepted by the team.
 
 ## Contributing
 
-- prefer generic websocket messages over app-specific transport
-- keep pétanque-specific logic in `src/apps/petanque`
-- keep sandbox-specific logic in `src/apps/sandbox`
-- do not add new app behavior directly into the generic runtime/page layer unless it truly applies to every app
+- Write README content, comments, PR descriptions, and shared docs in English.
+- Prefer generic websocket messages over app-specific transport.
+- Keep app-specific behavior in `src/apps/<app_name>`.
+- Keep the runtime/page layer generic unless behavior truly applies to every
+  app.
+- Keep video transport separate from topic monitoring.
+- Document any new ROS topic contract in both the frontend README and the
+  relevant backend package.
+
+## License
+
+This package is part of the ISIR Extender project. See the repository or
+workspace-level license information for terms.
