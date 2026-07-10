@@ -230,6 +230,7 @@ export type TopicMonitorWidget = WidgetBase & {
   kind: "topic-monitor";
   topics: TopicMonitorTopic[];
   showSummary?: boolean;
+  showDetails?: boolean;
   showRaw: boolean;
   staleAfterMs?: number;
 };
