@@ -2485,6 +2485,40 @@ const normalizePetanqueTeleopButtonLayout = (
   });
 };
 
+const normalizeGenericTeleopMaxVelocityRanges = (
+  configurations: WidgetConfiguration[]
+): WidgetConfiguration[] =>
+  configurations.map((configuration) => {
+    let changed = false;
+    const nextWidgets = configuration.widgets.map((widget) => {
+      if (widget.kind !== "max-velocity" || widget.topic !== "/cmd/max_velocity") {
+        return widget;
+      }
+
+      const nextWidget = {
+        ...widget,
+        min: 0,
+        max: 1,
+        step: 0.01,
+      };
+      if (
+        widget.min !== nextWidget.min ||
+        widget.max !== nextWidget.max ||
+        widget.step !== nextWidget.step
+      ) {
+        changed = true;
+      }
+      return nextWidget;
+    });
+
+    if (!changed) return configuration;
+    return {
+      ...configuration,
+      widgets: nextWidgets,
+      updatedAt: new Date().toISOString(),
+    };
+  });
+
 const cloneDefaultConfigurations = () => DEFAULT_DEMO_CONFIGURATIONS.map(cloneConfiguration);
 
 const mergeMissingDemoConfigurations = (
@@ -2564,38 +2598,25 @@ const parsePoses = (value: unknown): PoseSnapshot[] => {
 
 const applyConfigurationMigrations = (
   configurations: WidgetConfiguration[]
-): WidgetConfiguration[] =>
-  normalizePetanqueTeleopButtonLayout(
-    migratePlayPetanqueLancerDrawThrowWidget(
-      ensurePlayPetanqueLancerActionButtons(
-        normalizePetanqueSliderDisplayOptions(
-          normalizePetanqueSliderRanges(
-            migrateRosMessageToggleWidgets(
-              migrateVisualServoingLayout(
-                ensureSandboxRosMessageToggle(
-                  ensurePetanqueGripperControl(
-                    ensurePetanqueElectromagnetControl(
-                      removePetanqueLegacyNavigationButtons(
-                        migratePetanqueTeleopConfigLayout(
-                          disablePetanqueViewerWidget(
-                            migrateLegacyPetanque(
-                              migrateLegacyDefaultControl(
-                                mergeMissingDemoConfigurations(configurations)
-                              )
-                            )
-                          )
-                        )
-                      )
-                    )
-                  )
-                )
-              )
-            )
-          )
-        )
-      )
-    )
-  );
+): WidgetConfiguration[] => {
+  let nextConfigurations = mergeMissingDemoConfigurations(configurations);
+  nextConfigurations = migrateLegacyDefaultControl(nextConfigurations);
+  nextConfigurations = migrateLegacyPetanque(nextConfigurations);
+  nextConfigurations = disablePetanqueViewerWidget(nextConfigurations);
+  nextConfigurations = migratePetanqueTeleopConfigLayout(nextConfigurations);
+  nextConfigurations = removePetanqueLegacyNavigationButtons(nextConfigurations);
+  nextConfigurations = ensurePetanqueElectromagnetControl(nextConfigurations);
+  nextConfigurations = ensurePetanqueGripperControl(nextConfigurations);
+  nextConfigurations = ensureSandboxRosMessageToggle(nextConfigurations);
+  nextConfigurations = migrateVisualServoingLayout(nextConfigurations);
+  nextConfigurations = migrateRosMessageToggleWidgets(nextConfigurations);
+  nextConfigurations = normalizePetanqueSliderRanges(nextConfigurations);
+  nextConfigurations = normalizePetanqueSliderDisplayOptions(nextConfigurations);
+  nextConfigurations = ensurePlayPetanqueLancerActionButtons(nextConfigurations);
+  nextConfigurations = migratePlayPetanqueLancerDrawThrowWidget(nextConfigurations);
+  nextConfigurations = normalizePetanqueTeleopButtonLayout(nextConfigurations);
+  return normalizeGenericTeleopMaxVelocityRanges(nextConfigurations);
+};
 
 export function loadConfigurationsFromLocalStorage(): WidgetConfiguration[] {
   return readJsonStorage(STORAGE_KEY, cloneDefaultConfigurations(), (parsed) => {

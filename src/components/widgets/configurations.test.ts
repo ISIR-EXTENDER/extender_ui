@@ -1,7 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
+
 import { DEFAULT_CANVAS_SETTINGS } from "./canvasSettings";
-import { upsertConfiguration, type WidgetConfiguration } from "./configurations";
+import {
+  loadConfigurationsFromLocalStorage,
+  upsertConfiguration,
+  type WidgetConfiguration,
+} from "./configurations";
 import type { CanvasWidget } from "./widgetTypes";
+
+const STORAGE_KEY = "extender.controls.widget-configurations.v1";
 
 const buttonWidget: CanvasWidget = {
   id: "test-button",
@@ -55,5 +62,52 @@ describe("upsertConfiguration", () => {
 
     expect(result[0]?.widgets).toEqual([buttonWidget]);
     expect(result[0]?.updatedAt).toBe("2026-07-09T12:00:00.000Z");
+  });
+});
+
+describe("widget configuration migrations", () => {
+  afterEach(() => {
+    window.localStorage.clear();
+  });
+
+  it("normalizes existing generic teleop max velocity widgets", () => {
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify([
+        {
+          name: "control_panel",
+          widgets: [
+            {
+              id: "control-panel-max-velocity",
+              kind: "max-velocity",
+              label: "Max Velocity",
+              topic: "/cmd/max_velocity",
+              min: 0.1,
+              max: 3,
+              step: 0.1,
+              rect: { x: 610, y: 20, w: 640, h: 145 },
+            },
+          ],
+          poses: [],
+          canvas: { presetId: "hd", runtimeMode: "fit" },
+          updatedAt: "2026-02-24T00:00:00.000Z",
+        },
+      ])
+    );
+
+    const controlPanel = loadConfigurationsFromLocalStorage().find(
+      (configuration) => configuration.name === "control_panel"
+    );
+    const maxVelocityWidget = controlPanel?.widgets.find(
+      (widget) => widget.id === "control-panel-max-velocity"
+    );
+
+    expect(maxVelocityWidget).toMatchObject({
+      kind: "max-velocity",
+      topic: "/cmd/max_velocity",
+      min: 0,
+      max: 1,
+      step: 0.01,
+    });
   });
 });
