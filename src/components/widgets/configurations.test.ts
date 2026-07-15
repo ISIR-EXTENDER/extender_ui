@@ -171,4 +171,42 @@ describe("widget configuration migrations", () => {
       rect: { x: 700, y: 610, w: 520, h: 120 },
     });
   });
+
+  it("migrates saved snake hold buttons to the controller snake topic", () => {
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify([
+        {
+          name: "snake_control",
+          widgets: [
+            {
+              id: "snake-hold",
+              kind: "momentary-ros-message",
+              label: "Hold Snake",
+              topic: "/snake_control/enable",
+              messageType: "std_msgs/msg/Bool",
+              pressedPayload: "{data: true}",
+              releasedPayload: "{data: false}",
+              rect: { x: 860, y: 116, w: 220, h: 76 },
+            },
+          ],
+          poses: [],
+          canvas: { presetId: "hd", runtimeMode: "fit" },
+          updatedAt: "2026-02-24T00:00:00.000Z",
+        },
+      ])
+    );
+
+    const snakeControl = loadConfigurationsFromLocalStorage().find(
+      (configuration) => configuration.name === "snake_control"
+    );
+    const snakeHoldWidget = snakeControl?.widgets.find(
+      (widget) => widget.id === "snake-hold"
+    );
+
+    expect(snakeHoldWidget).toMatchObject({
+      kind: "momentary-ros-message",
+      topic: "/activate_snake",
+    });
+  });
 });

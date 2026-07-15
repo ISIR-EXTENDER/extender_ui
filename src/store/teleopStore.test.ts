@@ -3,6 +3,10 @@ import { describe, expect, it } from "vitest";
 import { clampTeleopMaxVelocity, selectNextTabletMode, useTeleopStore } from "./teleopStore";
 
 describe("teleopStore", () => {
+  it("starts in B1 to match the snake joystick demo", () => {
+    expect(useTeleopStore.getState().mode).toBe(0);
+  });
+
   it("cycles tablet controls through combined modes only", () => {
     expect(selectNextTabletMode(0)).toBe(3);
     expect(selectNextTabletMode(3)).toBe(0);

@@ -2545,6 +2545,36 @@ const normalizeGenericTeleopMaxVelocityRanges = (
     };
   });
 
+const migrateSnakeControlTopic = (
+  configurations: WidgetConfiguration[]
+): WidgetConfiguration[] =>
+  configurations.map((configuration) => {
+    if (configuration.name !== "snake_control") return configuration;
+
+    let changed = false;
+    const nextWidgets = configuration.widgets.map((widget) => {
+      if (
+        widget.id === "snake-hold" &&
+        widget.kind === "momentary-ros-message" &&
+        widget.topic === "/snake_control/enable"
+      ) {
+        changed = true;
+        return {
+          ...widget,
+          topic: "/activate_snake",
+        };
+      }
+      return widget;
+    });
+
+    if (!changed) return configuration;
+    return {
+      ...configuration,
+      widgets: nextWidgets,
+      updatedAt: new Date().toISOString(),
+    };
+  });
+
 const migrateControlPanelVisualServoTelemetry = (
   configurations: WidgetConfiguration[]
 ): WidgetConfiguration[] => {
@@ -2688,6 +2718,7 @@ const applyConfigurationMigrations = (
   nextConfigurations = migratePlayPetanqueLancerDrawThrowWidget(nextConfigurations);
   nextConfigurations = normalizePetanqueTeleopButtonLayout(nextConfigurations);
   nextConfigurations = normalizeGenericTeleopMaxVelocityRanges(nextConfigurations);
+  nextConfigurations = migrateSnakeControlTopic(nextConfigurations);
   return migrateControlPanelVisualServoTelemetry(nextConfigurations);
 };
 

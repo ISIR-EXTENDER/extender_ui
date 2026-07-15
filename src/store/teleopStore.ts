@@ -211,7 +211,7 @@ export const useTeleopStore = create<TeleopState>((set, get) => ({
   rotY: 0,
   z: 0,
   rz: 0,
-  mode: 3,
+  mode: 0,
   wsStatus: "disconnected",
   wsState: null,
   seq: 0,
