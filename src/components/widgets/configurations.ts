@@ -915,7 +915,7 @@ export const DEFAULT_DEMO_CONFIGURATIONS: WidgetConfiguration[] = [
     }),
     createDemoWidget("snake-hold", "momentary-ros-message", 860, 116, {
       label: "Hold Snake",
-      topic: "/snake_control/enable",
+      topic: "/activate_snake",
       messageType: "std_msgs/msg/Bool",
       pressedPayload: "{data: true}",
       releasedPayload: "{data: false}",

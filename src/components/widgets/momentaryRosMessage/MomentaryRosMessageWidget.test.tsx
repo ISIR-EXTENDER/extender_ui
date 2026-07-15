@@ -8,7 +8,7 @@ const widget: MomentaryRosMessageWidgetModel = {
   id: "snake-hold",
   kind: "momentary-ros-message",
   label: "Hold Snake",
-  topic: "/snake_control/enable",
+  topic: "/activate_snake",
   messageType: "std_msgs/msg/Bool",
   pressedPayload: "{data: true}",
   releasedPayload: "{data: false}",
