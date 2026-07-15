@@ -265,7 +265,7 @@ The `snake_control` screen uses two independent flows:
 | --- | --- | --- |
 | 2D joystick | `teleop_cmd` websocket message | Publishes `/teleop_cmd` |
 | Green mode button | teleop mode store | `B1 -> mode: 0`, `B2 -> mode: 3` |
-| Orange hold button | `ui_typed` websocket message | Publishes `/snake_control/enable` as `std_msgs/msg/Bool` |
+| Orange hold button | `ui_typed` websocket message | Publishes `/activate_snake` as `std_msgs/msg/Bool` |
 
 The frontend sends the same joystick velocity in `B1` and `B2`. Only the mode
 field changes; the controller interprets the mode backend-side.
@@ -273,8 +273,8 @@ field changes; the controller interprets the mode backend-side.
 Momentary snake button contract:
 
 ```text
-press   -> /snake_control/enable std_msgs/msg/Bool {data: true}
-release -> /snake_control/enable std_msgs/msg/Bool {data: false}
+press   -> /activate_snake std_msgs/msg/Bool {data: true}
+release -> /activate_snake std_msgs/msg/Bool {data: false}
 ```
 
 ### Visual Servoing Contract
@@ -311,9 +311,9 @@ Extender UI README and Sandbox V0.0 integration notes.
 | --- | --- | --- | --- | --- |
 | Frontend | [`extender_ui`](https://github.com/ISIR-EXTENDER/extender_ui) | Current branch | This README update | Documents the current Sandbox V0.0 UI contract. |
 | Workspace wrapper | [`extender_workspace`](https://github.com/ISIR-EXTENDER/extender_workspace) | `main` | `da55bc9 fix: import sandbox controller repository (#4)` | Imports `sandbox_controller` as a standalone repository. |
-| Controllers | [`controllers`](https://github.com/ISIR-EXTENDER/controllers) | `main` | `c6bbebc feat: add snake mode to cartesian_velocity controller (#7)` | Shared robot controllers. |
+| Controllers | [`controllers`](https://github.com/ISIR-EXTENDER/controllers) | `main` | `99fcbdb Add snake demo controller; previous: c6bbebc feat: add snake mode to cartesian_velocity controller (#7)` | Shared robot controllers. |
 | Sandbox controller | [`sandbox_controller`](https://github.com/ISIR-EXTENDER/sandbox_controller) | `main` | `0411619 fix: use synced joint positions for feedback (#4)` | Reference controller for new UI/backend/controller smoke tests. |
-| Backend/input interfaces | [`input_interfaces`](https://github.com/ISIR-EXTENDER/input_interfaces) | `main` | `c72c02a docs: update tablet interface readme (#20)` | Provides `tablet_interface`. |
+| Backend/input interfaces | [`input_interfaces`](https://github.com/ISIR-EXTENDER/input_interfaces) | `main` | `b278a53 Add snake Demo; previous: c72c02a docs: update tablet interface readme (#20)` | Provides `tablet_interface`. |
 | Robot messages | [`robot_interfaces`](https://github.com/ISIR-EXTENDER/robot_interfaces) | `main` | `1543180 Merge pull request #5 from ssrpo/fix/remove-stale-joint-pose-helper` | Provides shared ROS messages. |
 | Tools | [`tools`](https://github.com/ISIR-EXTENDER/tools) | `main` | `800bed7 Merge pull request #4 from MegMll/topic/add_snake` | Provides `apriltag_detector` for visual-servoing tag telemetry. |
 | Input devices | [`explorer_stack`](https://github.com/ISIR-EXTENDER/explorer_stack) | `feat/petanque` | `bee7467 feat - petanque parameter` | Current input-device package is `explorer_input_devices`; no top-level `input_devices` repo exists in this workspace. |

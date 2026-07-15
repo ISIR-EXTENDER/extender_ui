@@ -12,7 +12,7 @@ describe("momentaryRosMessage/model", () => {
       id: "snake-hold",
       kind: "momentary-ros-message",
       label: "Snake",
-      topic: "/snake_control/enable",
+      topic: "/activate_snake",
       messageType: "",
       pressedPayload: "",
       releasedPayload: "",
@@ -32,7 +32,7 @@ describe("momentaryRosMessage/model", () => {
         id: "snake-hold",
         kind: "momentary-ros-message",
         label: "Snake",
-        topic: "/snake_control/enable",
+        topic: "/activate_snake",
         messageType: "std_msgs/msg/Bool",
         pressedPayload: "{data: true}",
         releasedPayload: "{data: false}",
@@ -43,7 +43,7 @@ describe("momentaryRosMessage/model", () => {
 
     expect(message).toEqual({
       type: "ui_typed",
-      topic: "/snake_control/enable",
+      topic: "/activate_snake",
       message_type: "std_msgs/msg/Bool",
       payload_text: "{data: true}",
       widget_id: "snake-hold",
@@ -56,7 +56,7 @@ describe("momentaryRosMessage/model", () => {
         id: "snake-hold",
         kind: "momentary-ros-message",
         label: "Snake",
-        topic: "/snake_control/enable",
+        topic: "/activate_snake",
         messageType: "std_msgs/msg/Bool",
         pressedPayload: "{data: true}",
         releasedPayload: "{data: false}",
@@ -67,7 +67,7 @@ describe("momentaryRosMessage/model", () => {
 
     expect(message).toEqual({
       type: "ui_typed",
-      topic: "/snake_control/enable",
+      topic: "/activate_snake",
       message_type: "std_msgs/msg/Bool",
       payload_text: "{data: false}",
       widget_id: "snake-hold",
@@ -77,7 +77,7 @@ describe("momentaryRosMessage/model", () => {
   it("builds a CLI-style preview string", () => {
     const command = buildMomentaryRosMessageCliExample(
       {
-        topic: "/snake_control/enable",
+        topic: "/activate_snake",
         messageType: "std_msgs/msg/Bool",
         pressedPayload: "{data: true}",
         releasedPayload: "{data: false}",
@@ -86,7 +86,7 @@ describe("momentaryRosMessage/model", () => {
     );
 
     expect(command).toBe(
-      'ros2 topic pub -1 /snake_control/enable std_msgs/msg/Bool "{data: true}"'
+      'ros2 topic pub -1 /activate_snake std_msgs/msg/Bool "{data: true}"'
     );
   });
 });

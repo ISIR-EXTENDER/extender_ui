@@ -331,7 +331,7 @@ export function createWidgetFromCatalogType(
       id: nextWidgetId(),
       kind: "momentary-ros-message",
       label: "Hold",
-      topic: "/snake_control/enable",
+      topic: "/activate_snake",
       messageType: DEFAULT_MOMENTARY_ROS_MESSAGE_TYPE,
       pressedPayload: DEFAULT_MOMENTARY_ROS_MESSAGE_PRESSED_PAYLOAD,
       releasedPayload: DEFAULT_MOMENTARY_ROS_MESSAGE_RELEASED_PAYLOAD,
