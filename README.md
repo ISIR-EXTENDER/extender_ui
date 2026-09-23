@@ -1,6 +1,11 @@
 # Extender UI
 
-`extender_ui` is the current React tablet interface for the ISIR Extender robot
+> [!NOTE]
+> `extender_ui` is legacy. [Bloom](https://github.com/ISIR-EXTENDER/bloom) is the
+> active Extender operator interface; this app is kept as a rollback until Bloom's
+> live sessions are accepted.
+
+`extender_ui` is the previous React tablet interface for the ISIR Extender robot
 stack. It provides configurable operator screens for teleoperation, sandbox
 experiments, webcam preview, visual-servoing supervision, snake control, and
 legacy app workflows.
@@ -24,7 +29,7 @@ template for new development.
   <a href="#architecture">Architecture</a> ·
   <a href="#compatibility">Compatibility</a> ·
   <a href="#development">Development</a> ·
-  <a href="#bloom-migration">Bloom Migration</a>
+  <a href="#bloom">Bloom</a>
 </p>
 
 ## Preview
@@ -196,7 +201,7 @@ Important repositories:
 | [`robot_interfaces`](https://github.com/ISIR-EXTENDER/robot_interfaces) | Shared ROS messages such as `extender_msgs/msg/TeleopCommand`. |
 | [`tools`](https://github.com/ISIR-EXTENDER/tools) | Tools such as `apriltag_detector`. |
 | [`visual_servoing`](https://github.com/ISIR-EXTENDER/visual_servoing) | Visual-servoing control loop used by Robin's workflow. |
-| [`bloom`](https://github.com/ISIR-EXTENDER/bloom) | WIP next-generation monorepo that will replace `extender_ui` and its backend flow. |
+| [`bloom`](https://github.com/ISIR-EXTENDER/bloom) | Active Extender operator interface; replaces `extender_ui` and its backend flow. |
 
 ### Backend Contract
 
@@ -347,7 +352,7 @@ Extender UI README and Sandbox V0.0 integration notes.
 | Tools | [`tools`](https://github.com/ISIR-EXTENDER/tools) | `main` | `800bed7 Merge pull request #4 from MegMll/topic/add_snake` | Provides `apriltag_detector` for visual-servoing tag telemetry. |
 | Input devices | [`explorer_stack`](https://github.com/ISIR-EXTENDER/explorer_stack) | `feat/petanque` | `bee7467 feat - petanque parameter` | Current input-device package is `explorer_input_devices`; no top-level `input_devices` repo exists in this workspace. |
 | Visual servoing | [`visual_servoing`](https://github.com/ISIR-EXTENDER/visual_servoing) | `main` | `bc6a33a first commit` | Robin's visual-servoing package cloned locally for integration checks. |
-| Next platform | [`bloom`](https://github.com/ISIR-EXTENDER/bloom) | WIP | `5db90c9 fix(ros): add topic status preflight diagnostics (#95)` | Future replacement platform; see [Bloom Migration](#bloom-migration). |
+| Operator interface | [`bloom`](https://github.com/ISIR-EXTENDER/bloom) | Active | `5db90c9 fix(ros): add topic status preflight diagnostics (#95)` | Future replacement platform; see [Bloom Migration](#bloom-migration). |
 
 ## Repository Layout
 
@@ -454,25 +459,15 @@ When changing a default screen:
 4. Do not write migrations that permanently override future manual edits from
    the screen editor.
 
-## Bloom Migration
+## Bloom
 
-[`Bloom`](https://github.com/ISIR-EXTENDER/bloom) is the WIP next-generation
-robot UI platform. It is being developed as a monorepo that combines the
-frontend, backend API, reusable widget contracts, runtime safety rules, storage,
-and ROS adapters.
+[`Bloom`](https://github.com/ISIR-EXTENDER/bloom) is the active Extender operator
+interface: a builder, a kiosk runtime with a latched STOP, accessible input
+profiles, and its own backend with ROS adapters for `cartesian_manager`.
 
-The goal is for Bloom to replace both `extender_ui` and the current dedicated
-backend flow once the team has validated equivalent robot workflows. Until then,
-`extender_ui` and `tablet_interface` remain the stable path for integration
-week and current Sandbox V0.0 work.
-
-Migration rule of thumb:
-
-1. Keep shipping stable Extender work in `extender_ui` + `tablet_interface`.
-2. Use Sandbox V0.0 as the reference for new Extender workflows.
-3. Port accepted workflows into Bloom incrementally.
-4. Replace legacy repos only after the matching Bloom workflow is tested with
-   the robot stack and accepted by the team.
+`extender_ui` is legacy. Keep it runnable as a behaviour reference and emergency
+rollback until Bloom's live sessions are accepted, and put new screens and
+workflows in Bloom.
 
 ## Contributing
 
