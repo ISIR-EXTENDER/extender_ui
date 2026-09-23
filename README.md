@@ -1,13 +1,24 @@
 # Extender UI
 
-`extender_ui` is the current React tablet interface for the ISIR Extender robot
-stack. It provides configurable operator screens for teleoperation, sandbox
+> [!IMPORTANT]
+> **`extender_ui` is legacy and is no longer maintained.** Its last supported
+> release is tagged `v1.0.0`, together with its backend, `tablet_interface`,
+> at `tablet_interface/v1.0.0` in
+> [`input_interfaces`](https://github.com/ISIR-EXTENDER/input_interfaces).
+>
+> The operator interface for the ISIR Extender stack is now
+> **[Bloom](https://github.com/ISIR-EXTENDER/bloom)**. It speaks to
+> [`cartesian_manager`](https://github.com/ISIR-EXTENDER/cartesian_manager)
+> through its own FastAPI backend and ROS adapters, so it needs neither this
+> app nor `tablet_interface`. Put new operator work there.
+>
+> This repository stays readable for the record and for the rollback path. It
+> targets ROS 2 Humble, which the workspace retired in September 2026.
+
+`extender_ui` was the React tablet interface for the ISIR Extender robot stack.
+It provided configurable operator screens for teleoperation, sandbox
 experiments, webcam preview, visual-servoing supervision, snake control, and
 legacy app workflows.
-
-The current production-style app for new work is **Sandbox V0.0**. Petanque is
-kept as a legacy/example app family and should not be used as the default
-template for new development.
 
 <p align="center">
   <img alt="React" src="https://img.shields.io/badge/React-19-61dafb?style=for-the-badge&logo=react&logoColor=20232a" />
